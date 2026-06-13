@@ -1,0 +1,51 @@
+import { useState } from "react";
+import { View, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "./RootNavigator";
+import HomeScreen from "../screens/HomeScreen";
+import PeopleScreen from "../screens/PeopleScreen";
+import ProfileScreen from "../screens/ProfileScreen";
+import InsightsScreen from "../screens/InsightsScreen";
+import BottomTabBar from "../components/BottomTabBar";
+
+type Tab = "Home" | "People" | "Insights" | "Profile";
+
+type Props = NativeStackScreenProps<RootStackParamList, "MainTabs">;
+
+function ActiveScreen({ tab, navigation }: { tab: Tab; navigation: Props["navigation"] }) {
+  switch (tab) {
+    case "Home":     return <HomeScreen />;
+    case "People":   return <PeopleScreen navigation={navigation} />;
+    case "Insights": return <InsightsScreen />;
+    case "Profile":  return <ProfileScreen />;
+  }
+}
+
+export default function MainTabs({ navigation }: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>("Home");
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.screen}>
+        <ActiveScreen tab={activeTab} navigation={navigation} />
+      </View>
+      <BottomTabBar
+        activeTab={activeTab}
+        onTabPress={setActiveTab}
+        onAddPress={() => navigation.navigate("AddContact")}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  screen: {
+    flex: 1,
+  },
+});
