@@ -1,25 +1,44 @@
 {
   "expo": {
-    "name": "personalCRM",
+    "name": "Connectly",
     "slug": "personalCRM",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tugceulucn.personalCRM",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSContactsUsageDescription": "Rehbere erişerek kişi bilgilerini hızlıca aktarabilmen için izin istiyoruz."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#E6F8F6",
+        "foregroundImage": "./assets/app-icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tugceulucn.personalCRM"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "013bc8d8-0bce-4474-84c3-e8e0d3f696fb"
+      }
+    },
+    "plugins": [
+      "expo-sharing",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Rehbere erişerek kişi bilgilerini hızlıca aktarabilmen için izin istiyoruz."
+        }
+      ],
+      "expo-status-bar"
+    ]
   }
 }

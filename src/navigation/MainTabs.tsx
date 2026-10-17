@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { View, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "./RootNavigator";
 import HomeScreen from "../screens/HomeScreen";
@@ -15,19 +14,18 @@ type Props = NativeStackScreenProps<RootStackParamList, "MainTabs">;
 
 function ActiveScreen({ tab, navigation }: { tab: Tab; navigation: Props["navigation"] }) {
   switch (tab) {
-    case "Home":     return <HomeScreen />;
+    case "Home":     return <HomeScreen navigation={navigation} />;
     case "People":   return <PeopleScreen navigation={navigation} />;
-    case "Insights": return <InsightsScreen />;
-    case "Profile":  return <ProfileScreen />;
+    case "Insights": return <InsightsScreen navigation={navigation} />;
+    case "Profile":  return <ProfileScreen navigation={navigation} />;
   }
 }
 
 export default function MainTabs({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Home");
-  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <View style={styles.screen}>
         <ActiveScreen tab={activeTab} navigation={navigation} />
       </View>

@@ -1,0 +1,2557 @@
+[
+  {
+    "id": 1,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 2,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 3,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 4,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 5,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 6,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 7,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 8,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 9,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 10,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 11,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 12,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 13,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 14,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 15,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 16,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 17,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 18,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 19,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 20,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 21,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 22,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 23,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 24,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 25,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 26,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 27,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 28,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 29,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 30,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 31,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 32,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 33,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 34,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 35,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 36,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 37,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 38,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 39,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 40,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 41,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 42,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 43,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 44,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 45,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 46,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 47,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 48,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 49,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 50,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 51,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 52,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 53,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 54,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 55,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 56,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 57,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 58,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 59,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 60,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 61,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 62,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 63,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 64,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 65,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 66,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 67,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 68,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 69,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 70,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 71,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 72,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 73,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 74,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 75,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 76,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 77,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 78,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 79,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 80,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 81,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 82,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 83,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 84,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 85,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 86,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 87,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 88,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 89,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 90,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 91,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 92,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 93,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 94,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 95,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 96,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 97,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 98,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 99,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 100,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 101,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 102,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 103,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 104,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 105,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 106,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 107,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 108,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 109,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 110,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 111,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 112,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 113,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 114,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 115,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 116,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 117,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 118,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 119,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 120,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 121,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 122,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 123,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 124,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 125,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 126,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 127,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 128,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 129,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 130,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 131,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 132,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 133,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 134,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 135,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 136,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 137,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 138,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 139,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 140,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 141,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 142,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 143,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 144,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 145,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 146,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 147,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 148,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 149,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 150,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 151,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 152,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 153,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 154,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 155,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 156,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 157,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 158,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 159,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 160,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 161,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 162,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 163,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 164,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 165,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 166,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 167,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 168,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 169,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 170,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 171,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 172,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 173,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 174,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 175,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 176,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 177,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 178,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 179,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 180,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 181,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 182,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 183,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 184,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 185,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 186,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 187,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 188,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 189,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 190,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 191,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 192,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 193,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 194,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 195,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 196,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 197,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 198,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 199,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 200,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 201,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 202,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 203,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 204,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 205,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 206,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 207,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 208,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 209,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 210,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 211,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 212,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 213,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 214,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 215,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 216,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 217,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 218,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 219,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 220,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 221,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 222,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 223,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 224,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 225,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 226,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 227,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 228,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 229,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 230,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 231,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 232,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 233,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 234,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 235,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 236,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 237,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 238,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 239,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 240,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 241,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 242,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 243,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 244,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 245,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 246,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 247,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 248,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 249,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 250,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 251,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 252,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 253,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 254,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 255,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 256,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 257,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 258,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 259,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 260,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 261,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 262,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 263,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 264,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 265,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 266,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 267,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 268,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 269,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 270,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 271,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 272,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 273,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 274,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 275,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 276,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 277,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 278,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 279,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 280,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 281,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 282,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 283,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 284,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 285,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 286,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 287,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 288,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 289,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 290,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 291,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 292,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 293,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 294,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 295,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 296,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 297,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 298,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 299,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 300,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 301,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 302,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 303,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 304,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 305,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 306,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 307,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 308,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 309,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 310,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 311,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 312,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 313,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 314,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 315,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 316,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 317,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 318,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 319,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 320,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 321,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 322,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 323,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 324,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 325,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  },
+  {
+    "id": 326,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Eski bağlantı",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 327,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Mentor",
+    "tone": "Kısa"
+  },
+  {
+    "id": 328,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Genel",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 329,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "İş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 330,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Arkadaş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 331,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Aile",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 332,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Network",
+    "tone": "Kısa"
+  },
+  {
+    "id": 333,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Okul",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 334,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Samimi"
+  },
+  {
+    "id": 335,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Mentor",
+    "tone": "Nazik"
+  },
+  {
+    "id": 336,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Genel",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 337,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "İş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 338,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Arkadaş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 339,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Aile",
+    "tone": "Samimi"
+  },
+  {
+    "id": 340,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Network",
+    "tone": "Nazik"
+  },
+  {
+    "id": 341,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Okul",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 342,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Eski bağlantı",
+    "tone": "Kısa"
+  },
+  {
+    "id": 343,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Mentor",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 344,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Genel",
+    "tone": "Samimi"
+  },
+  {
+    "id": 345,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "İş",
+    "tone": "Nazik"
+  },
+  {
+    "id": 346,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Arkadaş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 347,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Aile",
+    "tone": "Kısa"
+  },
+  {
+    "id": 348,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Network",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 349,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Okul",
+    "tone": "Samimi"
+  },
+  {
+    "id": 350,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Eski bağlantı",
+    "tone": "Nazik"
+  },
+  {
+    "id": 351,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "Mentor",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 352,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Genel",
+    "tone": "Kısa"
+  },
+  {
+    "id": 353,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "İş",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 354,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Arkadaş",
+    "tone": "Samimi"
+  },
+  {
+    "id": 355,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Aile",
+    "tone": "Nazik"
+  },
+  {
+    "id": 356,
+    "title": "Destek mesajı",
+    "message": "Son dönemde yoğun olabileceğini düşündüm. Umarım iyi gidiyordur; bir şeye ihtiyacın olursa buradayım.",
+    "category": "Network",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 357,
+    "title": "Fırsat paylaşımı",
+    "message": "Bugün gördüğüm bir şey seni aklıma getirdi. İlgini çekebileceğini düşündüm.",
+    "category": "Okul",
+    "tone": "Kısa"
+  },
+  {
+    "id": 358,
+    "title": "Eski bağları canlandır",
+    "message": "Uzun zaman oldu. Kısa bir merhaba demek istedim; umarım keyfin yerindedir.",
+    "category": "Eski bağlantı",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 359,
+    "title": "Profesyonel takip",
+    "message": "Merhaba, uygun olduğunda kısa bir görüşme ayarlayabilir miyiz? Güncel durumunu duymak isterim.",
+    "category": "Mentor",
+    "tone": "Samimi"
+  },
+  {
+    "id": 360,
+    "title": "Teşekkür mesajı",
+    "message": "Geçmişteki desteğin aklıma geldi. Tekrar teşekkür etmek istedim; umarım iyisindir.",
+    "category": "Genel",
+    "tone": "Nazik"
+  },
+  {
+    "id": 361,
+    "title": "Kısa check-in",
+    "message": "Merhaba, nasılsın? Uzun zamandır konuşamadık; aklıma geldin, kısaca halini sormak istedim.",
+    "category": "İş",
+    "tone": "Sıcak"
+  },
+  {
+    "id": 362,
+    "title": "İş odaklı temas",
+    "message": "Selam, son dönemde işlerin nasıl gidiyor? Uygun olduğunda kısa bir güncelleşmek isterim.",
+    "category": "Arkadaş",
+    "tone": "Kısa"
+  },
+  {
+    "id": 363,
+    "title": "Samimi hatırlatma",
+    "message": "Bugün aklıma geldin. Umarım her şey yolundadır; müsait olduğunda haberleşelim.",
+    "category": "Aile",
+    "tone": "Profesyonel"
+  },
+  {
+    "id": 364,
+    "title": "Kahve daveti",
+    "message": "Bu hafta ya da önümüzdeki hafta kısa bir kahve molası yapalım mı? Seni dinlemek isterim.",
+    "category": "Network",
+    "tone": "Samimi"
+  },
+  {
+    "id": 365,
+    "title": "Notlardan devam",
+    "message": "Geçen konuştuğumuz konu aklıma geldi. Nasıl ilerledi, merak ettim.",
+    "category": "Okul",
+    "tone": "Nazik"
+  }
+]

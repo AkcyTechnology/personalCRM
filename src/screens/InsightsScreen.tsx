@@ -1,296 +1,1313 @@
-import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useState, useCallback, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  StatusBar,
+  TouchableOpacity,
+  useWindowDimensions,
+} from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { loadContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
-import insightsJson from "../data/insightsData.json";
 import type { ContactForm } from "./AddContactScreen";
+import { colors } from "../theme/colors";
+import { isDue, isSnoozed, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
+import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
+import HealthInfoModal from "../components/HealthInfoModal";
 
-const PURPLE = "#7C3AED";
-const BG     = "#FAF9FF";
-const CARD   = "#FFFFFF";
-const BORDER = "#ECE8F7";
-const TEXT   = "#191826";
-const MUTED  = "#8E8AA3";
-const GREEN  = "#22C55E";
-const ORANGE = "#F59E0B";
-const RED    = "#EF4444";
+const TEAL = "#00B5AC";
+const TEAL_DARK = "#008E88";
+const TEXT = "#111827";
+const SUB = "#687084";
+const MUTED = "#9AA3B2";
+const BORDER = "#E8ECF3";
+const SOFT = "#F8FAFC";
+const WHITE = "#FFFFFF";
 
-function daysSince(iso: string) {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+type InsightTone = "teal" | "green" | "amber" | "red" | "blue" | "purple";
+
+function safeDate(iso?: string) {
+  if (!iso) return null;
+
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function daysSince(iso?: string) {
+  const date = safeDate(iso);
+  if (!date) return 9999;
+
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
 }
 
 function initials(name: string) {
-  return name.trim().split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
+  return name
+    .trim()
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function avatarColor(name: string) {
-  const p = ["#7C3AED","#2563EB","#059669","#D97706","#0891B2","#9333EA"];
-  let h = 0; for (const c of name) h += c.charCodeAt(0);
-  return p[h % p.length];
+  const palette = [TEAL, "#7C3AED", "#0369A1", colors.success, colors.warning];
+
+  let h = 0;
+  for (const c of name) h += c.charCodeAt(0);
+
+  return palette[h % palette.length];
 }
 
-export default function InsightsScreen() {
-  const insets = useSafeAreaInsets();
+function clamp(n: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, n));
+}
 
-  const [contacts,  setContacts]  = useState<ContactForm[]>([]);
-  const [threshold, setThreshold] = useState(14);
+function nextBirthdayInfo(birthday?: string) {
+  if (!birthday) return null;
 
-  useFocusEffect(useCallback(() => {
-    Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
-      setContacts(c);
-      setThreshold(s.reachOutThresholdDays);
-    });
-  }, []));
+  const parts = birthday.split(/[./-]/).map(Number);
 
-  // ── Hesaplanan metrikler ──────────────────────────────────────────────────
+  let day: number | undefined;
+  let month: number | undefined;
+
+  if (parts.length >= 3) {
+    if (String(parts[0]).length === 4) {
+      month = parts[1];
+      day = parts[2];
+    } else {
+      day = parts[0];
+      month = parts[1];
+    }
+  }
+
+  if (!day || !month || day < 1 || day > 31 || month < 1 || month > 12) {
+    return null;
+  }
+
   const now = new Date();
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const next = new Date(now.getFullYear(), month - 1, day);
 
-  // Bu hafta iletişime geçilenler (lastContactDate son 7 gün içinde)
-  const contactedThisWeek = contacts.filter(c =>
-    new Date(c.lastContactDate) >= weekStart
+  if (next < today) {
+    next.setFullYear(now.getFullYear() + 1);
+  }
+
+  const daysLeft = Math.ceil((next.getTime() - today.getTime()) / 86_400_000);
+
+  return {
+    daysLeft,
+    label: daysLeft === 0 ? "Bugün" : `${daysLeft} gün kaldı`,
+  };
+}
+
+function contactSubtitle(c: ContactForm) {
+  return [c.jobTitle, c.company].filter(Boolean).join(" · ") || c.relationship || "Kişisel bağlantı";
+}
+
+function dayLabel(days: number) {
+  if (days <= 0) return "Bugün";
+  if (days === 1) return "Dün";
+  if (days >= 9999) return "Tarih yok";
+
+  return `${days} gün önce`;
+}
+
+function toneColor(tone: InsightTone) {
+  const map: Record<InsightTone, string> = {
+    teal: TEAL,
+    green: colors.success,
+    amber: colors.warning,
+    red: colors.danger,
+    blue: "#0369A1",
+    purple: "#7C3AED",
+  };
+
+  return map[tone];
+}
+
+export default function InsightsScreen({ navigation }: any) {
+  const { width } = useWindowDimensions();
+
+  const [contacts, setContacts] = useState<ContactForm[]>([]);
+  const [threshold, setThreshold] = useState(14);
+  const [healthInfoOpen, setHealthInfoOpen] = useState(false);
+
+  const isCompact = width < 380;
+
+  useFocusEffect(
+    useCallback(() => {
+      Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
+        setContacts(c);
+        setThreshold(s.reachOutThresholdDays || 14);
+      });
+    }, [])
   );
 
-  // Eşiği aşmış → ulaş listesi
-  const needsAttention = contacts
-    .filter(c => daysSince(c.lastContactDate) >= threshold)
-    .sort((a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate));
+  const data = useMemo(() => {
+    const active = contacts.filter((c) => !isSnoozed(c));
 
-  // Sağlık skoru: ortalama "tazelik" puanı (0-100)
-  const healthScore = contacts.length === 0 ? 0 : Math.round(
-    contacts.reduce((sum, c) => {
-      const d = daysSince(c.lastContactDate);
-      return sum + Math.max(0, 100 - Math.round((d / threshold) * 100));
-    }, 0) / contacts.length
-  );
+    const contactedThisWeek = active.filter((c) => daysSince(c.lastContactDate) <= 7);
 
-  // Weekly summary metni
-  const summaryDesc = insightsJson.summary.descriptionTemplate
-    .replace("{contactedCount}", String(contactedThisWeek.length))
-    .replace("{weeklyChange}", `+${insightsJson.summary.weeklyChange}`);
+    const needsAttention = [...active]
+      .filter((c) => isDue(c, threshold))
+      .sort((a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate));
 
-  // Health trend: JSON'dan al ama son değeri gerçek skorla güncelle
-  const healthTrend = insightsJson.healthTrend.map((item, i, arr) =>
-    i === arr.length - 1 ? { ...item, value: healthScore } : item
-  );
+    const atRisk = [...active]
+      .filter((c) => {
+        const d = daysSince(c.lastContactDate);
+        const interval = effectiveIntervalDays(c, threshold);
+        return d >= Math.floor(interval * 0.7) && d < interval;
+      })
+      .sort((a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate));
 
-  const maxTrend = Math.max(...healthTrend.map(i => i.value), 1);
-  const maxComm  = Math.max(...insightsJson.communication.map(i => i.count), 1);
+    const strongConnections = [...active]
+      .filter((c) => daysSince(c.lastContactDate) <= 7)
+      .sort((a, b) => daysSince(a.lastContactDate) - daysSince(b.lastContactDate));
 
-  const stats = [
-    { label: "Toplam kişi",          value: contacts.length,          change: "+0" },
-    { label: "Bu hafta iletişim",    value: contactedThisWeek.length, change: `+${insightsJson.summary.weeklyChange}` },
-    { label: "Bekleyen hatırlatma",  value: needsAttention.length,    change: needsAttention.length > 0 ? `+${needsAttention.length}` : "0" },
-  ];
+    const mostNeglected = [...active]
+      .filter((c) => neglectScore(c, threshold) > 0)
+      .sort((a, b) => neglectScore(b, threshold) - neglectScore(a, threshold))
+      .slice(0, 5);
+
+    const birthdayList = active
+      .map((c) => ({
+        contact: c,
+        birthday: nextBirthdayInfo(c.birthday),
+      }))
+      .filter(
+        (
+          x
+        ): x is {
+          contact: ContactForm;
+          birthday: { daysLeft: number; label: string };
+        } => !!x.birthday && x.birthday.daysLeft <= 30
+      )
+      .sort((a, b) => a.birthday.daysLeft - b.birthday.daysLeft);
+
+    const relationshipCounts = contacts.reduce<Record<string, number>>((acc, c) => {
+      const key = (c.relationship || "Diğer").trim() || "Diğer";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const relationshipMix = Object.entries(relationshipCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const averageHealth = averageHealthScore(active, threshold);
+
+    const weeklyGoal = Math.min(Math.max(3, Math.ceil(contacts.length * 0.15)), 8);
+
+    const weeklyProgress =
+      active.length === 0
+        ? 0
+        : clamp(Math.round((contactedThisWeek.length / weeklyGoal) * 100));
+
+    const healthyConnections =
+      active.length === 0
+        ? 0
+        : clamp(Math.round(((active.length - needsAttention.length) / active.length) * 100));
+
+    const focusText =
+      needsAttention.length > 0
+        ? `${needsAttention.length} kişi yeniden temas bekliyor`
+        : atRisk.length > 0
+        ? `${atRisk.length} bağlantı takip edilmeli`
+        : "Bağlantıların dengeli görünüyor";
+
+    const insightText =
+      needsAttention.length > 0
+        ? `${needsAttention[0].fullName} ile ${daysSince(
+            needsAttention[0].lastContactDate
+          )} gündür iletişim yok.`
+        : atRisk.length > 0
+        ? `${atRisk[0].fullName} için ${effectiveIntervalDays(atRisk[0], threshold) - daysSince(atRisk[0].lastContactDate)} gün kaldı.`
+        : contactedThisWeek.length > 0
+        ? `Bu hafta ${contactedThisWeek.length} kişiyle temas kurdun.`
+        : "Bu hafta henüz temas görünmüyor.";
+
+    return {
+      contactedThisWeek,
+      needsAttention,
+      atRisk,
+      strongConnections,
+      mostNeglected,
+      birthdayList,
+      relationshipMix,
+      averageHealth,
+      weeklyGoal,
+      weeklyProgress,
+      healthyConnections,
+      focusText,
+      insightText,
+    };
+  }, [contacts, threshold]);
+
+  const priorityList = [...data.needsAttention, ...data.atRisk]
+    .sort((a, b) => neglectScore(b, threshold) - neglectScore(a, threshold))
+    .slice(0, 4);
 
   return (
     <View style={styles.screen}>
+      <InsightsHeader health={data.averageHealth} />
+
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[
+          styles.content,
+          isCompact && styles.contentCompact,
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Insights</Text>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroTextWrap}>
+              <Text style={styles.heroKicker}>Genel görünüm</Text>
+              <Text style={styles.heroTitle}>{data.focusText}</Text>
+              <Text style={styles.heroDesc}>{data.insightText}</Text>
+            </View>
 
-        {/* ── Weekly Summary ── */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>HAFTALIK ÖZET</Text>
-          <Text style={styles.summaryText}>{summaryDesc}</Text>
-          <View style={styles.summaryStats}>
-            <MiniStat label="Sağlık" value={healthScore} suffix="/100" />
-            <MiniStat label="Değişim" value={insightsJson.summary.weeklyChange} prefix="+" />
-            <MiniStat label="En iyi" value={insightsJson.summary.bestImprovementValue} prefix="+" />
+            <HealthBadge value={data.averageHealth} />
           </View>
-        </View>
 
-        {/* ── Stat Cards ── */}
-        <View style={styles.statsGrid}>
-          {stats.map(item => (
-            <View key={item.label} style={styles.statCard}>
-              <Text style={styles.statValue}>{item.value}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
-              <Text style={[styles.statChange, item.change.startsWith("-") && { color: RED }]}>
-                {item.change}
+          <View style={styles.heroProgressBlock}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Haftalık hedef</Text>
+              <Text style={styles.progressValue}>
+                {data.contactedThisWeek.length}/{data.weeklyGoal}
               </Text>
             </View>
-          ))}
+
+            <ProgressBar value={data.weeklyProgress} color={TEAL} />
+          </View>
         </View>
 
-        {/* ── Health Trend Chart ── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>İlişki Sağlığı Trendi</Text>
-          <Text style={styles.cardSubtitle}>Son 5 ay — son değer anlık hesaplama</Text>
-          <View style={styles.lineChart}>
-            {healthTrend.map((item, idx) => {
-              const isLast = idx === healthTrend.length - 1;
+        <View style={styles.metricsGrid}>
+          <MetricCard
+            label="Toplam"
+            value={contacts.length}
+            caption="Kayıtlı kişi"
+            tone="teal"
+          />
+
+          <MetricCard
+            label="Bu hafta"
+            value={data.contactedThisWeek.length}
+            caption="Temas kuruldu"
+            tone="green"
+          />
+
+          <MetricCard
+            label="Bekleyen"
+            value={data.needsAttention.length}
+            caption="Ulaşılacak kişi"
+            tone="red"
+          />
+
+          <MetricCard
+            label="Özel gün"
+            value={data.birthdayList.length}
+            caption="30 gün içinde"
+            tone="amber"
+          />
+        </View>
+
+        <SectionTitle
+          title="Öncelikli bağlantılar"
+          subtitle="Bugün ilgilenmen iyi olabilecek kişiler"
+        />
+
+        {priorityList.length > 0 ? (
+          <View style={styles.stack}>
+            {priorityList.map((c, i) => {
+              const days = daysSince(c.lastContactDate);
+              const interval = effectiveIntervalDays(c, threshold);
+              const isLate = days >= interval;
+
               return (
-                <View key={item.month} style={styles.lineItem}>
-                  <Text style={[styles.chartValue, isLast && { color: PURPLE, fontWeight: "700" }]}>
-                    {item.value}
-                  </Text>
-                  <View style={[
-                    styles.lineDot,
-                    { marginTop: 90 - Math.round((item.value / maxTrend) * 70) },
-                    isLast && { backgroundColor: GREEN, width: 14, height: 14, borderRadius: 7 },
-                  ]} />
-                  <Text style={[styles.chartLabel, isLast && { color: PURPLE }]}>{item.month}</Text>
-                </View>
+                <PriorityCard
+                  key={`${c.fullName}-${i}`}
+                  contact={c}
+                  label={isLate ? `${days} gündür yok` : `${interval - days} gün kaldı`}
+                  tone={isLate ? colors.danger : colors.warning}
+                  onPress={() => navigation.navigate("PersonDetail", { contact: c })}
+                />
               );
             })}
           </View>
-        </View>
-
-        {/* ── Communication Bar Chart ── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Bu Hafta İletişim</Text>
-          <Text style={styles.cardSubtitle}>Günlük etkileşim sayısı</Text>
-          <View style={styles.barChart}>
-            {insightsJson.communication.map((item, idx) => (
-              <View key={`${item.day}-${idx}`} style={styles.barItem}>
-                <View style={[styles.bar, { height: 18 + Math.round((item.count / maxComm) * 56) }]} />
-                <Text style={styles.chartLabel}>{item.day}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* ── Öngörüler (JSON) ── */}
-        <Text style={styles.sectionTitle}>Öngörüler</Text>
-        {insightsJson.recommendations.map(item => (
-          <View key={item.title} style={styles.recommendationCard}>
-            <View style={[styles.levelDot, getLevelStyle(item.level)]} />
-            <View style={styles.recommendationInfo}>
-              <Text style={styles.recommendationTitle}>{item.level} · {item.title}</Text>
-              <Text style={styles.recommendationDesc}>{item.description}</Text>
-            </View>
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionText}>{item.action}</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {/* ── Dikkat Gereken Kişi (gerçek veri) ── */}
-        {needsAttention.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Dikkat Gerekiyor</Text>
-            {needsAttention.slice(0, 3).map((c, i) => {
-              const color = avatarColor(c.fullName);
-              const days  = daysSince(c.lastContactDate);
-              return (
-                <View key={i} style={styles.warningCard}>
-                  <View style={[styles.warningAvatar, { backgroundColor: color + "20" }]}>
-                    <Text style={[styles.warningAvatarText, { color }]}>{initials(c.fullName)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.warningTitle}>{days > 30 ? "Uzun süredir yok" : "Yakında eşik"}</Text>
-                    <Text style={styles.warningName}>{c.fullName}</Text>
-                    <Text style={styles.warningDesc}>{days} gündür iletişim yok</Text>
-                  </View>
-                  <TouchableOpacity style={styles.warningButton}>
-                    <Text style={styles.warningButtonText}>Ulaş</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </>
+        ) : (
+          <EmptyState
+            title="Kritik bağlantı yok"
+            desc="Yaklaşan veya geciken kişi görünmüyor. Ağın şu an dengeli."
+          />
         )}
+
+        {data.birthdayList.length > 0 ? (
+          <>
+            <SectionTitle
+              title="Yaklaşan özel günler"
+              subtitle="Önceden hazırlık yapabileceğin kişiler"
+            />
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.birthdayRow}
+            >
+              {data.birthdayList.slice(0, 8).map(({ contact, birthday }, i) => (
+                <BirthdayCard
+                  key={`${contact.fullName}-${i}`}
+                  contact={contact}
+                  label={birthday.label}
+                  onPress={() => navigation.navigate("PersonDetail", { contact })}
+                />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
+
+        <SectionTitle
+          title="İlişki sağlığı"
+          subtitle="Bağlantı ağının güncel performansı"
+          onInfoPress={() => setHealthInfoOpen(true)}
+        />
+
+        <View style={styles.card}>
+          <HealthRow
+            label="Genel sağlık"
+            value={data.averageHealth}
+            color={healthScoreColor(data.averageHealth)}
+          />
+
+          <HealthRow
+            label="Haftalık hedef"
+            value={data.weeklyProgress}
+            color={TEAL}
+          />
+
+          <HealthRow
+            label="Sağlıklı bağlantılar"
+            value={data.healthyConnections}
+            color="#7C3AED"
+            last
+          />
+        </View>
+
+        {data.relationshipMix.length > 0 ? (
+          <>
+            <SectionTitle
+              title="Bağlantı dağılımı"
+              subtitle="Kişilerin ilişki türlerine göre dağılımı"
+            />
+
+            <View style={styles.card}>
+              {data.relationshipMix.map(([label, count], i) => (
+                <MixRow
+                  key={label}
+                  label={label}
+                  count={count}
+                  total={contacts.length}
+                  color={[TEAL, "#0369A1", colors.success, colors.warning, "#7C3AED"][i % 5]}
+                  last={i === data.relationshipMix.length - 1}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {data.strongConnections.length > 0 ? (
+          <>
+            <SectionTitle
+              title="Güçlü bağlantılar"
+              subtitle="Son günlerde temas kurduğun kişiler"
+            />
+
+            <View style={styles.stack}>
+              {data.strongConnections.slice(0, 4).map((c, i) => (
+                <CompactPerson
+                  key={`${c.fullName}-strong-${i}`}
+                  contact={c}
+                  rightText={dayLabel(daysSince(c.lastContactDate))}
+                  onPress={() => navigation.navigate("PersonDetail", { contact: c })}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {data.mostNeglected.length > 0 ? (
+          <>
+            <SectionTitle
+              title="En çok ihmal edilen kişiler"
+              subtitle="İletişim aralığını en çok aşan bağlantılar"
+            />
+
+            <View style={styles.stack}>
+              {data.mostNeglected.map((c, i) => (
+                <CompactPerson
+                  key={`${c.fullName}-neglected-${i}`}
+                  contact={c}
+                  rightText={dayLabel(daysSince(c.lastContactDate))}
+                  onPress={() => navigation.navigate("PersonDetail", { contact: c })}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
+
+      <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function MiniStat({ label, value, prefix = "", suffix = "" }: {
-  label: string; value: number; prefix?: string; suffix?: string;
+function InsightsHeader({ health }: { health: number }) {
+  return (
+    <View style={styles.appBar}>
+      <View style={styles.appBarText}>
+        <Text style={styles.appTitle}>Analiz</Text>
+        <Text style={styles.appSubtitle}>İlişki ağının güncel durumu</Text>
+      </View>
+
+      <View style={styles.headerBadge}>
+        <Text style={styles.headerBadgeValue}>{health}</Text>
+        <Text style={styles.headerBadgeLabel}>/100</Text>
+      </View>
+    </View>
+  );
+}
+
+function HealthBadge({ value }: { value: number }) {
+  return (
+    <View style={styles.healthBadge}>
+      <Text style={styles.healthBadgeValue}>{value}</Text>
+      <Text style={styles.healthBadgeLabel}>Skor</Text>
+    </View>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  label: string;
+  value: number;
+  caption: string;
+  tone: InsightTone;
+}) {
+  const color = toneColor(tone);
+
+  return (
+    <View style={styles.metricCard}>
+      <View style={styles.metricTop}>
+        <View style={[styles.metricMark, { backgroundColor: color + "18" }]}>
+          <View style={[styles.metricDot, { backgroundColor: color }]} />
+        </View>
+
+        <Text style={[styles.metricValue, { color }]}>{value}</Text>
+      </View>
+
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricCaption}>{caption}</Text>
+    </View>
+  );
+}
+
+function SectionTitle({
+  title,
+  subtitle,
+  onInfoPress,
+}: {
+  title: string;
+  subtitle?: string;
+  onInfoPress?: () => void;
 }) {
   return (
-    <View style={styles.miniStat}>
-      <Text style={styles.miniValue}>{prefix}{value}{suffix}</Text>
-      <Text style={styles.miniLabel}>{label}</Text>
+    <View style={styles.sectionHeader}>
+      <View style={{ flex: 1 }}>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {onInfoPress ? (
+            <TouchableOpacity onPress={onInfoPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.sectionInfoIcon}>ⓘ</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      </View>
     </View>
   );
 }
 
-function getLevelStyle(level: string) {
-  if (level === "High")   return { backgroundColor: RED };
-  if (level === "Medium") return { backgroundColor: ORANGE };
-  return { backgroundColor: GREEN };
+function PriorityCard({
+  contact,
+  label,
+  tone,
+  onPress,
+}: {
+  contact: ContactForm;
+  label: string;
+  tone: string;
+  onPress?: () => void;
+}) {
+  const color = avatarColor(contact.fullName);
+
+  return (
+    <TouchableOpacity style={styles.priorityCard} onPress={onPress} activeOpacity={0.75}>
+      <View
+        style={[
+          styles.avatar,
+          {
+            backgroundColor: color + "16",
+            borderColor: color + "35",
+          },
+        ]}
+      >
+        <Text style={[styles.avatarText, { color }]}>{initials(contact.fullName)}</Text>
+      </View>
+
+      <View style={styles.personInfo}>
+        <Text style={styles.personName} numberOfLines={1}>
+          {contact.fullName}
+        </Text>
+
+        <Text style={styles.personSub} numberOfLines={1}>
+          {contactSubtitle(contact)}
+        </Text>
+      </View>
+
+      <View style={[styles.statusPill, { backgroundColor: tone + "14" }]}>
+        <Text style={[styles.statusText, { color: tone }]}>{label}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+function BirthdayCard({
+  contact,
+  label,
+  onPress,
+}: {
+  contact: ContactForm;
+  label: string;
+  onPress?: () => void;
+}) {
+  const color = avatarColor(contact.fullName);
+
+  return (
+    <TouchableOpacity style={styles.birthdayCard} onPress={onPress} activeOpacity={0.75}>
+      <View
+        style={[
+          styles.birthdayAvatar,
+          {
+            backgroundColor: color + "16",
+            borderColor: color + "30",
+          },
+        ]}
+      >
+        <Text style={[styles.birthdayInitials, { color }]}>
+          {initials(contact.fullName)}
+        </Text>
+      </View>
+
+      <Text style={styles.birthdayName} numberOfLines={1}>
+        {contact.fullName.split(" ")[0]}
+      </Text>
+
+      <Text style={styles.birthdayLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function HealthRow({
+  label,
+  value,
+  color,
+  last,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.healthRow, !last && styles.rowDivider]}>
+      <View style={styles.healthRowTop}>
+        <Text style={styles.healthRowLabel}>{label}</Text>
+        <Text style={[styles.healthRowValue, { color }]}>{value}%</Text>
+      </View>
+
+      <ProgressBar value={value} color={color} />
+    </View>
+  );
+}
+
+function ProgressBar({
+  value,
+  color,
+}: {
+  value: number;
+  color: string;
+}) {
+  return (
+    <View style={styles.progressTrack}>
+      <View
+        style={[
+          styles.progressFill,
+          {
+            width: `${clamp(value)}%`,
+            backgroundColor: color,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+function MixRow({
+  label,
+  count,
+  total,
+  color,
+  last,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+  last?: boolean;
+}) {
+  const pct = total === 0 ? 0 : Math.round((count / total) * 100);
+
+  return (
+    <View style={[styles.mixRow, !last && styles.rowDivider]}>
+      <View style={[styles.mixDot, { backgroundColor: color }]} />
+
+      <View style={styles.mixInfo}>
+        <Text style={styles.mixLabel}>{label}</Text>
+        <View style={styles.mixProgressTrack}>
+          <View
+            style={[
+              styles.mixProgressFill,
+              {
+                width: `${pct}%`,
+                backgroundColor: color,
+              },
+            ]}
+          />
+        </View>
+      </View>
+
+      <View style={styles.mixRight}>
+        <Text style={styles.mixCount}>{count}</Text>
+        <Text style={styles.mixPct}>{pct}%</Text>
+      </View>
+    </View>
+  );
+}
+
+function CompactPerson({
+  contact,
+  rightText,
+  onPress,
+}: {
+  contact: ContactForm;
+  rightText: string;
+  onPress?: () => void;
+}) {
+  const color = avatarColor(contact.fullName);
+
+  return (
+    <TouchableOpacity style={styles.compactRow} onPress={onPress} activeOpacity={0.75}>
+      <View
+        style={[
+          styles.compactAvatar,
+          {
+            backgroundColor: color + "16",
+            borderColor: color + "30",
+          },
+        ]}
+      >
+        <Text style={[styles.compactInitials, { color }]}>
+          {initials(contact.fullName)}
+        </Text>
+      </View>
+
+      <View style={styles.personInfo}>
+        <Text style={styles.personName} numberOfLines={1}>
+          {contact.fullName}
+        </Text>
+
+        <Text style={styles.personSub} numberOfLines={1}>
+          {contactSubtitle(contact)}
+        </Text>
+      </View>
+
+      <Text style={styles.rightLabel}>{rightText}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function EmptyState({
+  title,
+  desc,
+}: {
+  title: string;
+  desc: string;
+}) {
+  return (
+    <View style={styles.emptyCard}>
+      <View style={styles.emptyMark}>
+        <Text style={styles.emptyMarkText}>✓</Text>
+      </View>
+
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyDesc}>{desc}</Text>
+    </View>
+  );
+}
+
+const TOP_SAFE =
+  Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 10 : 54;
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: BG },
-  content: { paddingHorizontal: 22, paddingBottom: 120 },
-
-  title: { fontSize: 26, fontWeight: "900", color: TEXT, marginBottom: 22 },
-
-  summaryCard: {
-    backgroundColor: "#9B7CFF", borderRadius: 18, padding: 20,
-    shadowColor: PURPLE, shadowOpacity: 0.22, shadowRadius: 16, elevation: 7,
+  screen: {
+    flex: 1,
+    backgroundColor: WHITE,
   },
-  summaryLabel: { color: "#F3EFFF", fontSize: 11, fontWeight: "900", marginBottom: 10, letterSpacing: 0.8 },
-  summaryText: { color: "#FFFFFF", fontSize: 14, lineHeight: 21, fontWeight: "600" },
-  summaryStats: { flexDirection: "row", marginTop: 16, gap: 10 },
-  miniStat: { flex: 1, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 12, padding: 11 },
-  miniValue: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
-  miniLabel: { color: "#EFEAFF", fontSize: 11, marginTop: 3 },
 
-  statsGrid: { flexDirection: "row", gap: 10, marginTop: 14 },
-  statCard: {
-    flex: 1, backgroundColor: CARD, borderRadius: 14,
-    borderWidth: 1, borderColor: BORDER, padding: 13,
+  appBar: {
+    paddingTop: TOP_SAFE,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F2F6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  statValue: { fontSize: 22, fontWeight: "900", color: TEXT },
-  statLabel: { marginTop: 5, fontSize: 11, color: MUTED },
-  statChange: { marginTop: 7, color: GREEN, fontSize: 12, fontWeight: "800" },
 
-  card: {
-    marginTop: 16, backgroundColor: CARD, borderRadius: 16,
-    borderWidth: 1, borderColor: BORDER, padding: 16,
+  appBarText: {
+    flex: 1,
+    paddingRight: 16,
   },
-  cardTitle: { fontSize: 15, fontWeight: "800", color: TEXT },
-  cardSubtitle: { marginTop: 3, fontSize: 11, color: MUTED },
 
-  lineChart: { height: 140, marginTop: 14, flexDirection: "row", justifyContent: "space-between" },
-  lineItem: { alignItems: "center", flex: 1 },
-  chartValue: { fontSize: 10, color: MUTED },
-  lineDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: PURPLE },
-  chartLabel: { marginTop: 7, fontSize: 11, color: MUTED, fontWeight: "700" },
-
-  barChart: {
-    marginTop: 18, height: 100,
-    flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between",
+  appTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: TEXT,
+    letterSpacing: -0.5,
   },
-  barItem: { alignItems: "center", flex: 1 },
-  bar: { width: 22, borderRadius: 6, backgroundColor: "#8B5CF6" },
 
-  sectionTitle: { marginTop: 22, marginBottom: 12, fontSize: 16, fontWeight: "800", color: TEXT },
-
-  recommendationCard: {
-    backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
-    padding: 14, flexDirection: "row", alignItems: "center", marginBottom: 10,
+  appSubtitle: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18,
+    color: SUB,
+    fontWeight: "500",
   },
-  levelDot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  recommendationInfo: { flex: 1 },
-  recommendationTitle: { fontSize: 13, color: TEXT, fontWeight: "800" },
-  recommendationDesc: { marginTop: 4, fontSize: 12, color: MUTED, lineHeight: 17 },
-  actionButton: { backgroundColor: "#F1ECFF", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  actionText: { color: PURPLE, fontSize: 12, fontWeight: "800" },
 
-  warningCard: {
-    backgroundColor: "#FFF7F7", borderColor: "#FFE1E1", borderWidth: 1,
-    borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center",
+  headerBadge: {
+    minWidth: 66,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#E6FAF8",
+    borderWidth: 1,
+    borderColor: "#BDEDEA",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  headerBadgeValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: TEAL_DARK,
+  },
+
+  headerBadgeLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: TEAL_DARK,
+    opacity: 0.75,
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 112,
+  },
+
+  contentCompact: {
+    paddingHorizontal: 16,
+  },
+
+  heroCard: {
+    backgroundColor: WHITE,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#64748B",
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
+  },
+
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+
+  heroTextWrap: {
+    flex: 1,
+  },
+
+  heroKicker: {
+    fontSize: 12,
+    color: TEAL_DARK,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+
+  heroTitle: {
+    marginTop: 7,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "700",
+    color: TEXT,
+    letterSpacing: -0.4,
+  },
+
+  heroDesc: {
+    marginTop: 7,
+    fontSize: 13,
+    color: SUB,
+    lineHeight: 19,
+    fontWeight: "500",
+  },
+
+  healthBadge: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: "#F3FFFE",
+    borderWidth: 8,
+    borderColor: "#D9F3F1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  healthBadgeValue: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "700",
+    color: TEAL_DARK,
+  },
+
+  healthBadgeLabel: {
+    marginTop: 1,
+    fontSize: 10,
+    fontWeight: "600",
+    color: SUB,
+  },
+
+  heroProgressBlock: {
+    marginTop: 18,
+  },
+
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  progressLabel: {
+    fontSize: 12,
+    color: SUB,
+    fontWeight: "600",
+  },
+
+  progressValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: TEXT,
+  },
+
+  progressTrack: {
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: "#EEF1F6",
+    overflow: "hidden",
+  },
+
+  progressFill: {
+    height: 7,
+    borderRadius: 999,
+  },
+
+  metricsGrid: {
+    marginTop: 16,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  metricCard: {
+    flexGrow: 1,
+    flexBasis: "47%",
+    minWidth: 145,
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 15,
+  },
+
+  metricTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  metricMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  metricDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+
+  metricValue: {
+    fontSize: 25,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+  },
+
+  metricLabel: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEXT,
+  },
+
+  metricCaption: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    color: SUB,
+  },
+
+  sectionHeader: {
+    marginTop: 24,
     marginBottom: 10,
   },
-  warningAvatar: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: "center", justifyContent: "center", marginRight: 12,
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: TEXT,
+    letterSpacing: -0.3,
   },
-  warningAvatarText: { fontWeight: "900", fontSize: 14 },
-  warningTitle: { color: RED, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  warningName: { marginTop: 3, color: TEXT, fontSize: 13, fontWeight: "800" },
-  warningDesc: { marginTop: 2, color: MUTED, fontSize: 11 },
-  warningButton: { backgroundColor: PURPLE, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
-  warningButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  sectionInfoIcon: {
+    fontSize: 13,
+    color: MUTED,
+  },
+
+  sectionSubtitle: {
+    marginTop: 4,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: SUB,
+  },
+
+  stack: {
+    gap: 9,
+  },
+
+  card: {
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: "hidden",
+  },
+
+  priorityCard: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  avatarText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  personInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  personName: {
+    fontSize: 14.5,
+    fontWeight: "700",
+    color: TEXT,
+  },
+
+  personSub: {
+    marginTop: 4,
+    fontSize: 12.5,
+    color: SUB,
+    lineHeight: 17,
+  },
+
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+
+  statusText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+
+  birthdayRow: {
+    gap: 10,
+    paddingRight: 4,
+    paddingBottom: 2,
+  },
+
+  birthdayCard: {
+    width: 104,
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 14,
+    alignItems: "center",
+  },
+
+  birthdayAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+  },
+
+  birthdayInitials: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  birthdayName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: TEXT,
+    textAlign: "center",
+  },
+
+  birthdayLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    color: SUB,
+    textAlign: "center",
+  },
+
+  healthRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF1F6",
+  },
+
+  healthRowTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  healthRowLabel: {
+    fontSize: 13.5,
+    color: TEXT,
+    fontWeight: "600",
+  },
+
+  healthRowValue: {
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
+
+  mixRow: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  mixDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+  },
+
+  mixInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  mixLabel: {
+    fontSize: 13.5,
+    color: TEXT,
+    fontWeight: "600",
+  },
+
+  mixProgressTrack: {
+    marginTop: 7,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#EEF1F6",
+    overflow: "hidden",
+  },
+
+  mixProgressFill: {
+    height: 5,
+    borderRadius: 999,
+  },
+
+  mixRight: {
+    minWidth: 48,
+    alignItems: "flex-end",
+  },
+
+  mixCount: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEXT,
+  },
+
+  mixPct: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: SUB,
+  },
+
+  compactRow: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  compactAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  compactInitials: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  rightLabel: {
+    fontSize: 12,
+    color: SUB,
+    fontWeight: "600",
+  },
+
+  emptyCard: {
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 22,
+    alignItems: "center",
+  },
+
+  emptyMark: {
+    width: 52,
+    height: 52,
+    borderRadius: 20,
+    backgroundColor: "#E6FAF8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+
+  emptyMarkText: {
+    fontSize: 24,
+    color: TEAL_DARK,
+    fontWeight: "700",
+  },
+
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: TEXT,
+  },
+
+  emptyDesc: {
+    marginTop: 6,
+    fontSize: 12.5,
+    color: SUB,
+    lineHeight: 18,
+    textAlign: "center",
+  },
 });

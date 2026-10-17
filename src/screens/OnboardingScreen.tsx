@@ -3,233 +3,231 @@ import {
   View,
   Text,
   Image,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Animated,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { colors } from "../theme/colors";
 
-const slides = [
+const TEAL = colors.primary;
+
+const SLIDES = [
   {
     id: "1",
-    title: "Never lose important relationships.",
-    description: "Your AI relationship memory.",
-    button: "Get Started",
+    image: require("../../assets/onboarding1.png"),
+    title: "İlişkilerini\nunutma.",
+    desc: "Yakın çevreni, iş bağlantılarını ve özel günleri tek yerde takip et.",
+    btn: "Devam",
   },
   {
     id: "2",
-    title: "Remember what matters.",
-    description:
-      "Kin uses AI to remember important moments, conversations, and details about the people you care about.",
-    button: "Continue",
+    image: require("../../assets/onboarding2.png"),
+    title: "Doğru zamanda\nhatırla.",
+    desc: "Her kişi için iletişim aralığı belirle, zamanı geldiğinde hatırlat.",
+    btn: "Devam",
   },
   {
     id: "3",
-    title: "Strengthen relationships.",
-    description:
-      "Get personalized AI suggestions to reach out at exactly the right moment with the right message.",
-    button: "Continue",
+    image: require("../../assets/onboarding3.png"),
+    title: "Mesajını kolayca\nhazırla.",
+    desc: "Notlarına ve ilişkinize göre samimi ya da profesyonel mesaj önerileri al.",
+    btn: "Başlayalım",
   },
 ];
 
 export default function OnboardingScreen({ navigation }: any) {
-  const scrollRef = useRef<ScrollView>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [index, setIndex] = useState(0);
 
-  const pageWidth = Math.min(width, 430);
-  const isSmallScreen = height < 700;
+  const opacity   = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
-  const handleNext = () => {
-    const nextIndex = currentIndex + 1;
-
-    if (nextIndex < slides.length) {
-      setCurrentIndex(nextIndex);
-
-      scrollRef.current?.scrollTo({
-        x: nextIndex * pageWidth,
-        animated: true,
-      });
-    } else {
-      navigation.navigate("SignUp");
-    }
+  const navigate = (nextIdx: number) => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue: 0,   duration: 150, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: -16, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      setIndex(nextIdx);
+      translateY.setValue(20);
+      Animated.parallel([
+        Animated.timing(opacity,    { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+    });
   };
 
-  const handleScrollEnd = (
-    event: NativeSyntheticEvent<NativeScrollEvent>
-  ) => {
-    const index = Math.round(
-      event.nativeEvent.contentOffset.x / pageWidth
-    );
+  const handleNext = () =>
+    index < SLIDES.length - 1 ? navigate(index + 1) : navigation.navigate("SignUp");
 
-    setCurrentIndex(index);
-  };
+  const handleSkip = () => navigation.navigate("SignUp");
+
+  const slide = SLIDES[index];
+
+  const panelWidth = Math.min(width, 430);
+  // Cap image at 38 % of screen height but never more than 280 px
+  const imgH = Math.min(Math.round(height * 0.38), 280);
 
   return (
-    <View style={styles.screen}>
-      <View style={[styles.phoneFrame, { width: pageWidth }]}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={handleScrollEnd}
-          onScrollEndDrag={handleScrollEnd}
-        >
-          {slides.map((item) => (
-            <View
-              key={item.id}
-              style={[
-                styles.slide,
-                {
-                  width: pageWidth,
-                  paddingTop: isSmallScreen ? 36 : 60,
-                },
-              ]}
-            >
-              <View style={styles.dots}>
-                {slides.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.dot,
-                      currentIndex === index && styles.activeDot,
-                    ]}
-                  />
-                ))}
-              </View>
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* Skip — top right */}
+      <TouchableOpacity
+        onPress={handleSkip}
+        hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
+        style={[styles.skipCorner, { top: insets.top + 12 }]}
+      >
+        <Text style={styles.skip}>Atla</Text>
+      </TouchableOpacity>
 
-              <Image
-                source={require("../../assets/android-icon-background.png")}
-                style={[
-                  styles.image,
-                  {
-                    width: isSmallScreen ? 210 : 260,
-                    height: isSmallScreen ? 210 : 260,
-                  },
-                ]}
-                resizeMode="contain"
-              />
+      {/* Horizontally centres the 430-px panel on wide screens */}
+      <View style={[styles.centerer, { width }]}>
+        {/* Panel: vertically centres the whole content block */}
+        <View style={[styles.panel, { width: panelWidth }]}>
 
-              <Text style={styles.title}>{item.title}</Text>
+          {/* Single animated group — illustration → dots → title → desc → button */}
+          <Animated.View style={[styles.group, { opacity, transform: [{ translateY }] }]}>
 
-              <Text style={styles.description}>{item.description}</Text>
+            {/* Illustration */}
+            <View style={[styles.imgWrap, { height: imgH }]}>
+              <Image source={slide.image} style={styles.img} resizeMode="contain" />
+            </View>
 
-              <View style={styles.buttonGlow}>
+            {/* Dots — 24 px below illustration */}
+            <View style={styles.dots}>
+              {SLIDES.map((_, i) => (
                 <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleNext}
-                  style={styles.buttonWrapper}
+                  key={i}
+                  onPress={() => i !== index && navigate(i)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <LinearGradient
-                    colors={["#A78BFA", "#7C3AED"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.button}
-                  >
-                    <Text style={styles.buttonText}>{item.button}</Text>
-                  </LinearGradient>
+                  <View style={[styles.dot, i === index ? styles.dotActive : styles.dotInactive]} />
                 </TouchableOpacity>
-              </View>
+              ))}
+            </View>
 
-              <TouchableOpacity onPress={() => navigation.navigate("SignIn")}>
-                <Text style={styles.loginText}>
-                  I already have an account
-                </Text>
+            {/* Title — 20 px below dots */}
+            <Text style={styles.title}>{slide.title}</Text>
+
+            {/* Description — 12 px below title */}
+            <Text style={styles.desc}>{slide.desc}</Text>
+
+            {/* Primary button — 40 px below description */}
+            <View style={styles.btnShadow}>
+              <TouchableOpacity onPress={handleNext} activeOpacity={0.85} style={styles.btnTouch}>
+                <LinearGradient
+                  colors={["#4DD9CF", TEAL]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.btn}
+                >
+                  <Text style={styles.btnText}>{slide.btn}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          ))}
-        </ScrollView>
+
+          </Animated.View>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  root: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
+    backgroundColor: "#FAFEFE",
     overflow: "hidden",
   },
-  phoneFrame: {
-    flex: 1,
-    maxWidth: 430,
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+
+  skipCorner: {
+    position: "absolute",
+    right: 20,
+    zIndex: 10,
   },
-  slide: {
+
+  centerer: {
     flex: 1,
     alignItems: "center",
-    paddingHorizontal: 32,
   },
+
+  // flex: 1 + justifyContent: "center" → keeps the group vertically centred
+  panel: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 28,
+  },
+
+  // No flex: 1 here — natural height only, so it stays as a compact block
+  group: {
+    width: "100%",
+    alignItems: "center",
+  },
+
+  imgWrap: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
+  img: {
+    width: "100%",
+    height: "100%",
+  },
+
   dots: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 6,
-    marginBottom: 40,
+    marginBottom: 20,
   },
   dot: {
-    width: 6,
     height: 6,
-    borderRadius: 999,
-    backgroundColor: "#BDBDBD",
+    borderRadius: 3,
   },
-  activeDot: {
-    width: 22,
-    backgroundColor: "#8B5CF6",
-  },
-  image: {
-    marginBottom: 36,
-  },
+  dotActive:   { width: 22, backgroundColor: TEAL },
+  dotInactive: { width: 6,  backgroundColor: colors.primarySoft },
+
   title: {
-    fontSize: 27,
-    fontWeight: "800",
-    color: "#20202A",
+    fontSize: 28,
+    fontWeight: "900",
+    color: colors.text,
     textAlign: "center",
-    lineHeight: 32,
-    marginBottom: 10,
+    lineHeight: 34,
+    marginBottom: 12,
   },
-  description: {
+  desc: {
     fontSize: 14,
-    color: "#9A9AA5",
+    color: colors.textSub,
     textAlign: "center",
-    lineHeight: 21,
-    marginBottom: 48,
-    maxWidth: 340,
+    lineHeight: 22,
+    maxWidth: 300,
+    marginBottom: 40,
   },
-  buttonGlow: {
+
+  btnShadow: {
     width: "100%",
-    borderRadius: 15,
-    marginBottom: 18,
-    shadowColor: "#7C3AED",
+    borderRadius: 16,
+    shadowColor: TEAL,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.3,
     shadowRadius: 18,
     elevation: 10,
   },
-  buttonWrapper: {
-    borderRadius: 15,
-    overflow: "hidden",
-  },
-  button: {
-    height: 54,
+  btnTouch: { borderRadius: 16, overflow: "hidden" },
+  btn: {
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: 0.3,
+  btnText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
-  loginText: {
-    fontSize: 13,
-    color: "#A0A0AA",
-  },
+
+  skip: { fontSize: 14, color: colors.textMuted, fontWeight: "600" },
 });

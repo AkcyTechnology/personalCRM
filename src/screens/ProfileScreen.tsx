@@ -5,682 +5,667 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Modal,
   Pressable,
+  Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { loadSettings, saveSettings } from "../data/userSettings";
+import { loadContacts } from "../data/contacts";
+import type { ContactForm } from "./AddContactScreen";
+import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
+import HealthInfoModal from "../components/HealthInfoModal";
 
-const PURPLE = "#7C3AED";
-const LIGHT_PURPLE = "#F1ECFF";
-const BG = "#FAF9FF";
-const CARD = "#FFFFFF";
-const BORDER = "#ECE8F7";
-const TEXT = "#191826";
-const MUTED = "#8E8AA3";
-const DANGER = "#EF4444";
+// ── Constants ─────────────────────────────────────────────────────────────────
+const TEAL      = "#00B5AC";
+const TEAL_SOFT = "#E6FAF8";
+const TEAL_DARK = "#008E88";
+const TEXT      = "#111827";
+const TEXTSUB   = "#6B7280";
+const TEXTMUTED = "#9CA3AF";
+const BORDER    = "#E5E7EB";
+const BORDER_SOFT = "#F3F4F6";
+const BG        = "#FFFFFF";
+const CARD      = "#FFFFFF";
+const DANGER    = "#DC2626";
 
 const THRESHOLD_OPTIONS = [7, 14, 21, 30];
+const LANGUAGE_OPTIONS: { code: "tr" | "en" | "es" | "de"; label: string; native: string }[] = [
+  { code: "tr", label: "Türkçe",  native: "TR" },
+  { code: "en", label: "English", native: "EN" },
+  { code: "es", label: "Español", native: "ES" },
+  { code: "de", label: "Deutsch", native: "DE" },
+];
 
+const TOP_SAFE = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function daysSince(iso?: string) {
+  if (!iso) return 999;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 999;
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
+}
+
+function initials(name: string) {
+  return name.trim().split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: any) {
-  const [darkMode, setDarkMode]     = useState(false);
-  const [modal, setModal]           = useState<string | null>(null);
-  const [threshold, setThreshold]   = useState(14);
-  const [thresholdOpen, setThresholdOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const topPad = insets.top > 0 ? insets.top + 8 : TOP_SAFE;
 
-  useFocusEffect(useCallback(() => {
-    loadSettings().then(s => setThreshold(s.reachOutThresholdDays));
-  }, []));
+  const [threshold,      setThreshold]      = useState(14);
+  const [thresholdOpen,  setThresholdOpen]  = useState(false);
+  const [languageOpen,   setLanguageOpen]   = useState(false);
+  const [language,       setLanguage]       = useState<"tr" | "en" | "es" | "de">("tr");
+  const [userName,       setUserName]       = useState("");
+  const [email,          setEmail]          = useState("");
+  const [contactsList,   setContactsList]   = useState<ContactForm[]>([]);
+  const [totalContacts,  setTotalContacts]  = useState(0);
+  const [weeklyContacts, setWeeklyContacts] = useState(0);
+  const [needsAttention, setNeedsAttention] = useState(0);
+  const [healthInfoOpen, setHealthInfoOpen] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      Promise.all([loadSettings(), loadContacts()]).then(([s, contacts]) => {
+        const t = s.reachOutThresholdDays || 14;
+        setThreshold(t);
+        setUserName(s.userName || "");
+        setEmail(s.email || "");
+        setLanguage(s.language || "tr");
+        setContactsList(contacts);
+        setTotalContacts(contacts.length);
+        setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
+        setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= t).length);
+      });
+    }, [])
+  );
 
   const handleThresholdSelect = async (val: number) => {
     setThreshold(val);
     setThresholdOpen(false);
-    await saveSettings({ reachOutThresholdDays: val });
+    const s = await loadSettings();
+    await saveSettings({ ...s, reachOutThresholdDays: val });
+    const contacts = await loadContacts();
+    setContactsList(contacts);
+    setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= val).length);
   };
+
+  const handleLanguageSelect = async (code: "tr" | "en" | "es" | "de") => {
+    setLanguage(code);
+    setLanguageOpen(false);
+    const s = await loadSettings();
+    await saveSettings({ ...s, language: code });
+  };
+
+  const handleExport = async () => {
+    const contacts = await loadContacts();
+    if (!contacts.length) { Alert.alert("Kişi yok", "Dışa aktarılacak kişi bulunamadı."); return; }
+    const lines = contacts.map((c, i) =>
+      [`--- Kişi ${i + 1} ---`, `Ad: ${c.fullName}`, `İlişki: ${c.relationship || "-"}`,
+       `Şirket: ${c.company || "-"}`, `Telefon: ${c.phone || "-"}`, `E-posta: ${c.email || "-"}`,
+       `Son görüşme: ${c.lastContactDate || "-"}`, `Notlar: ${c.notes || "-"}`].join("\n")
+    ).join("\n\n");
+    try {
+      const FileSystem = require("expo-file-system");
+      const Sharing = require("expo-sharing");
+      const path = FileSystem.documentDirectory + "kisiler.txt";
+      await FileSystem.writeAsStringAsync(path, lines, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(path, { mimeType: "text/plain", dialogTitle: "Kişileri paylaş" });
+      } else {
+        Alert.alert("Kaydedildi", `Dosya: ${path}`);
+      }
+    } catch {
+      Alert.alert("Kişiler hazır", `${contacts.length} kişi hazır.\n\n` + lines.slice(0, 400), [{ text: "Tamam" }]);
+    }
+  };
+
+  const health = averageHealthScore(contactsList, threshold);
+  const healthColor = healthScoreColor(health);
+  const currentLang = LANGUAGE_OPTIONS.find(l => l.code === language);
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>T</Text>
+
+      {/* ── Header ── */}
+      <View style={[styles.header, { paddingTop: topPad }]}>
+        <View style={styles.headerRow}>
+          {/* Avatar */}
+          <View style={styles.avatarWrap}>
+            <Text style={styles.avatarText}>{initials(userName)}</Text>
           </View>
 
-          <Text style={styles.name}>Tuğçe Yılmaz</Text>
-          <Text style={styles.email}>tugce@email.com</Text>
+          {/* Name + email */}
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName} numberOfLines={1}>{userName || "Profil"}</Text>
+            <Text style={styles.headerEmail} numberOfLines={1}>{email || "Hesap ayarları"}</Text>
+          </View>
 
-          <View style={styles.statsRow}>
-            <Stat value="4" label="Contacts" />
-            <Stat value="23" label="Memories" />
-            <Stat value="84" label="Health" />
+          {/* Edit button */}
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => navigation.navigate("ProfileSettings")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.editBtnText}>Düzenle</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+
+        {/* ── Stats row ── */}
+        <View style={styles.statsRow}>
+          <StatCard value={totalContacts}  label="Toplam kişi" />
+          <StatCard value={weeklyContacts} label="Bu hafta" />
+          <StatCard value={needsAttention} label="Bekleyen" danger={needsAttention > 0} />
+        </View>
+
+        {/* ── Health bar ── */}
+        <View style={styles.healthCard}>
+          <View style={styles.healthLeft}>
+            <View style={styles.healthLabelRow}>
+              <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
+              <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.healthInfoIcon}>ⓘ</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.healthSub}>Bağlantı genel durumu</Text>
+            <View style={styles.barTrack}>
+              <View style={[styles.barFill, { width: `${health}%` as any, backgroundColor: healthColor }]} />
+            </View>
+          </View>
+          <View style={styles.healthRight}>
+            <Text style={[styles.healthScore, { color: healthColor }]}>{health}</Text>
+            <Text style={styles.healthSuffix}>/100</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.premiumCard}
-          onPress={() => setModal("premium")}
-        >
-          <View style={styles.premiumIcon}>
-            <Text style={styles.premiumIconText}>★</Text>
-          </View>
+        {/* ── Hesap ── */}
+        <SectionLabel title="Hesap" />
 
-          <View style={styles.premiumTextArea}>
-            <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
-            <Text style={styles.premiumDesc}>
-              Unlock AI deep insights & more
-            </Text>
-          </View>
-
-          <View style={styles.planButton}>
-            <Text style={styles.planButtonText}>See plans</Text>
-          </View>
-        </TouchableOpacity>
-
-        <Section title="Account" />
-
-        <Card>
-          <MenuItem
-            icon="☻"
-            title="Profile Settings"
-            onPress={() => setModal("profile")}
+        <View style={styles.card}>
+          <RowItem
+            icon={<PersonIcon />}
+            title="Profil Ayarları"
+            sub="Ad, e-posta ve profil bilgileri"
+            onPress={() => navigation.navigate("ProfileSettings")}
           />
-          <MenuItem
-            icon="🔔"
-            title="Notification Settings"
-            onPress={() => setModal("notifications")}
+          <RowItem
+            icon={<BellIcon />}
+            title="Bildirim Ayarları"
+            sub="Hatırlatma ve bildirim tercihleri"
+            onPress={() => navigation.navigate("NotificationSettings")}
           />
-          <MenuItem
-            icon="🛡"
-            title="Privacy & Security"
-            onPress={() => setModal("privacy")}
+          <RowItem
+            icon={<ShieldIcon />}
+            title="Gizlilik ve Güvenlik"
+            sub="Veri ve güvenlik kontrolleri"
+            onPress={() => navigation.navigate("PrivacySecurity")}
+          />
+          <RowItem
+            icon={<StarIcon />}
+            title="Abonelik"
+            sub="Plan ve ödeme yönetimi"
+            onPress={() => navigation.navigate("ManageSubscription")}
             last
           />
-        </Card>
+        </View>
 
-        <Section title="App" />
+        {/* ── Uygulama ── */}
+        <SectionLabel title="Uygulama" />
 
-        <Card>
+        <View style={styles.card}>
           <TouchableOpacity
-            style={[styles.menuItem, styles.menuBorder]}
+            style={[styles.rowItem, styles.rowBorder]}
             onPress={() => setThresholdOpen(true)}
+            activeOpacity={0.75}
           >
-            <View style={styles.menuLeft}>
-              <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>⏱</Text>
-              </View>
-              <View>
-                <Text style={styles.menuTitle}>Ulaş Eşiği</Text>
-                <Text style={styles.menuSub}>Son {threshold} günde görüşülmeyenler</Text>
-              </View>
+            <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
+              <ClockIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Ulaş Eşiği</Text>
+              <Text style={styles.rowSub}>Son {threshold} günde görüşülmeyenler</Text>
+            </View>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{threshold}g</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setLanguageOpen(true)}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: "#EEF2FF" }]}>
+              <GlobeIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Dil</Text>
+              <Text style={styles.rowSub}>Uygulama dili</Text>
+            </View>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{currentLang?.native ?? "TR"}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => navigation.navigate("AddContact")}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
+              <UploadIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Kişileri içe aktar</Text>
+              <Text style={styles.rowSub}>Rehberden kişi aktar</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-          <MenuItem
-            icon="⇩"
-            title="Export Data"
-            onPress={() => setModal("export")}
-          />
 
-          <View style={styles.switchRow}>
-            <View style={styles.menuLeft}>
-              <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>◐</Text>
-              </View>
-              <Text style={styles.menuTitle}>Dark Mode</Text>
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] })}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: "#F3F0FF" }]}>
+              <RestartIcon />
             </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Onboarding'i tekrar göster</Text>
+              <Text style={styles.rowSub}>Tanıtım ekranlarını yeniden izle</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
 
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: "#E5E1EF", true: "#C4B5FD" }}
-              thumbColor={darkMode ? PURPLE : "#FFFFFF"}
-            />
-          </View>
-        </Card>
+          <TouchableOpacity
+            style={styles.rowItem}
+            onPress={handleExport}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: "#F0FDF4" }]}>
+              <DownloadIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Verileri dışa aktar</Text>
+              <Text style={styles.rowSub}>.txt formatında dışa aktar</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Section title="Subscription" />
+        {/* ── Veri Özeti ── */}
+        <SectionLabel title="Veri Özeti" />
 
-        <Card>
-          <MenuItem
-            icon="▣"
-            title="Manage Subscription"
-            onPress={() => setModal("subscription")}
-          />
-          <MenuItem
-            icon="☆"
-            title="Upgrade to Premium"
-            onPress={() => setModal("premium")}
-            last
-          />
-        </Card>
+        <View style={styles.card}>
+          <DataRow label="Toplam kişi"         value={`${totalContacts}`} />
+          <DataRow label="Bu hafta iletişim"    value={`${weeklyContacts}`} />
+          <DataRow label="Ulaşılması gereken"   value={`${needsAttention}`} />
+          <DataRow label="Ulaş eşiği"           value={`${threshold} gün`} last />
+        </View>
 
-        <TouchableOpacity
-          style={[styles.signOutButton, styles.signOutDisabled]}
-          disabled
-        >
-          <Text style={[styles.signOutText, styles.signOutTextDisabled]}>Sign Out</Text>
+        {/* ── Sign out ── */}
+        <TouchableOpacity style={styles.signOutBtn} disabled activeOpacity={0.6}>
+          <Text style={styles.signOutText}>Çıkış Yap</Text>
         </TouchableOpacity>
+
       </ScrollView>
 
-      <ProfileModal
-        visible={!!modal}
-        type={modal}
-        onClose={() => setModal(null)}
-        onConfirm={() => {
-          setModal(null);
-          if (modal === "signout") navigation?.navigate?.("SignIn");
-        }}
-      />
+      {/* ── Threshold modal ── */}
+      <PickerModal
+        visible={thresholdOpen}
+        title="Ulaş Eşiği"
+        desc="Kaç gün görüşülmeyenler listeye girsin?"
+        onClose={() => setThresholdOpen(false)}
+      >
+        {THRESHOLD_OPTIONS.map(val => (
+          <PickerOption
+            key={val}
+            label={`${val} gün`}
+            active={threshold === val}
+            onPress={() => handleThresholdSelect(val)}
+          />
+        ))}
+      </PickerModal>
 
-      {/* Threshold Seçici */}
-      <Modal visible={thresholdOpen} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => setThresholdOpen(false)}>
-          <Pressable style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Ulaş Eşiği</Text>
-            <Text style={styles.modalDesc}>
-              Kaç günde bir görüşülmeyenler "Ulaş" listesine girsin?
-            </Text>
-            {THRESHOLD_OPTIONS.map(val => (
-              <TouchableOpacity
-                key={val}
-                style={[styles.thresholdOption, threshold === val && styles.thresholdOptionActive]}
-                onPress={() => handleThresholdSelect(val)}
-              >
-                <Text style={[styles.thresholdOptionText, threshold === val && styles.thresholdOptionTextActive]}>
-                  {val} gün
-                </Text>
-                {threshold === val && <Text style={styles.thresholdCheck}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* ── Language modal ── */}
+      <PickerModal
+        visible={languageOpen}
+        title="Dil Seçin"
+        desc="Uygulama dilini seçin"
+        onClose={() => setLanguageOpen(false)}
+      >
+        {LANGUAGE_OPTIONS.map(opt => (
+          <PickerOption
+            key={opt.code}
+            label={`${opt.native}  ${opt.label}`}
+            active={language === opt.code}
+            onPress={() => handleLanguageSelect(opt.code)}
+          />
+        ))}
+      </PickerModal>
+
+      <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function SectionLabel({ title }: { title: string }) {
+  return <Text style={styles.sectionLabel}>{title}</Text>;
+}
+
+function StatCard({ value, label, danger }: { value: number; label: string; danger?: boolean }) {
   return (
-    <View style={styles.statItem}>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={styles.statCard}>
+      <Text style={[styles.statValue, danger && { color: DANGER }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function Section({ title }: { title: string }) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
-}
-
-function MenuItem({
-  icon,
-  title,
-  onPress,
-  last,
+function RowItem({
+  icon, title, sub, onPress, last,
 }: {
-  icon: string;
-  title: string;
-  onPress: () => void;
-  last?: boolean;
+  icon: React.ReactNode; title: string; sub?: string; onPress: () => void; last?: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.menuItem, !last && styles.menuBorder]}
+      style={[styles.rowItem, !last && styles.rowBorder]}
       onPress={onPress}
+      activeOpacity={0.75}
     >
-      <View style={styles.menuLeft}>
-        <View style={styles.menuIcon}>
-          <Text style={styles.menuIconText}>{icon}</Text>
-        </View>
-        <Text style={styles.menuTitle}>{title}</Text>
+      <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>{icon}</View>
+      <View style={styles.rowInfo}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
       </View>
-
       <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
   );
 }
 
+function DataRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.dataRow, !last && styles.rowBorder]}>
+      <Text style={styles.dataLabel}>{label}</Text>
+      <Text style={styles.dataValue}>{value}</Text>
+    </View>
+  );
+}
 
-function ProfileModal({
-  visible,
-  type,
-  onClose,
-  onConfirm,
+function PickerModal({
+  visible, title, desc, onClose, children,
 }: {
-  visible: boolean;
-  type: string | null;
-  onClose: () => void;
-  onConfirm: () => void;
+  visible: boolean; title: string; desc: string; onClose: () => void; children: React.ReactNode;
 }) {
-  const data = getModalContent(type);
-
   return (
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.modalBox}>
-          <View style={styles.modalIcon}>
-            <Text style={styles.modalIconText}>{data.icon}</Text>
-          </View>
-
-          <Text style={styles.modalTitle}>{data.title}</Text>
-          <Text style={styles.modalDesc}>{data.description}</Text>
-
-          {data.items.map((item) => (
-            <View key={item} style={styles.modalInfoRow}>
-              <Text style={styles.modalBullet}>•</Text>
-              <Text style={styles.modalInfoText}>{item}</Text>
-            </View>
-          ))}
-
-          <TouchableOpacity
-            style={[
-              styles.modalPrimaryButton,
-              type === "signout" && styles.dangerButton,
-            ]}
-            onPress={onConfirm}
-          >
-            <Text style={styles.modalPrimaryText}>{data.primary}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.modalSecondaryButton} onPress={onClose}>
-            <Text style={styles.modalSecondaryText}>Cancel</Text>
-          </TouchableOpacity>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalDesc}>{desc}</Text>
+          {children}
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
-function getModalContent(type: string | null) {
-  switch (type) {
-    case "profile":
-      return {
-        icon: "☻",
-        title: "Profile Settings",
-        description: "Update your name, email, avatar and personal details.",
-        items: ["Edit profile photo", "Change display name", "Update email address"],
-        primary: "Open settings",
-      };
-    case "notifications":
-      return {
-        icon: "🔔",
-        title: "Notification Settings",
-        description: "Control reminders, smart nudges and relationship alerts.",
-        items: ["Birthday reminders", "Follow-up reminders", "Weekly summary"],
-        primary: "Manage notifications",
-      };
-    case "privacy":
-      return {
-        icon: "🛡",
-        title: "Privacy & Security",
-        description: "Keep your personal CRM data safe and private.",
-        items: ["Change password", "Two-factor authentication", "Data visibility"],
-        primary: "Review privacy",
-      };
-    case "ai":
-      return {
-        icon: "✦",
-        title: "AI Settings",
-        description: "Customize how AI helps you remember and follow up.",
-        items: ["Tone preferences", "Suggestion frequency", "Memory sensitivity"],
-        primary: "Configure AI",
-      };
-    case "export":
-      return {
-        icon: "⇩",
-        title: "Export Data",
-        description: "Download your contacts, notes and memories.",
-        items: ["CSV export", "JSON backup", "Email delivery"],
-        primary: "Export now",
-      };
-    case "subscription":
-      return {
-        icon: "▣",
-        title: "Manage Subscription",
-        description: "View your current plan and billing details.",
-        items: ["Current plan", "Billing history", "Cancel plan"],
-        primary: "Manage plan",
-      };
-    case "premium":
-      return {
-        icon: "★",
-        title: "Upgrade to Premium",
-        description: "Unlock deeper AI insights for your relationships.",
-        items: ["Unlimited memories", "Smart relationship health", "Advanced reminders"],
-        primary: "See plans",
-      };
-    case "signout":
-      return {
-        icon: "!",
-        title: "Sign Out?",
-        description: "You can sign back in anytime with your account.",
-        items: ["Unsynced local changes may be lost"],
-        primary: "Sign out",
-      };
-    default:
-      return {
-        icon: "✦",
-        title: "Settings",
-        description: "Manage your account preferences.",
-        items: [],
-        primary: "Continue",
-      };
-  }
+function PickerOption({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={[styles.optionRow, active && styles.optionActive]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={[styles.optionText, active && styles.optionTextActive]}>{label}</Text>
+      {active && <Text style={styles.optionCheck}>✓</Text>}
+    </TouchableOpacity>
+  );
 }
 
+// ── Inline icons ──────────────────────────────────────────────────────────────
+
+const ic = { color: TEAL, size: 16 };
+
+function PersonIcon() {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: ic.color }} />
+      <View style={{ width: 13, height: 6, borderWidth: 1.5, borderBottomWidth: 0, borderRadius: 6, borderColor: ic.color, marginTop: 2 }} />
+    </View>
+  );
+}
+
+function BellIcon() {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: 12, height: 11, borderRadius: 5, borderWidth: 1.5, borderColor: ic.color }} />
+      <View style={{ width: 5, height: 2, borderRadius: 1, backgroundColor: ic.color, marginTop: 1 }} />
+    </View>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <View style={{ width: 13, height: 15, borderWidth: 1.5, borderColor: ic.color, borderRadius: 4, borderTopLeftRadius: 6, borderTopRightRadius: 6, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: ic.color }} />
+    </View>
+  );
+}
+
+function StarIcon() {
+  return (
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: ic.color, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: ic.color }} />
+    </View>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: ic.color, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 1.5, height: 4, backgroundColor: ic.color, position: "absolute", top: 2, borderRadius: 1 }} />
+      <View style={{ width: 3, height: 1.5, backgroundColor: ic.color, position: "absolute", right: 3, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#6366F1", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 14, height: 1.5, backgroundColor: "#6366F1", position: "absolute" }} />
+    </View>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: 1.5, height: 8, backgroundColor: "#16A34A", borderRadius: 1 }} />
+      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#16A34A", marginTop: -1 }} />
+      <View style={{ width: 12, height: 1.5, backgroundColor: "#16A34A", marginTop: 2, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderBottomWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: TEAL, marginBottom: -1 }} />
+      <View style={{ width: 1.5, height: 8, backgroundColor: TEAL, borderRadius: 1 }} />
+      <View style={{ width: 12, height: 1.5, backgroundColor: TEAL, marginTop: 2, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+function RestartIcon() {
+  return (
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#7C3AED", borderTopColor: "transparent", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 4, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: "#7C3AED", position: "absolute", top: -3, right: -1 }} />
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+  screen: { flex: 1, backgroundColor: BG },
+
+  // Header
+  header: {
     backgroundColor: BG,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#EBEBF0",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
+      android: { elevation: 2 },
+    }),
   },
-  content: {
-    paddingTop: 58,
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatarWrap: {
+    width: 52, height: 52, borderRadius: 16,
+    backgroundColor: TEAL_SOFT,
+    borderWidth: 1.5, borderColor: TEAL + "40",
+    alignItems: "center", justifyContent: "center",
   },
-  profileHeader: {
-    alignItems: "center",
+  avatarText: { fontSize: 18, fontWeight: "700", color: TEAL_DARK },
+  headerInfo: { flex: 1 },
+  headerName:  { fontSize: 17, fontWeight: "700", color: TEXT, letterSpacing: -0.2 },
+  headerEmail: { marginTop: 2, fontSize: 12, color: TEXTSUB },
+  editBtn: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: TEAL_SOFT,
+    borderWidth: 1, borderColor: TEAL + "40",
   },
-  avatar: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    backgroundColor: "#9B7CFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: PURPLE,
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 10,
+  editBtnText: { fontSize: 13, fontWeight: "600", color: TEAL_DARK },
+
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
+
+  // Stats
+  statsRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  statCard: {
+    flex: 1, backgroundColor: CARD,
+    borderRadius: 14, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 12, paddingVertical: 12,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+    }),
   },
-  avatarText: {
-    color: "#FFFFFF",
-    fontSize: 32,
-    fontWeight: "800",
+  statValue: { fontSize: 22, fontWeight: "700", color: TEXT },
+  statLabel: { marginTop: 3, fontSize: 11, color: TEXTSUB, fontWeight: "500" },
+
+  // Health bar
+  healthCard: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: CARD, borderRadius: 14,
+    borderWidth: 1, borderColor: BORDER, padding: 14,
+    marginBottom: 4,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+    }),
   },
-  name: {
-    marginTop: 16,
-    fontSize: 22,
-    fontWeight: "800",
-    color: TEXT,
+  healthLeft: { flex: 1, marginRight: 16 },
+  healthLabel: { fontSize: 13, fontWeight: "700", color: TEXT },
+  healthLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  healthInfoIcon: { fontSize: 12, color: TEXTMUTED },
+  healthSub:   { fontSize: 11, color: TEXTSUB, marginTop: 2 },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: "#F3F4F6", marginTop: 10, overflow: "hidden" },
+  barFill:  { height: 6, borderRadius: 3 },
+  healthRight: { flexDirection: "row", alignItems: "flex-end" },
+  healthScore:  { fontSize: 28, fontWeight: "700", letterSpacing: -0.5 },
+  healthSuffix: { fontSize: 12, color: TEXTMUTED, fontWeight: "400", marginBottom: 3 },
+
+  // Section label
+  sectionLabel: {
+    marginTop: 22, marginBottom: 8,
+    fontSize: 11, fontWeight: "700", color: TEXTMUTED,
+    textTransform: "uppercase", letterSpacing: 0.7,
   },
-  email: {
-    marginTop: 4,
-    fontSize: 13,
-    color: MUTED,
-  },
-  statsRow: {
-    marginTop: 20,
-    width: "80%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: TEXT,
-  },
-  statLabel: {
-    marginTop: 3,
-    fontSize: 11,
-    color: MUTED,
-  },
-  premiumCard: {
-    marginTop: 28,
-    backgroundColor: "#9B7CFF",
-    borderRadius: 18,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: PURPLE,
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  premiumIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  premiumIconText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-  },
-  premiumTextArea: {
-    flex: 1,
-  },
-  premiumTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  premiumDesc: {
-    color: "#EFEAFF",
-    fontSize: 12,
-    marginTop: 3,
-    lineHeight: 17,
-  },
-  planButton: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  planButtonText: {
-    color: PURPLE,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  sectionTitle: {
-    marginTop: 26,
-    marginBottom: 10,
-    fontSize: 12,
-    fontWeight: "800",
-    color: MUTED,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
+
+  // Card
   card: {
-    backgroundColor: CARD,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: "hidden",
+    backgroundColor: CARD, borderRadius: 16,
+    borderWidth: 1, borderColor: BORDER, overflow: "hidden",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+    }),
   },
-  menuItem: {
-    minHeight: 62,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+
+  // Row item
+  rowItem: {
+    minHeight: 58, paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: "row", alignItems: "center", gap: 12,
   },
-  menuBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER_SOFT },
+  iconWrap: {
+    width: 34, height: 34, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
   },
-  menuLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+  rowInfo: { flex: 1 },
+  rowTitle: { fontSize: 14, fontWeight: "500", color: TEXT },
+  rowSub:   { fontSize: 11, color: TEXTSUB, marginTop: 2, lineHeight: 15 },
+  chevron:  { fontSize: 20, color: TEXTMUTED },
+
+  // Pill
+  pill: {
+    backgroundColor: TEAL_SOFT, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 4,
   },
-  menuIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: LIGHT_PURPLE,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 13,
+  pillText: { fontSize: 11, fontWeight: "600", color: TEAL_DARK },
+
+  // Data row
+  dataRow: {
+    paddingHorizontal: 14, paddingVertical: 13,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
-  menuIconText: {
-    color: PURPLE,
-    fontSize: 14,
+  dataLabel: { fontSize: 13, color: TEXTSUB, fontWeight: "400" },
+  dataValue: { fontSize: 13, fontWeight: "600", color: TEXT },
+
+  // Sign out
+  signOutBtn: {
+    marginTop: 20, height: 48, borderRadius: 14,
+    backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA",
+    alignItems: "center", justifyContent: "center", opacity: 0.5,
   },
-  menuTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: TEXT,
-  },
-  chevron: {
-    fontSize: 24,
-    color: MUTED,
-  },
-  switchRow: {
-    minHeight: 62,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  signOutButton: {
-    marginTop: 26,
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: "#FFF1F1",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  signOutDisabled: {
-    opacity: 0.4,
-  },
-  signOutText: {
-    color: DANGER,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  signOutTextDisabled: {
-    color: DANGER,
-  },
+  signOutText: { color: DANGER, fontSize: 14, fontWeight: "600" },
+
+  // Modal
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(25, 24, 38, 0.36)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+    flex: 1, backgroundColor: "rgba(0,0,0,0.28)",
+    alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
-    width: "100%",
-    maxWidth: 380,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 26,
-    padding: 24,
+    width: "100%", maxWidth: 380,
+    backgroundColor: CARD, borderRadius: 18, padding: 22,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+      android: { elevation: 12 },
+    }),
   },
-  modalIcon: {
-    alignSelf: "center",
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: LIGHT_PURPLE,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
+  modalTitle: { fontSize: 17, fontWeight: "700", color: TEXT, textAlign: "center" },
+  modalDesc:  { marginTop: 5, fontSize: 13, color: TEXTSUB, textAlign: "center", lineHeight: 19, marginBottom: 16 },
+  optionRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 13, paddingHorizontal: 14,
+    borderRadius: 12, marginBottom: 8,
+    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BORDER,
   },
-  modalIconText: {
-    color: PURPLE,
-    fontSize: 24,
-    fontWeight: "800",
-  },
-  modalTitle: {
-    fontSize: 21,
-    fontWeight: "900",
-    color: TEXT,
-    textAlign: "center",
-  },
-  modalDesc: {
-    marginTop: 8,
-    fontSize: 14,
-    color: MUTED,
-    textAlign: "center",
-    lineHeight: 21,
-    marginBottom: 18,
-  },
-  modalInfoRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  modalBullet: {
-    color: PURPLE,
-    marginRight: 8,
-    fontSize: 16,
-  },
-  modalInfoText: {
-    flex: 1,
-    color: "#514D67",
-    fontSize: 14,
-  },
-  modalPrimaryButton: {
-    marginTop: 18,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: PURPLE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dangerButton: {
-    backgroundColor: DANGER,
-  },
-  modalPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  modalSecondaryButton: {
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalSecondaryText: {
-    color: MUTED,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  menuSub: {
-    fontSize: 11,
-    color: MUTED,
-    marginTop: 2,
-  },
-  thresholdOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: "#F8F7FF",
-    borderWidth: 1,
-    borderColor: "#ECE8F7",
-  },
-  thresholdOptionActive: {
-    backgroundColor: "#EDE9FF",
-    borderColor: PURPLE,
-  },
-  thresholdOptionText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#4A4566",
-  },
-  thresholdOptionTextActive: {
-    color: PURPLE,
-    fontWeight: "800",
-  },
-  thresholdCheck: {
-    fontSize: 16,
-    color: PURPLE,
-    fontWeight: "700",
-  },
+  optionActive:    { backgroundColor: TEAL_SOFT, borderColor: TEAL + "60" },
+  optionText:      { fontSize: 15, fontWeight: "500", color: TEXT },
+  optionTextActive:{ color: TEAL_DARK, fontWeight: "700" },
+  optionCheck:     { fontSize: 15, color: TEAL, fontWeight: "700" },
 });

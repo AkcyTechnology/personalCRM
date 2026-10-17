@@ -9,48 +9,62 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Alert,
+  StatusBar,
+  FlatList,
 } from "react-native";
+import { useState, useCallback, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useState, useCallback } from "react";
+import * as Contacts from "expo-contacts/legacy";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { addContact } from "../data/contacts";
+import { loadSettings } from "../data/userSettings";
+import {
+  DEFAULT_RELATIONSHIPS,
+  loadCustomRelationships,
+  addCustomRelationship,
+  removeCustomRelationship,
+} from "../data/relationshipTypes";
+import { colors } from "../theme/colors";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { INTERVAL_PRESETS } from "../utils/reminderInterval";
+import { showToast } from "../components/Toast";
+import PermissionDeniedModal from "../components/PermissionDeniedModal";
 
-// ─── Theme ───────────────────────────────────────────────────────────────────
-const C = {
-  purple:       "#7C3AED",
-  purpleLight:  "#EDE9FF",
-  purpleMid:    "#A78BFA",
-  bg:           "#F6F5FB",
-  card:         "#FFFFFF",
-  border:       "#E5E1F5",
-  text:         "#18172A",
-  sub:          "#6B6884",
-  muted:        "#A09CB8",
-  error:        "#EF4444",
-  errorBg:      "#FEF2F2",
-  errorBorder:  "#FCA5A5",
-  success:      "#10B981",
-  divider:      "#F0EEF9",
-};
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type SocialEntry = { platform: string; handle: string };
 
 export type ContactForm = {
-  fullName:        string;
-  company:         string;
-  jobTitle:        string;
-  birthday:        string;
-  relationship:    string;
-  metWhere:        string;
-  phone:           string;
-  email:           string;
-  socials:         SocialEntry[];
-  tags:            string;
-  priority:        string;
-  notes:           string;
-  lastContactDate: string; // ISO date string, örn. "2025-05-10"
+  id?:                    string;
+  fullName:               string;
+  company:                string;
+  jobTitle:               string;
+  birthday:               string;
+  relationship:           string;
+  closenessTag?:          string;
+  metWhere:               string;
+  phone:                  string;
+  email:                  string;
+  website:                string;
+  linkedin?:              string;
+  instagram:              string;
+  city:                   string;
+  socials:                SocialEntry[];
+  tags:                   string;
+  priority:               string;
+  lastContactDate:        string;
+  reminderFreq:           string;
+  reminderIntervalDays?:  number;
+  reminderIntervalStart?: string;
+  reminderEnabled?:       boolean;
+  snoozedUntil?:          string;
+  notes:                  string;
+  createdAt?:             string;
+  updatedAt?:             string;
+  order?:                 number;
 };
 
 const EMPTY: ContactForm = {
@@ -59,125 +73,209 @@ const EMPTY: ContactForm = {
   jobTitle:        "",
   birthday:        "",
   relationship:    "",
+  closenessTag:    "",
   metWhere:        "",
   phone:           "",
   email:           "",
-  socials:         [{ platform: "LinkedIn", handle: "" }],
+  website:         "",
+  linkedin:        "",
+  instagram:       "",
+  city:            "",
+  socials:         [],
   tags:            "",
   priority:        "",
+  lastContactDate: "",
+  reminderFreq:    "",
   notes:           "",
-  lastContactDate: new Date().toISOString().split("T")[0],
 };
 
-// ─── Seçenek Listeleri ────────────────────────────────────────────────────────
-const RELATIONSHIPS = [
-  { label: "Arkadaş",        emoji: "👋" },
-  { label: "İş arkadaşı",   emoji: "💼" },
-  { label: "Mentor",         emoji: "🎓" },
-  { label: "Mentee",         emoji: "🌱" },
-  { label: "Müşteri",        emoji: "🤝" },
-  { label: "Partner",        emoji: "🔗" },
-  { label: "Aile",           emoji: "❤️" },
-  { label: "Tanıdık",        emoji: "😊" },
-];
+// ── Data ──────────────────────────────────────────────────────────────────────
 
 const MET_WHERE = [
-  { label: "Etkinlik / Konferans", emoji: "🎤" },
-  { label: "İş ortamı",           emoji: "🏢" },
-  { label: "Okul / Üniversite",   emoji: "🎓" },
-  { label: "Ortak arkadaş",       emoji: "👥" },
-  { label: "LinkedIn",             emoji: "💼" },
-  { label: "Twitter / X",          emoji: "🐦" },
-  { label: "Online topluluk",      emoji: "🌐" },
-  { label: "Diğer",                emoji: "📍" },
+  "İş", "Etkinlik", "Okul", "Sosyal çevre", "Online", "Ortak arkadaş",
 ];
 
-const PRIORITY_OPTIONS = [
-  { label: "Yüksek",  emoji: "🔥", color: "#EF4444" },
-  { label: "Orta",    emoji: "⚡", color: "#F59E0B" },
-  { label: "Normal",  emoji: "💙", color: C.purple   },
+const PRIORITIES = ["Düşük", "Orta", "Yüksek"];
+
+const LAST_CONTACT_OPTIONS = [
+  "Bugün", "Dün", "1 hafta önce", "1 ay önce", "Özel tarih",
 ];
 
-const SOCIAL_PLATFORMS = ["LinkedIn", "Twitter/X", "Instagram", "GitHub", "Website", "Diğer"];
+const CUSTOM_INTERVAL = "Özel aralık";
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+const SUGGESTED_TAGS = [
+  "pazarlama", "teknoloji", "yatırımcı", "yazılım",
+  "tasarım", "mentor", "girişim", "fintech",
+];
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
 type Props = NativeStackScreenProps<RootStackParamList, "AddContact">;
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function AddContactScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
-  const [form, setForm]               = useState<ContactForm>(EMPTY);
-  const [errors, setErrors]           = useState<Partial<Record<keyof ContactForm, string>>>({});
-  const [discardModal, setDiscardModal] = useState(false);
+  const [form, setForm]             = useState<ContactForm>(EMPTY);
+  const [errors, setErrors]         = useState<Partial<Record<keyof ContactForm, string>>>({});
+  const [discardModal, setDiscard]  = useState(false);
+  const [importedName, setImported] = useState("");
+  const [notesOpen, setNotesOpen]   = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customInterval, setCustomInterval] = useState(false);
+  const [customIntervalText, setCustomIntervalText] = useState("");
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [deviceContacts, setDeviceContacts] = useState<Contacts.ExistingContact[]>([]);
+  const [permissionModal, setPermissionModal] = useState(false);
+  const [customRelationships, setCustomRelationships] = useState<string[]>([]);
+  const [relationshipManagerOpen, setRelationshipManagerOpen] = useState(false);
 
-  // dropdown states
-  const [relOpen, setRelOpen]       = useState(false);
-  const [metOpen, setMetOpen]       = useState(false);
-  const [prioOpen, setPrioOpen]     = useState(false);
+  useEffect(() => {
+    loadSettings().then((s) => {
+      if (s.defaultContactIntervalDays) {
+        setForm((prev) => ({ ...prev, reminderIntervalDays: s.defaultContactIntervalDays }));
+      }
+    });
+    loadCustomRelationships().then(setCustomRelationships);
+  }, []);
 
-  const isDirty = JSON.stringify(form) !== JSON.stringify(EMPTY);
+  const relationships = [...DEFAULT_RELATIONSHIPS, ...customRelationships];
+
+  const isDirty = JSON.stringify(form) !== JSON.stringify(EMPTY) || selectedTags.length > 0;
 
   const set = useCallback(<K extends keyof ContactForm>(key: K, val: ContactForm[K]) => {
     setForm(prev => ({ ...prev, [key]: val }));
     setErrors(prev => ({ ...prev, [key]: undefined }));
   }, []);
 
-  // ── Validation ──────────────────────────────────────────────────────────────
-  const validate = () => {
-    const e: Partial<Record<keyof ContactForm, string>> = {};
-    if (!form.fullName.trim())     e.fullName = "Ad Soyad zorunlu alandır.";
-    if (!form.relationship)        e.relationship = "Lütfen bir ilişki türü seçin.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  const handleAddRelationship = async (label: string) => {
+    setCustomRelationships(await addCustomRelationship(label));
   };
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!validate()) return;
-    await addContact({ ...form });
-    navigation.goBack();
+  const handleRemoveRelationship = async (label: string) => {
+    setCustomRelationships(await removeCustomRelationship(label));
+    if (form.relationship === label) set("relationship", "");
   };
 
-  const handleBackPress = () => {
-    if (isDirty) {
-      setDiscardModal(true);
-    } else {
-      navigation.goBack();
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  // ── Import from contacts ───────────────────────────────────────────────────
+  const handleImport = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== "granted") {
+        showToast("Rehber izni verilmedi");
+        setPermissionModal(true);
+        return;
+      }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [
+          Contacts.Fields.Name,
+          Contacts.Fields.PhoneNumbers,
+          Contacts.Fields.Emails,
+          Contacts.Fields.Company,
+          Contacts.Fields.JobTitle,
+        ],
+        sort: Contacts.SortTypes.FirstName,
+      });
+      if (!data?.length) {
+        Alert.alert("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
+        return;
+      }
+      setDeviceContacts(data.filter((c) => !!c.name));
+      setPickerVisible(true);
+    } catch {
+      showToast("Bir sorun oluştu. Lütfen tekrar dene.");
     }
   };
 
-  // ── Social helpers ──────────────────────────────────────────────────────────
-  const updateSocial = (i: number, key: keyof SocialEntry, val: string) => {
-    set("socials", form.socials.map((s, idx) => idx === i ? { ...s, [key]: val } : s));
+  const handlePickDeviceContact = (picked: Contacts.ExistingContact) => {
+    const name    = picked.name ?? "";
+    const phone   = picked.phoneNumbers?.[0]?.number ?? "";
+    const email   = picked.emails?.[0]?.email ?? "";
+    const company = picked.company ?? "";
+    const title   = picked.jobTitle ?? "";
+    if (name) {
+      setForm(prev => ({
+        ...prev,
+        fullName: name,
+        phone: phone.trim(),
+        email: email.trim(),
+        company: company.trim() || prev.company,
+        jobTitle: title.trim() || prev.jobTitle,
+      }));
+      setImported(name);
+      setErrors({});
+    }
+    setPickerVisible(false);
   };
 
-  const addSocial = () => set("socials", [...form.socials, { platform: "LinkedIn", handle: "" }]);
+  // ── Validation + save ─────────────────────────────────────────────────────
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const BIRTHDAY_RE = /^\d{2}\/\d{2}\/\d{4}$/;
 
-  const removeSocial = (i: number) => {
-    const next = form.socials.filter((_, idx) => idx !== i);
-    set("socials", next.length ? next : [{ platform: "LinkedIn", handle: "" }]);
+  const emailValid = !form.email.trim() || EMAIL_RE.test(form.email.trim());
+  const birthdayValid = !form.birthday.trim() || BIRTHDAY_RE.test(form.birthday.trim());
+  // Rehberden aktarılan kişilerde ilişki türü zorunlu değil — formu doldurmadan hızlıca kaydedilebilsin.
+  const relationshipRequired = !importedName;
+  const canSave = !!form.fullName.trim() && emailValid && birthdayValid
+    && (!relationshipRequired || !!form.relationship);
+
+  const validate = () => {
+    const e: Partial<Record<keyof ContactForm, string>> = {};
+    if (!form.fullName.trim()) e.fullName = "Ad Soyad zorunlu.";
+    if (relationshipRequired && !form.relationship) e.relationship = "İlişki türü seçin.";
+    if (!emailValid)          e.email = "Geçerli bir e-posta adresi gir.";
+    if (!birthdayValid)       e.birthday = "Tarihi GG/AA/YYYY biçiminde gir.";
+    setErrors(e);
+    return !Object.keys(e).length;
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!validate()) return;
+    await addContact({
+      ...form,
+      tags: selectedTags.join(", "),
+      lastContactDate: form.lastContactDate || new Date().toISOString().split("T")[0],
+    });
+    navigation.goBack();
+    showToast("Kişi kaydedildi");
+  };
+
+  const handleBack = () => {
+    if (isDirty) setDiscard(true);
+    else navigation.goBack();
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* ── App Bar ── */}
-      <View style={styles.appBar}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backBtn} activeOpacity={0.7}>
-          <View style={styles.backArrow} />
-          <Text style={styles.backText}>Geri</Text>
+      {/* App bar */}
+      <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={handleBack} style={styles.appBarSide} activeOpacity={0.7}>
+          <Text style={styles.appBarBack}>Geri</Text>
         </TouchableOpacity>
         <Text style={styles.appBarTitle}>Kişi Ekle</Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity
+          onPress={handleSave}
+          style={styles.appBarSide}
+          activeOpacity={0.7}
+          disabled={!canSave}
+        >
+          <Text style={[styles.appBarSave, !canSave && styles.appBarSaveDisabled]}>
+            Kaydet
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* ── Form ── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.scroll}
@@ -186,355 +284,536 @@ export default function AddContactScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
 
-          {/* ════════ TEMEL BİLGİLER ════════ */}
-          <SectionHeader title="Temel Bilgiler" />
-
-          <FieldInput
-            label="Ad Soyad"
-            required
-            value={form.fullName}
-            error={errors.fullName}
-            placeholder="Ahmet Yılmaz"
-            onChangeText={v => set("fullName", v)}
-          />
-          <FieldInput
-            label="Şirket / Kurum"
-            value={form.company}
-            placeholder="Acme A.Ş."
-            onChangeText={v => set("company", v)}
-          />
-          <FieldInput
-            label="Unvan / Pozisyon"
-            value={form.jobTitle}
-            placeholder="Yazılım Mühendisi"
-            onChangeText={v => set("jobTitle", v)}
-          />
-          <FieldInput
-            label="Doğum Tarihi"
-            value={form.birthday}
-            placeholder="GG/AA/YYYY"
-            onChangeText={v => set("birthday", v)}
-          />
-
-          {/* ════════ İLİŞKİ ════════ */}
-          <SectionHeader title="İlişki" />
-
-          <DropdownField
-            label="Bu kişi senin için kim?"
-            required
-            placeholder="İlişki türü seç..."
-            value={form.relationship}
-            error={errors.relationship}
-            open={relOpen}
-            onToggle={() => { setRelOpen(p => !p); setMetOpen(false); setPrioOpen(false); }}
-            onClear={() => set("relationship", "")}
-          >
-            <View style={styles.dropGrid}>
-              {RELATIONSHIPS.map(r => (
-                <TouchableOpacity
-                  key={r.label}
-                  style={[styles.dropGridItem, form.relationship === r.label && styles.dropGridItemActive]}
-                  onPress={() => { set("relationship", r.label); setRelOpen(false); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropGridEmoji}>{r.emoji}</Text>
-                  <Text style={[styles.dropGridLabel, form.relationship === r.label && styles.dropGridLabelActive]}>
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* ── Section 1: Import ── */}
+          <TouchableOpacity style={styles.importCard} onPress={handleImport} activeOpacity={0.8}>
+            <View style={styles.importIconWrap}>
+              <ContactBookIcon />
             </View>
-          </DropdownField>
-
-          <DropdownField
-            label="Nerede tanıştınız?"
-            placeholder="Tanışma yeri seç..."
-            value={form.metWhere}
-            open={metOpen}
-            onToggle={() => { setMetOpen(p => !p); setRelOpen(false); setPrioOpen(false); }}
-            onClear={() => set("metWhere", "")}
-          >
-            <View style={styles.dropList}>
-              {MET_WHERE.map(m => (
-                <TouchableOpacity
-                  key={m.label}
-                  style={[styles.dropListItem, form.metWhere === m.label && styles.dropListItemActive]}
-                  onPress={() => { set("metWhere", m.label); setMetOpen(false); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropListEmoji}>{m.emoji}</Text>
-                  <Text style={[styles.dropListText, form.metWhere === m.label && styles.dropListTextActive]}>
-                    {m.label}
-                  </Text>
-                  {form.metWhere === m.label && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              ))}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.importTitle}>Rehberden kişi seç</Text>
+              <Text style={styles.importSub}>Telefon rehberinden bilgileri hızlıca aktar</Text>
             </View>
-          </DropdownField>
-
-          <DropdownField
-            label="Öncelik"
-            placeholder="Öncelik seviyesi seç..."
-            value={form.priority}
-            open={prioOpen}
-            onToggle={() => { setPrioOpen(p => !p); setRelOpen(false); setMetOpen(false); }}
-            onClear={() => set("priority", "")}
-          >
-            <View style={styles.dropRow}>
-              {PRIORITY_OPTIONS.map(p => (
-                <TouchableOpacity
-                  key={p.label}
-                  style={[styles.dropRowItem, form.priority === p.label && { borderColor: p.color, backgroundColor: p.color + "15" }]}
-                  onPress={() => { set("priority", p.label); setPrioOpen(false); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.dropRowEmoji}>{p.emoji}</Text>
-                  <Text style={[styles.dropRowLabel, form.priority === p.label && { color: p.color, fontWeight: "700" }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </DropdownField>
-
-          {/* ════════ İLETİŞİM ════════ */}
-          <SectionHeader title="İletişim" />
-
-          <FieldInput
-            label="Telefon"
-            value={form.phone}
-            placeholder="+90 5xx xxx xx xx"
-            keyboardType="phone-pad"
-            onChangeText={v => set("phone", v)}
-          />
-          <FieldInput
-            label="E-posta"
-            value={form.email}
-            placeholder="ornek@email.com"
-            keyboardType="email-address"
-            onChangeText={v => set("email", v)}
-          />
-
-          {/* ════════ SOSYAL MEDYA ════════ */}
-          <SectionHeader title="Sosyal Medya" />
-
-          {form.socials.map((social, i) => (
-            <View key={i} style={styles.socialCard}>
-              <View style={styles.socialCardHeader}>
-                <Text style={styles.socialCardTitle}>Hesap {i + 1}</Text>
-                {form.socials.length > 1 && (
-                  <TouchableOpacity onPress={() => removeSocial(i)} activeOpacity={0.7}>
-                    <Text style={styles.socialRemove}>Kaldır</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Platform chips */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.platformRow}>
-                {SOCIAL_PLATFORMS.map(p => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[styles.platformChip, social.platform === p && styles.platformChipActive]}
-                    onPress={() => updateSocial(i, "platform", p)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.platformChipText, social.platform === p && styles.platformChipTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <View style={styles.socialInputWrap}>
-                <TextInput
-                  style={styles.socialInput}
-                  value={social.handle}
-                  onChangeText={v => updateSocial(i, "handle", v)}
-                  placeholder="Kullanıcı adı veya URL"
-                  placeholderTextColor={C.muted}
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addSocialBtn} onPress={addSocial} activeOpacity={0.7}>
-            <Text style={styles.addSocialText}>+ Hesap ekle</Text>
+            <ChevronRight />
           </TouchableOpacity>
 
-          {/* ════════ ETİKETLER ════════ */}
-          <SectionHeader title="Etiketler" />
+          {importedName ? (
+            <View style={styles.importedPreview}>
+              <View style={styles.importedAvatar}>
+                <Text style={styles.importedAvatarText}>{initials(importedName)}</Text>
+              </View>
+              <View>
+                <Text style={styles.importedName}>{importedName}</Text>
+                {form.phone ? <Text style={styles.importedPhone}>{form.phone}</Text> : null}
+              </View>
+              <View style={styles.importedBadge}>
+                <Text style={styles.importedBadgeText}>Aktarıldı</Text>
+              </View>
+            </View>
+          ) : null}
 
-          <FieldInput
-            label="Etiketler"
-            value={form.tags}
-            placeholder="yatırımcı, mentor, teknoloji  (virgülle ayır)"
-            onChangeText={v => set("tags", v)}
+          {/* ── Section 2: Basic info ── */}
+          <SectionLabel title="Temel Bilgiler" />
+
+          <FieldGroup>
+            <Field
+              label="Ad Soyad"
+              required
+              value={form.fullName}
+              error={errors.fullName}
+              placeholder="Ahmet Yılmaz"
+              onChangeText={v => set("fullName", v)}
+            />
+            <Divider />
+            <Field
+              label="Şirket / Kurum"
+              value={form.company}
+              placeholder="Acme A.Ş."
+              onChangeText={v => set("company", v)}
+            />
+            <Divider />
+            <Field
+              label="Unvan / Pozisyon"
+              value={form.jobTitle}
+              placeholder="Yazılım Mühendisi"
+              onChangeText={v => set("jobTitle", v)}
+            />
+            <Divider />
+            <Field
+              label="Doğum Tarihi"
+              value={form.birthday}
+              error={errors.birthday}
+              placeholder="GG / AA / YYYY"
+              onChangeText={v => set("birthday", v)}
+            />
+            <Divider />
+            <Field
+              label="Şehir"
+              value={form.city}
+              placeholder="İstanbul"
+              onChangeText={v => set("city", v)}
+            />
+          </FieldGroup>
+
+          <FieldGroup>
+            <Field
+              label="Telefon"
+              value={form.phone}
+              placeholder="+90 5xx xxx xx xx"
+              keyboardType="phone-pad"
+              onChangeText={v => set("phone", v)}
+            />
+            <Divider />
+            <Field
+              label="E-posta"
+              value={form.email}
+              error={errors.email}
+              placeholder="ornek@email.com"
+              keyboardType="email-address"
+              onChangeText={v => set("email", v)}
+            />
+            <Divider />
+            <Field
+              label="Website"
+              value={form.website}
+              placeholder="https://..."
+              keyboardType="url"
+              onChangeText={v => set("website", v)}
+            />
+            <Divider />
+            <Field
+              label="LinkedIn"
+              value={form.linkedin ?? ""}
+              placeholder="linkedin.com/in/kullanici"
+              autoCapitalize="none"
+              onChangeText={v => set("linkedin", v)}
+            />
+            <Divider />
+            <Field
+              label="Instagram"
+              value={form.instagram}
+              placeholder="@kullanici"
+              autoCapitalize="none"
+              onChangeText={v => set("instagram", v)}
+            />
+          </FieldGroup>
+
+          {/* ── Section 3: Relationship ── */}
+          <SectionLabel title="İlişki" />
+
+          <ChipSection
+            label="Bu kişi senin için kim?"
+            required={relationshipRequired}
+            error={errors.relationship}
+            chips={relationships}
+            selected={form.relationship}
+            onSelect={v => set("relationship", v === form.relationship ? "" : v)}
+            onManage={() => setRelationshipManagerOpen(true)}
           />
 
-          {/* ════════ NOTLAR ════════ */}
-          <SectionHeader title="Notlar" />
+          <FieldGroup>
+            <Field
+              label="Yakınlık"
+              value={form.closenessTag ?? ""}
+              placeholder="örn. Çok yakın, Yüzeysel"
+              onChangeText={v => set("closenessTag", v)}
+            />
+          </FieldGroup>
 
-          <FieldInput
-            label="Serbest not"
-            value={form.notes}
-            placeholder={"İlk izlenim, ortak ilgi alanları,\ntakip edilecek konular..."}
-            multiline
-            onChangeText={v => set("notes", v)}
+          <ChipSection
+            label="Nerede tanıştınız?"
+            chips={MET_WHERE}
+            selected={form.metWhere}
+            onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
           />
 
-          {/* alt boşluk — butonların üstüne gelmemesi için */}
+          <ChipSection
+            label="Öncelik"
+            chips={PRIORITIES}
+            selected={form.priority}
+            onSelect={v => set("priority", v === form.priority ? "" : v)}
+            colorMap={{ Düşük: "#6B7280", Orta: "#D97706", Yüksek: "#DC2626" }}
+          />
+
+          {/* ── Section 4: Activity & reminders ── */}
+          <SectionLabel title="Son İletişim ve Hatırlatıcı" />
+
+          <ChipSection
+            label="En son ne zaman görüştünüz?"
+            chips={LAST_CONTACT_OPTIONS}
+            selected={form.lastContactDate}
+            onSelect={v => {
+              const map: Record<string, string> = {
+                "Bugün":       new Date().toISOString().split("T")[0],
+                "Dün":         daysAgo(1),
+                "1 hafta önce": daysAgo(7),
+                "1 ay önce":   daysAgo(30),
+              };
+              set("lastContactDate", map[v] ?? v);
+            }}
+            displayMap={{
+              [new Date().toISOString().split("T")[0]]: "Bugün",
+              [daysAgo(1)]: "Dün",
+              [daysAgo(7)]: "1 hafta önce",
+              [daysAgo(30)]: "1 ay önce",
+            }}
+          />
+
+          <View style={styles.card}>
+            <Text style={styles.chipLabel}>Tekrar ne zaman hatırlatayım?</Text>
+            <View style={styles.chipRow}>
+              {INTERVAL_PRESETS.map(preset => {
+                const active = !customInterval && form.reminderIntervalDays === preset.days;
+                return (
+                  <TouchableOpacity
+                    key={preset.label}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => {
+                      setCustomInterval(false);
+                      setCustomIntervalText("");
+                      set("reminderIntervalDays", preset.days);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                style={[styles.chip, customInterval && styles.chipActive]}
+                onPress={() => setCustomInterval(true)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.chipText, customInterval && styles.chipTextActive]}>
+                  {CUSTOM_INTERVAL}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {customInterval && (
+              <View style={styles.customIntervalRow}>
+                <Text style={styles.customIntervalLabel}>Her</Text>
+                <TextInput
+                  style={styles.customIntervalInput}
+                  value={customIntervalText}
+                  onChangeText={(v) => {
+                    const digits = v.replace(/[^0-9]/g, "");
+                    setCustomIntervalText(digits);
+                    const n = parseInt(digits, 10);
+                    set("reminderIntervalDays", Number.isFinite(n) && n > 0 ? n : undefined);
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="30"
+                  placeholderTextColor={colors.textMuted}
+                  maxLength={4}
+                />
+                <Text style={styles.customIntervalLabel}>günde bir iletişime geç</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Section 5: Tags ── */}
+          <SectionLabel title="Etiketler" />
+
+          <View style={styles.card}>
+            <Text style={styles.chipLabel}>Önerilen etiketler</Text>
+            <View style={styles.chipRow}>
+              {SUGGESTED_TAGS.map(tag => {
+                const active = selectedTags.includes(tag);
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => toggleTag(tag)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* ── Section 6: Notes ── */}
+          <SectionLabel title="Notlar" />
+
+          <View style={styles.card}>
+            <TextInput
+              style={styles.notesInput}
+              value={form.notes}
+              onChangeText={v => set("notes", v)}
+              placeholder="İlk izlenim, ortak ilgi alanları, önemli detaylar..."
+              placeholderTextColor={colors.textMuted}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.optionalToggle}
+            onPress={() => setNotesOpen(p => !p)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.optionalToggleText}>
+              {notesOpen ? "Ek bilgileri gizle" : "+ Aile, hediye ve kişisel notlar"}
+            </Text>
+          </TouchableOpacity>
+
+          {notesOpen && (
+            <View style={styles.card}>
+              <TextInput
+                style={styles.notesInput}
+                placeholder="Aile bilgisi, hediye fikirleri, özel günler..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+          )}
+
           <View style={{ height: 120 }} />
         </ScrollView>
 
-        {/* ── Sticky Buttons ── */}
-        <View style={[styles.stickyBar, { paddingBottom: insets.bottom + 12 }]}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={handleBackPress} activeOpacity={0.7}>
+        {/* Sticky bottom bar */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 12 }]}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={handleBack} activeOpacity={0.7}>
             <Text style={styles.cancelBtnText}>İptal</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, !form.fullName.trim() && styles.saveBtnDisabled]}
+            style={[styles.saveBtn, !canSave && styles.saveBtnOff]}
             onPress={handleSave}
-            activeOpacity={0.8}
-            disabled={!form.fullName.trim()}
+            activeOpacity={0.85}
+            disabled={!canSave}
           >
-            <Text style={styles.saveBtnText}>Kaydet</Text>
+            <Text style={styles.saveBtnText}>Kişiyi Kaydet</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
-      {/* ── Discard Confirm Modal ── */}
+      {/* Discard modal */}
       <DiscardModal
         visible={discardModal}
-        onKeep={() => setDiscardModal(false)}
-        onDiscard={() => { setDiscardModal(false); setForm(EMPTY); navigation.goBack(); }}
+        onKeep={() => setDiscard(false)}
+        onDiscard={() => { setDiscard(false); navigation.goBack(); }}
+      />
+
+      {/* Contacts permission modal */}
+      <PermissionDeniedModal
+        visible={permissionModal}
+        title="Rehbere erişim izni gerekli"
+        description="Telefon rehberinden kişi ekleyebilmek için rehber erişimine izin vermelisin."
+        onClose={() => setPermissionModal(false)}
+      />
+
+      {/* Device contact picker */}
+      <DeviceContactPickerModal
+        visible={pickerVisible}
+        contacts={deviceContacts}
+        onSelect={handlePickDeviceContact}
+        onClose={() => setPickerVisible(false)}
+      />
+
+      {/* Relationship options manager */}
+      <ManageOptionsModal
+        visible={relationshipManagerOpen}
+        title="İlişki türlerini yönet"
+        customOptions={customRelationships}
+        onAdd={handleAddRelationship}
+        onRemove={handleRemoveRelationship}
+        onClose={() => setRelationshipManagerOpen(false)}
       />
     </View>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function SectionHeader({ title }: { title: string }) {
+function initials(name: string) {
+  return name.trim().split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
+}
+
+function daysAgo(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split("T")[0];
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function SectionLabel({ title }: { title: string }) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionLine} />
+    <View style={styles.sectionLabel}>
+      <Text style={styles.sectionLabelText}>{title}</Text>
     </View>
   );
 }
 
-function FieldInput({
-  label, required, value, error, placeholder, multiline, keyboardType, onChangeText,
+function FieldGroup({ children }: { children: React.ReactNode }) {
+  return <View style={styles.card}>{children}</View>;
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+function Field({
+  label, required, value, error, placeholder, multiline, keyboardType, autoCapitalize, onChangeText,
 }: {
   label: string; required?: boolean; value: string; error?: string;
   placeholder?: string; multiline?: boolean;
-  keyboardType?: "default" | "phone-pad" | "email-address";
+  keyboardType?: "default" | "phone-pad" | "email-address" | "url";
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
   onChangeText: (v: string) => void;
 }) {
-  const hasError = !!error;
   return (
-    <View style={styles.fieldWrap}>
-      <View style={styles.fieldLabelRow}>
+    <View style={styles.field}>
+      <View style={styles.fieldTop}>
         <Text style={styles.fieldLabel}>{label}</Text>
-        {required && <Text style={styles.requiredBadge}>Zorunlu</Text>}
+        {required && <View style={styles.requiredDot} />}
       </View>
       <TextInput
-        style={[
-          styles.fieldInput,
-          multiline && styles.fieldTextArea,
-          hasError && styles.fieldInputError,
-        ]}
+        style={[styles.fieldInput, error && styles.fieldInputError]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={C.muted}
+        placeholderTextColor={colors.textMuted}
         multiline={multiline}
         keyboardType={keyboardType ?? "default"}
         textAlignVertical={multiline ? "top" : "center"}
-        autoCapitalize={keyboardType === "email-address" ? "none" : "words"}
+        autoCapitalize={autoCapitalize ?? (keyboardType === "email-address" || keyboardType === "url" ? "none" : "words")}
       />
-      {hasError && (
-        <View style={styles.errorRow}>
-          <Text style={styles.errorDot}>●</Text>
-          <Text style={styles.errorMsg}>{error}</Text>
-        </View>
-      )}
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
 
-function DropdownField({
-  label, required, placeholder, value, error, open, onToggle, onClear, children,
+function ChipSection({
+  label, required, error, chips, selected, onSelect, colorMap, displayMap, onManage,
 }: {
-  label: string; required?: boolean; placeholder: string; value: string;
-  error?: string; open: boolean;
-  onToggle: () => void; onClear: () => void;
-  children: React.ReactNode;
+  label: string; required?: boolean; error?: string;
+  chips: string[]; selected: string;
+  onSelect: (v: string) => void;
+  colorMap?: Record<string, string>;
+  displayMap?: Record<string, string>;
+  onManage?: () => void;
 }) {
+  const displayVal = displayMap?.[selected] ?? selected;
   return (
-    <View style={styles.fieldWrap}>
-      <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
-        {required && <Text style={styles.requiredBadge}>Zorunlu</Text>}
+    <View style={styles.card}>
+      <View style={styles.fieldTop}>
+        <Text style={styles.chipLabel}>{label}</Text>
+        {required && <View style={styles.requiredDot} />}
       </View>
-
-      <TouchableOpacity
-        style={[styles.dropTrigger, error && styles.fieldInputError, open && styles.dropTriggerOpen]}
-        onPress={onToggle}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.dropTriggerText, !value && { color: C.muted }]}>
-          {value || placeholder}
-        </Text>
-        <View style={styles.dropTriggerRight}>
-          {!!value && (
+      <View style={styles.chipRow}>
+        {chips.map(chip => {
+          const isActive = selected === chip || displayVal === chip;
+          const accent = colorMap?.[chip];
+          return (
             <TouchableOpacity
-              onPress={e => { e.stopPropagation?.(); onClear(); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              key={chip}
+              style={[
+                styles.chip,
+                isActive && (accent
+                  ? { backgroundColor: accent + "18", borderColor: accent }
+                  : styles.chipActive),
+              ]}
+              onPress={() => onSelect(chip)}
+              activeOpacity={0.75}
             >
-              <Text style={styles.dropClear}>✕</Text>
+              <Text style={[
+                styles.chipText,
+                isActive && (accent ? { color: accent, fontWeight: "600" } : styles.chipTextActive),
+              ]}>
+                {chip}
+              </Text>
             </TouchableOpacity>
-          )}
-          <Text style={[styles.dropChevron, open && styles.dropChevronOpen]}>›</Text>
-        </View>
-      </TouchableOpacity>
-
-      {open && (
-        <View style={styles.dropPanel}>
-          {children}
-        </View>
-      )}
-
-      {!!error && (
-        <View style={styles.errorRow}>
-          <Text style={styles.errorDot}>●</Text>
-          <Text style={styles.errorMsg}>{error}</Text>
-        </View>
-      )}
+          );
+        })}
+        {onManage && (
+          <TouchableOpacity
+            style={styles.chipAddBtn}
+            onPress={onManage}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.chipAddBtnText}>+</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
 
-function DiscardModal({
-  visible, onKeep, onDiscard,
+function ManageOptionsModal({
+  visible, title, customOptions, onAdd, onRemove, onClose,
 }: {
-  visible: boolean; onKeep: () => void; onDiscard: () => void;
+  visible: boolean;
+  title: string;
+  customOptions: string[];
+  onAdd: (label: string) => void;
+  onRemove: (label: string) => void;
+  onClose: () => void;
 }) {
+  const [text, setText] = useState("");
+
+  const handleAdd = () => {
+    if (!text.trim()) return;
+    onAdd(text.trim());
+    setText("");
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <Pressable style={styles.overlay} onPress={onKeep}>
-        <Pressable style={styles.discardBox}>
-          <View style={styles.discardIcon}>
-            <Text style={styles.discardIconText}>⚠️</Text>
-          </View>
-          <Text style={styles.discardTitle}>Değişiklikler kaybolacak</Text>
-          <Text style={styles.discardDesc}>
-            Kaydetmeden çıkarsan girdiğin bilgiler silinecek. Devam etmek istiyor musun?
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={styles.modalBox}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalDesc}>
+            Kendi seçeneğini ekle veya daha önce eklediklerini kaldır.
           </Text>
-          <TouchableOpacity style={styles.discardKeepBtn} onPress={onKeep} activeOpacity={0.8}>
-            <Text style={styles.discardKeepText}>Düzenlemeye devam et</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.discardLeaveBtn} onPress={onDiscard} activeOpacity={0.8}>
-            <Text style={styles.discardLeaveText}>Sil ve çık</Text>
+
+          <View style={styles.manageInputRow}>
+            <TextInput
+              style={styles.manageInput}
+              value={text}
+              onChangeText={setText}
+              placeholder="Yeni seçenek yaz..."
+              placeholderTextColor={colors.textMuted}
+              onSubmitEditing={handleAdd}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={[styles.manageAddBtn, !text.trim() && styles.manageAddBtnOff]}
+              onPress={handleAdd}
+              activeOpacity={0.8}
+              disabled={!text.trim()}
+            >
+              <Text style={styles.manageAddBtnText}>Ekle</Text>
+            </TouchableOpacity>
+          </View>
+
+          {customOptions.length > 0 ? (
+            <View style={styles.manageList}>
+              {customOptions.map((opt) => (
+                <View key={opt} style={styles.manageListRow}>
+                  <Text style={styles.manageListText} numberOfLines={1}>{opt}</Text>
+                  <TouchableOpacity
+                    onPress={() => onRemove(opt)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.manageListRemove}>Kaldır</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.manageEmptyText}>Henüz özel seçenek eklemedin.</Text>
+          )}
+
+          <TouchableOpacity style={styles.modalPrimary} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.modalPrimaryText}>Kapat</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -542,468 +821,379 @@ function DiscardModal({
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+function DiscardModal({ visible, onKeep, onDiscard }: {
+  visible: boolean; onKeep: () => void; onDiscard: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <Pressable style={styles.overlay} onPress={onKeep}>
+        <Pressable style={styles.modalBox}>
+          <Text style={styles.modalTitle}>Değişiklikler kaybolacak</Text>
+          <Text style={styles.modalDesc}>
+            Kaydetmeden çıkarsan girdiğin bilgiler silinecek.
+          </Text>
+          <TouchableOpacity style={styles.modalPrimary} onPress={onKeep} activeOpacity={0.85}>
+            <Text style={styles.modalPrimaryText}>Düzenlemeye devam et</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.modalSecondary} onPress={onDiscard} activeOpacity={0.75}>
+            <Text style={styles.modalSecondaryText}>Sil ve çık</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
+  visible: boolean;
+  contacts: Contacts.ExistingContact[];
+  onSelect: (c: Contacts.ExistingContact) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={styles.pickerBox}>
+          <Text style={styles.modalTitle}>Rehberden Seç</Text>
+          <Text style={styles.modalDesc}>Forma aktarmak istediğin kişiyi seç.</Text>
+          <FlatList
+            data={contacts}
+            keyExtractor={(item, i) => item.id ?? String(i)}
+            style={styles.pickerList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerRow}
+                onPress={() => onSelect(item)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.pickerAvatar}>
+                  <Text style={styles.pickerAvatarText}>{initials(item.name || "?")}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || "İsimsiz"}</Text>
+                  <Text style={styles.pickerRowSub} numberOfLines={1}>
+                    {item.phoneNumbers?.[0]?.number || item.emails?.[0]?.email || ""}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+          <TouchableOpacity style={styles.modalSecondary} onPress={onClose} activeOpacity={0.75}>
+            <Text style={styles.modalSecondaryText}>Kapat</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ── Inline SVG-less Icons ─────────────────────────────────────────────────────
+
+function ContactBookIcon() {
+  return (
+    <View style={{ width: 22, height: 22, justifyContent: "center", alignItems: "center" }}>
+      <View style={{
+        width: 16, height: 18, borderRadius: 3,
+        borderWidth: 1.8, borderColor: colors.primary,
+        justifyContent: "center", alignItems: "center",
+      }}>
+        <View style={{ width: 8, height: 1.5, backgroundColor: colors.primary, marginBottom: 2, borderRadius: 1 }} />
+        <View style={{ width: 8, height: 1.5, backgroundColor: colors.primary, marginBottom: 2, borderRadius: 1 }} />
+        <View style={{ width: 8, height: 1.5, backgroundColor: colors.primary, borderRadius: 1 }} />
+      </View>
+    </View>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <View style={{
+      width: 7, height: 7,
+      borderTopWidth: 1.8, borderRightWidth: 1.8,
+      borderColor: colors.textMuted,
+      transform: [{ rotate: "45deg" }],
+      marginRight: 2,
+    }} />
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-
-  // App Bar
-  appBar: {
-    height: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    backgroundColor: C.card,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  backBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    minWidth: 64,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: 4,
-  },
-  backArrow: {
-    width: 8,
-    height: 8,
-    borderLeftWidth: 2,
-    borderBottomWidth: 2,
-    borderColor: C.purple,
-    transform: [{ rotate: "45deg" }],
-    marginRight: 2,
-  },
-  backText: {
-    fontSize: 15,
-    color: C.purple,
-    fontWeight: "500",
-  },
-  appBarTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: C.text,
-  },
-
-  // Scroll
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 20 },
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
 
-  // Badge
-  badgeWrap: {
-    alignItems: "center",
-    marginBottom: 24,
-    gap: 8,
-  },
-  badge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: C.purpleLight,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
-    borderColor: C.purpleMid + "55",
-  },
-  badgeText: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: C.purple,
-    letterSpacing: 1,
-  },
-  priorityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  priorityBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  // Section Header
-  sectionHeader: {
+  // App bar
+  appBar: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 24,
-    marginBottom: 12,
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: C.purple,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  sectionLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: C.border,
-  },
-
-  // Field
-  fieldWrap: { marginBottom: 14 },
-  fieldLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    marginBottom: 7,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 12,
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: C.sub,
+  appBarSide: { minWidth: 60 },
+  appBarBack: { fontSize: 15, color: colors.primary, fontWeight: "500" },
+  appBarTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
+  appBarSave: { fontSize: 15, color: colors.primary, fontWeight: "700", textAlign: "right" },
+  appBarSaveDisabled: { color: colors.textMuted },
+
+  // Import card
+  importCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.primary + "30",
+    padding: 16,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  requiredBadge: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: C.purple,
-    backgroundColor: C.purpleLight,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    overflow: "hidden",
+  importIconWrap: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: colors.primary + "18",
+    alignItems: "center", justifyContent: "center",
+  },
+  importTitle: { fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: 2 },
+  importSub:   { fontSize: 12, color: colors.textSub, lineHeight: 17 },
+
+  importedPreview: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: colors.card, borderRadius: radius.card,
+    borderWidth: 1, borderColor: colors.border,
+    padding: 12, marginBottom: spacing.sm,
+  },
+  importedAvatar: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: colors.primary + "18",
+    alignItems: "center", justifyContent: "center",
+  },
+  importedAvatarText: { fontSize: 14, fontWeight: "700", color: colors.primary },
+  importedName:  { fontSize: 14, fontWeight: "600", color: colors.text },
+  importedPhone: { fontSize: 12, color: colors.textSub, marginTop: 1 },
+  importedBadge: {
+    marginLeft: "auto", backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  importedBadgeText: { fontSize: 11, color: colors.primary, fontWeight: "600" },
+
+  // Section label
+  sectionLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
+  sectionLabelText: {
+    fontSize: 11, fontWeight: "800", letterSpacing: 0.8,
+    textTransform: "uppercase", color: colors.textSub,
+  },
+
+  // Card container
+  card: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: spacing.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+      },
+      android: { elevation: 1 },
+    }),
+  },
+
+  // Field (grouped inside card)
+  field: { paddingVertical: 4 },
+  fieldTop: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  fieldLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub },
+  requiredDot: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: colors.primary,
   },
   fieldInput: {
-    height: 48,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: C.text,
+    fontSize: 15, color: colors.text,
+    paddingVertical: 0, minHeight: 28,
   },
-  fieldTextArea: {
-    height: 112,
-    paddingTop: 13,
+  fieldInputError: { color: colors.danger },
+  fieldError: { fontSize: 11, color: colors.danger, marginTop: 4, fontWeight: "500" },
+
+  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 10 },
+
+  // Chips
+  chipLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub, marginBottom: 10 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card,
   },
-  fieldInputError: {
-    borderColor: C.errorBorder,
-    backgroundColor: C.errorBg,
+  chipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
-  errorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 5,
+  chipText: { fontSize: 13, color: colors.textSub, fontWeight: "500" },
+  chipTextActive: { color: colors.primary, fontWeight: "700" },
+  chipAddBtn: {
+    width: 34, height: 34,
+    borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: "center", justifyContent: "center",
   },
-  errorDot: {
-    fontSize: 7,
-    color: C.error,
+  chipAddBtnText: { fontSize: 17, color: colors.primary, fontWeight: "700", marginTop: -1 },
+
+  // Custom reminder interval
+  customIntervalRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginTop: 12,
   },
-  errorMsg: {
-    fontSize: 12,
-    color: C.error,
-    fontWeight: "600",
+  customIntervalLabel: { fontSize: 13, color: colors.textSub, fontWeight: "500" },
+  customIntervalInput: {
+    minWidth: 56, textAlign: "center",
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.input,
+    backgroundColor: colors.card, color: colors.text,
+    fontSize: 14, fontWeight: "700",
+    paddingVertical: 8, paddingHorizontal: 10,
   },
 
-  // Dropdown Trigger
-  dropTrigger: {
-    height: 48,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dropTriggerOpen: {
-    borderColor: C.purple,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomWidth: 0,
-  },
-  dropTriggerText: {
-    fontSize: 15,
-    color: C.text,
-    flex: 1,
-  },
-  dropTriggerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  dropClear: {
-    fontSize: 12,
-    color: C.muted,
-    padding: 2,
-  },
-  dropChevron: {
-    fontSize: 20,
-    color: C.muted,
-    transform: [{ rotate: "90deg" }],
-    lineHeight: 22,
-  },
-  dropChevronOpen: {
-    transform: [{ rotate: "270deg" }],
-    color: C.purple,
-  },
-  dropPanel: {
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: C.purple,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    overflow: "hidden",
+  // Notes
+  notesInput: {
+    fontSize: 14, color: colors.text,
+    minHeight: 90, lineHeight: 22,
   },
 
-  // Grid dropdown (relationship)
-  dropGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    padding: 10,
-    gap: 8,
-  },
-  dropGridItem: {
-    width: "47%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.bg,
-  },
-  dropGridItemActive: {
-    borderColor: C.purple,
-    backgroundColor: C.purpleLight,
-  },
-  dropGridEmoji: { fontSize: 18 },
-  dropGridLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: C.sub,
-    flex: 1,
-  },
-  dropGridLabelActive: {
-    color: C.purple,
-    fontWeight: "700",
-  },
+  // Optional toggle
+  optionalToggle: { alignSelf: "flex-start", marginBottom: spacing.sm },
+  optionalToggleText: { fontSize: 13, color: colors.primary, fontWeight: "600" },
 
-  // List dropdown (met where)
-  dropList: { paddingVertical: 4 },
-  dropListItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  dropListItemActive: {
-    backgroundColor: C.purpleLight,
-  },
-  dropListEmoji: { fontSize: 16 },
-  dropListText: { fontSize: 14, color: C.text, flex: 1, fontWeight: "500" },
-  dropListTextActive: { color: C.purple, fontWeight: "700" },
-  checkmark: { fontSize: 15, color: C.purple, fontWeight: "700" },
-
-  // Row dropdown (priority)
-  dropRow: {
-    flexDirection: "row",
-    padding: 12,
-    gap: 8,
-  },
-  dropRowItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    gap: 4,
-  },
-  dropRowEmoji: { fontSize: 20 },
-  dropRowLabel: { fontSize: 13, fontWeight: "500", color: C.sub },
-
-  // Social
-  socialCard: {
-    backgroundColor: C.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginBottom: 10,
-    overflow: "hidden",
-  },
-  socialCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  socialCardTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.text,
-  },
-  socialRemove: {
-    fontSize: 13,
-    color: C.error,
-    fontWeight: "700",
-  },
-  platformRow: {
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 6,
-    flexDirection: "row",
-  },
-  platformChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.bg,
-  },
-  platformChipActive: {
-    backgroundColor: C.purple,
-    borderColor: C.purple,
-  },
-  platformChipText: { fontSize: 12, fontWeight: "600", color: C.sub },
-  platformChipTextActive: { color: "#fff" },
-  socialInputWrap: {
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-  },
-  socialInput: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: C.text,
-  },
-  addSocialBtn: {
-    alignItems: "center",
-    paddingVertical: 10,
-    marginBottom: 4,
-  },
-  addSocialText: {
-    fontSize: 14,
-    color: C.purple,
-    fontWeight: "700",
-  },
-
-  // Sticky bar
-  stickyBar: {
+  // Bottom bar
+  bottomBar: {
     flexDirection: "row",
     gap: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingTop: 12,
-    backgroundColor: C.card,
+    backgroundColor: colors.bg,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: colors.borderLight,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+    }),
   },
   cancelBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1, height: 52, borderRadius: radius.button,
+    borderWidth: 1.5, borderColor: colors.border,
+    alignItems: "center", justifyContent: "center",
   },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: C.sub,
-  },
+  cancelBtnText: { fontSize: 15, fontWeight: "600", color: colors.textSub },
   saveBtn: {
-    flex: 2,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: C.purple,
+    flex: 2.2, height: 52, borderRadius: radius.button,
+    backgroundColor: colors.primary,
+    alignItems: "center", justifyContent: "center",
+  },
+  saveBtnOff: { backgroundColor: colors.primary + "55" },
+  saveBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF", letterSpacing: 0.2 },
+
+  // Modal
+  overlay: {
+    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    alignItems: "center", justifyContent: "center", padding: 24,
+  },
+  modalBox: {
+    width: "100%", maxWidth: 360,
+    backgroundColor: colors.bg, borderRadius: radius.modal, padding: 24,
     alignItems: "center",
-    justifyContent: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 20,
+      },
+      android: { elevation: 16 },
+    }),
   },
-  saveBtnDisabled: {
-    backgroundColor: C.purpleMid + "80",
+  modalTitle: { fontSize: 18, fontWeight: "800", color: colors.text, marginBottom: 8, textAlign: "center" },
+  modalDesc:  { fontSize: 14, color: colors.textSub, textAlign: "center", lineHeight: 21, marginBottom: 24 },
+  modalPrimary: {
+    width: "100%", height: 50, borderRadius: radius.button,
+    backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  saveBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: 0.3,
+  modalPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  modalSecondary: {
+    width: "100%", height: 50, borderRadius: radius.button,
+    backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.danger + "50",
+    alignItems: "center", justifyContent: "center",
+  },
+  modalSecondaryText: { color: colors.danger, fontWeight: "700", fontSize: 15 },
+
+  // Manage options modal
+  manageInputRow: {
+    flexDirection: "row", gap: 8, width: "100%", marginBottom: 14,
+  },
+  manageInput: {
+    flex: 1, height: 46,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.input,
+    backgroundColor: colors.card, color: colors.text,
+    paddingHorizontal: 14, fontSize: 14,
+  },
+  manageAddBtn: {
+    height: 46, paddingHorizontal: 16, borderRadius: radius.input,
+    backgroundColor: colors.primary,
+    alignItems: "center", justifyContent: "center",
+  },
+  manageAddBtnOff: { backgroundColor: colors.primary + "55" },
+  manageAddBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  manageList: { width: "100%", marginBottom: 14 },
+  manageListRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+  },
+  manageListText: { flex: 1, fontSize: 14, color: colors.text, fontWeight: "500", marginRight: 12 },
+  manageListRemove: { fontSize: 13, color: colors.danger, fontWeight: "700" },
+  manageEmptyText: {
+    fontSize: 13, color: colors.textMuted, textAlign: "center",
+    marginBottom: 14,
   },
 
-  // Discard Modal
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(10,8,30,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+  // Device contact picker
+  pickerBox: {
+    width: "100%", maxWidth: 400, maxHeight: "75%",
+    backgroundColor: colors.bg, borderRadius: radius.modal, padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 20,
+      },
+      android: { elevation: 16 },
+    }),
   },
-  discardBox: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: C.card,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: "center",
+  pickerList: { marginTop: 8, marginBottom: 12 },
+  pickerRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
   },
-  discardIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#FEF3C7",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
+  pickerAvatar: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: colors.primary + "18",
+    alignItems: "center", justifyContent: "center",
   },
-  discardIconText: { fontSize: 26 },
-  discardTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: C.text,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  discardDesc: {
-    fontSize: 14,
-    color: C.sub,
-    textAlign: "center",
-    lineHeight: 21,
-    marginBottom: 24,
-  },
-  discardKeepBtn: {
-    width: "100%",
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: C.purple,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  discardKeepText: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  discardLeaveBtn: {
-    width: "100%",
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: C.errorBg,
-    borderWidth: 1,
-    borderColor: C.errorBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  discardLeaveText: {
-    color: C.error,
-    fontWeight: "800",
-    fontSize: 15,
-  },
+  pickerAvatarText: { fontSize: 14, fontWeight: "700", color: colors.primary },
+  pickerRowName: { fontSize: 14, fontWeight: "600", color: colors.text },
+  pickerRowSub: { fontSize: 12, color: colors.textSub, marginTop: 1 },
 });
