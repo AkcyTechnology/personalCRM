@@ -142,7 +142,7 @@ export default function BottomTabBar({ activeTab, onTabPress, onAddPress }: Prop
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     borderTopLeftRadius: radius.bottomBar,
     borderTopRightRadius: radius.bottomBar,
     paddingTop: 8,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     height: 1,
-    backgroundColor: "#F0EFF8",
+    backgroundColor: colors.borderLight,
     borderRadius: 1,
   },
   row: {
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     ...Platform.select({
       ios: {
-        shadowColor: "#00B5AC",
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.28,
         shadowRadius: 10,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     }),
   },
   addIcon: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 32,
     fontWeight: "200",
     lineHeight: 36,

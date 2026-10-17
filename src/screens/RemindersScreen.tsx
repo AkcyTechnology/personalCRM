@@ -5,13 +5,14 @@ import AppHeader from "../components/AppHeader";
 import EmptyState from "../components/EmptyState";
 import SnoozeModal from "../components/SnoozeModal";
 import MessageComposer from "../components/MessageComposer";
-import { loadContacts, markContacted, snoozeContact } from "../data/contacts";
+import { loadContacts, markContacted, snoozeContact, updateContact } from "../data/contacts";
+import { hapticSuccess } from "../utils/haptics";
 import LogInteractionModal from "../components/LogInteractionModal";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm, InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { isSnoozed, isDue, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
-import { showToast } from "../components/Toast";
+import { showToast, showUndoToast } from "../components/Toast";
 
 const PURPLE = colors.primary;
 const BG = colors.bg;
@@ -108,10 +109,14 @@ export default function RemindersScreen({ navigation }: any) {
 
   const handleSnoozeConfirm = useCallback(async (date: string) => {
     if (!snoozeTarget?.id) return;
+    const target = snoozeTarget;
     try {
-      await snoozeContact(snoozeTarget.id, date);
+      await snoozeContact(target.id!, date);
       setContacts(await loadContacts());
-      showToast("Hatırlatma ertelendi");
+      showUndoToast("Hatırlatma ertelendi", async () => {
+        await updateContact(target.id!, { snoozedUntil: target.snoozedUntil });
+        setContacts(await loadContacts());
+      });
     } catch {
       showToast("Ertelenemedi. Lütfen tekrar dene.");
     }
@@ -124,10 +129,20 @@ export default function RemindersScreen({ navigation }: any) {
     const target = logTarget;
     setLogTarget(null);
     if (!target?.id) return;
+    const snapshot = {
+      interactions: target.interactions,
+      lastContactDate: target.lastContactDate,
+      reminderIntervalStart: target.reminderIntervalStart,
+      snoozedUntil: target.snoozedUntil,
+    };
     try {
       await markContacted(target.id, type, note, date);
+      hapticSuccess();
       setContacts(await loadContacts());
-      showToast("Görüşme kaydedildi");
+      showUndoToast("Görüşme kaydedildi", async () => {
+        await updateContact(target.id!, snapshot);
+        setContacts(await loadContacts());
+      });
     } catch {
       showToast("Kaydedilemedi. Lütfen tekrar dene.");
     }
@@ -146,10 +161,10 @@ export default function RemindersScreen({ navigation }: any) {
 
       {isEmpty ? (
         <EmptyState
-          icon="🔔"
-          title="Henüz hatırlatıcın yok"
-          description="Ulaşmak istediğin kişiler için hatırlatıcı oluşturabilirsin."
-          buttonLabel="Hatırlatıcı oluştur"
+          icon="notifications-outline"
+          title="Her şey yolunda"
+          description="Bekleyen görüşme ya da yaklaşan doğum günü yok."
+          buttonLabel="Kişi ekle"
           onPress={() => navigation.navigate("AddContact")}
         />
       ) : (
@@ -164,6 +179,8 @@ export default function RemindersScreen({ navigation }: any) {
                   style={[styles.priorityCard, { borderLeftColor: days >= effectiveIntervalDays(contact, threshold) * 1.3 ? RED : ORANGE }]}
                   onPress={() => goToContact(contact)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${contact.fullName}, ${days} gündür iletişim yok`}
                 >
                   <View style={[styles.iconCircle, { backgroundColor: PURPLE + "15" }]}>
                     <Text style={[styles.iconText, { color: PURPLE }]}>{initials(contact.fullName)}</Text>

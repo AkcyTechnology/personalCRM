@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import { loadContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
@@ -18,14 +19,13 @@ import { isDue, isSnoozed, effectiveIntervalDays, neglectScore } from "../utils/
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
 
-const TEAL = "#00B5AC";
-const TEAL_DARK = "#008E88";
-const TEXT = "#111827";
-const SUB = "#687084";
-const MUTED = "#9AA3B2";
-const BORDER = "#E8ECF3";
-const SOFT = "#F8FAFC";
-const WHITE = "#FFFFFF";
+const TEAL = colors.primary;
+const TEAL_DARK = colors.primaryDark;
+const TEXT = colors.text;
+const SUB = colors.textSub;
+const MUTED = colors.textMuted;
+const BORDER = colors.borderLight;
+const WHITE = colors.white;
 
 type InsightTone = "teal" | "green" | "amber" | "red" | "blue" | "purple";
 
@@ -53,7 +53,7 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const palette = [TEAL, "#7C3AED", "#0369A1", colors.success, colors.warning];
+  const palette = [TEAL, colors.accent, "#0369A1", colors.success, colors.warning];
 
   let h = 0;
   for (const c of name) h += c.charCodeAt(0);
@@ -122,7 +122,7 @@ function toneColor(tone: InsightTone) {
     amber: colors.warning,
     red: colors.danger,
     blue: "#0369A1",
-    purple: "#7C3AED",
+    purple: colors.accent,
   };
 
   return map[tone];
@@ -252,7 +252,7 @@ export default function InsightsScreen({ navigation }: any) {
 
   return (
     <View style={styles.screen}>
-      <InsightsHeader health={data.averageHealth} />
+      <InsightsHeader />
 
       <ScrollView
         contentContainerStyle={[
@@ -288,35 +288,30 @@ export default function InsightsScreen({ navigation }: any) {
           <MetricCard
             label="Toplam"
             value={contacts.length}
-            caption="Kayıtlı kişi"
             tone="teal"
           />
 
           <MetricCard
             label="Bu hafta"
             value={data.contactedThisWeek.length}
-            caption="Temas kuruldu"
             tone="green"
           />
 
           <MetricCard
             label="Bekleyen"
             value={data.needsAttention.length}
-            caption="Ulaşılacak kişi"
             tone="red"
           />
 
           <MetricCard
             label="Özel gün"
             value={data.birthdayList.length}
-            caption="30 gün içinde"
             tone="amber"
           />
         </View>
 
         <SectionTitle
           title="Öncelikli bağlantılar"
-          subtitle="Bugün ilgilenmen iyi olabilecek kişiler"
         />
 
         {priorityList.length > 0 ? (
@@ -339,8 +334,8 @@ export default function InsightsScreen({ navigation }: any) {
           </View>
         ) : (
           <EmptyState
-            title="Kritik bağlantı yok"
-            desc="Yaklaşan veya geciken kişi görünmüyor. Ağın şu an dengeli."
+            title="Bekleyen kimse yok"
+            desc="Harika gidiyorsun!"
           />
         )}
 
@@ -348,7 +343,6 @@ export default function InsightsScreen({ navigation }: any) {
           <>
             <SectionTitle
               title="Yaklaşan özel günler"
-              subtitle="Önceden hazırlık yapabileceğin kişiler"
             />
 
             <ScrollView
@@ -370,7 +364,6 @@ export default function InsightsScreen({ navigation }: any) {
 
         <SectionTitle
           title="İlişki sağlığı"
-          subtitle="Bağlantı ağının güncel performansı"
           onInfoPress={() => setHealthInfoOpen(true)}
         />
 
@@ -390,7 +383,7 @@ export default function InsightsScreen({ navigation }: any) {
           <HealthRow
             label="Sağlıklı bağlantılar"
             value={data.healthyConnections}
-            color="#7C3AED"
+            color={colors.accent}
             last
           />
         </View>
@@ -399,7 +392,6 @@ export default function InsightsScreen({ navigation }: any) {
           <>
             <SectionTitle
               title="Bağlantı dağılımı"
-              subtitle="Kişilerin ilişki türlerine göre dağılımı"
             />
 
             <View style={styles.card}>
@@ -409,7 +401,7 @@ export default function InsightsScreen({ navigation }: any) {
                   label={label}
                   count={count}
                   total={contacts.length}
-                  color={[TEAL, "#0369A1", colors.success, colors.warning, "#7C3AED"][i % 5]}
+                  color={[TEAL, "#0369A1", colors.success, colors.warning, colors.accent][i % 5]}
                   last={i === data.relationshipMix.length - 1}
                 />
               ))}
@@ -421,7 +413,6 @@ export default function InsightsScreen({ navigation }: any) {
           <>
             <SectionTitle
               title="Güçlü bağlantılar"
-              subtitle="Son günlerde temas kurduğun kişiler"
             />
 
             <View style={styles.stack}>
@@ -437,25 +428,6 @@ export default function InsightsScreen({ navigation }: any) {
           </>
         ) : null}
 
-        {data.mostNeglected.length > 0 ? (
-          <>
-            <SectionTitle
-              title="En çok ihmal edilen kişiler"
-              subtitle="İletişim aralığını en çok aşan bağlantılar"
-            />
-
-            <View style={styles.stack}>
-              {data.mostNeglected.map((c, i) => (
-                <CompactPerson
-                  key={`${c.fullName}-neglected-${i}`}
-                  contact={c}
-                  rightText={dayLabel(daysSince(c.lastContactDate))}
-                  onPress={() => navigation.navigate("PersonDetail", { contact: c })}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
       </ScrollView>
 
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
@@ -463,17 +435,11 @@ export default function InsightsScreen({ navigation }: any) {
   );
 }
 
-function InsightsHeader({ health }: { health: number }) {
+function InsightsHeader() {
   return (
     <View style={styles.appBar}>
       <View style={styles.appBarText}>
-        <Text style={styles.appTitle}>Analiz</Text>
-        <Text style={styles.appSubtitle}>İlişki ağının güncel durumu</Text>
-      </View>
-
-      <View style={styles.headerBadge}>
-        <Text style={styles.headerBadgeValue}>{health}</Text>
-        <Text style={styles.headerBadgeLabel}>/100</Text>
+        <Text style={styles.appTitle} accessibilityRole="header">Analiz</Text>
       </View>
     </View>
   );
@@ -496,7 +462,7 @@ function MetricCard({
 }: {
   label: string;
   value: number;
-  caption: string;
+  caption?: string;
   tone: InsightTone;
 }) {
   const color = toneColor(tone);
@@ -512,7 +478,7 @@ function MetricCard({
       </View>
 
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricCaption}>{caption}</Text>
+      {caption ? <Text style={styles.metricCaption}>{caption}</Text> : null}
     </View>
   );
 }
@@ -533,7 +499,7 @@ function SectionTitle({
           <Text style={styles.sectionTitle}>{title}</Text>
           {onInfoPress ? (
             <TouchableOpacity onPress={onInfoPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={styles.sectionInfoIcon}>ⓘ</Text>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textSub} accessibilityLabel="Bilgi" />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -786,7 +752,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F2F6",
+    borderBottomColor: colors.borderLight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -816,9 +782,9 @@ const styles = StyleSheet.create({
     minWidth: 66,
     height: 42,
     borderRadius: 14,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -854,7 +820,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#64748B",
+    shadowColor: colors.textSub,
     shadowOpacity: 0.07,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -900,7 +866,7 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: "#F3FFFE",
+    backgroundColor: colors.primarySoft,
     borderWidth: 8,
     borderColor: "#D9F3F1",
     alignItems: "center",
@@ -946,7 +912,7 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 7,
     borderRadius: 999,
-    backgroundColor: "#EEF1F6",
+    backgroundColor: colors.borderLight,
     overflow: "hidden",
   },
 
@@ -1163,7 +1129,7 @@ const styles = StyleSheet.create({
 
   rowDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: "#EEF1F6",
+    borderBottomColor: colors.borderLight,
   },
 
   healthRowTop: {
@@ -1213,7 +1179,7 @@ const styles = StyleSheet.create({
     marginTop: 7,
     height: 5,
     borderRadius: 999,
-    backgroundColor: "#EEF1F6",
+    backgroundColor: colors.borderLight,
     overflow: "hidden",
   },
 
@@ -1285,7 +1251,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 20,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Pressable, KeyboardAvoidingView, Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { InteractionType } from "../screens/AddContactScreen";
 import { colors } from "../theme/colors";
 import { todayISO } from "../utils/dates";
@@ -91,7 +91,7 @@ export default function LogInteractionModal({ visible, contactName, initialType 
               accessibilityRole="button"
               accessibilityLabel="Görüşmeyi kaydet"
             >
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Ionicons name="checkmark-circle" size={20} color={colors.white} />
               <Text style={styles.saveText}>Kaydet</Text>
             </TouchableOpacity>
           </Pressable>
@@ -124,5 +124,5 @@ const styles = StyleSheet.create({
     marginTop: 16, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
     backgroundColor: colors.primary, paddingVertical: 15, borderRadius: 14,
   },
-  saveText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  saveText: { color: colors.white, fontSize: 16, fontWeight: "700" },
 });

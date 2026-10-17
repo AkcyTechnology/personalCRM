@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from "react-native";
 import { copyWithAutoClear } from "../utils/clipboard";
 import { colors } from "../theme/colors";
@@ -20,7 +20,7 @@ type Props = {
 export default function MessageComposer({ visible, contact, onClose, onExternalSend }: Props) {
   const [tone, setTone] = useState<MessageTone>("samimi");
   const [message, setMessage] = useState("");
-  const [variant, setVariant] = useState(0);
+  const [, setVariant] = useState(0);
 
   useEffect(() => {
     if (visible && contact) {
@@ -28,6 +28,8 @@ export default function MessageComposer({ visible, contact, onClose, onExternalS
       setVariant(0);
       setMessage(generateMessage(contact, "samimi"));
     }
+    // Yalnızca açılışta / kişi değişince yeniden üret
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, contact?.id, contact?.fullName]);
 
   const regenerate = (nextTone: MessageTone = tone) => {
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
   },
   btnDisabled: { backgroundColor: colors.primary + "45" },
-  primaryBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
+  primaryBtnText: { fontSize: 13, fontWeight: "700", color: colors.white },
 
   secondaryBtn: {
     marginTop: 10, height: 46, borderRadius: radius.button,

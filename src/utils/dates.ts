@@ -22,6 +22,8 @@ export function parseISODate(value: string | undefined): Date | null {
 /** Birthdays are stored as DD/MM/YYYY. */
 export function parseBirthday(value: string | undefined): { day: number; month: number; year?: number } | null {
   if (!value) return null;
+  // Bounded quantifiers, no nesting: linear-time, not a ReDoS risk.
+  // eslint-disable-next-line security/detect-unsafe-regex
   const m = /^(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?$/.exec(value.trim());
   if (!m) return null;
   const day = Number(m[1]);

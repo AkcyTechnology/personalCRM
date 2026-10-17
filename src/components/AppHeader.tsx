@@ -1,7 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
-import { radius } from "../theme/radius";
 
 const HEADER_HEIGHT = 64;
 
@@ -111,7 +110,7 @@ function IconButton({ label, onPress }: { label: string; color?: string; onPress
       accessibilityRole="button"
       accessibilityLabel={label === "+" || label === "＋" ? "Ekle" : label}
     >
-      <Text style={{ fontSize: 22, color: "#FFFFFF", fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
+      <Text style={{ fontSize: 22, color: colors.white, fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -134,9 +133,9 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F0EFF8",
+    borderBottomColor: colors.borderLight,
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowRadius: 6,

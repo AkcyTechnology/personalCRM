@@ -4,6 +4,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import { updateSettings } from "../data/userSettings";
 
@@ -47,9 +48,9 @@ export default function SignUpScreen({ navigation }: any) {
 
           {/* Privacy promises */}
           <View style={styles.promiseGroup}>
-            <PromiseRow icon="🔒" text={Platform.OS === "web" ? "Verilerin yalnızca bu cihazda saklanır" : "Verilerin cihazında şifreli saklanır"} />
-            <PromiseRow icon="📵" text="Hesap yok, sunucu yok, reklam yok" />
-            <PromiseRow icon="🗑️" text="İstediğin an tek dokunuşla hepsini sil" />
+            <PromiseRow icon="lock-closed-outline" text={Platform.OS === "web" ? "Verilerin yalnızca bu cihazda saklanır" : "Verilerin cihazında şifreli saklanır"} />
+            <PromiseRow icon="cloud-offline-outline" text="Hesap yok, sunucu yok, reklam yok" />
+            <PromiseRow icon="trash-outline" text="İstediğin an tek dokunuşla hepsini sil" />
           </View>
 
           {/* Primary CTA */}
@@ -64,7 +65,7 @@ export default function SignUpScreen({ navigation }: any) {
               accessibilityRole="button"
             >
               <LinearGradient
-                colors={["#4DD9CF", TEAL]}
+                colors={[colors.gradientFrom, TEAL]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.guestBtn}
@@ -101,11 +102,11 @@ export default function SignUpScreen({ navigation }: any) {
   );
 }
 
-function PromiseRow({ icon, text }: { icon: string; text: string }) {
+function PromiseRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.promiseRow}>
       <View style={styles.promiseLeft}>
-        <Text style={styles.promiseIcon}>{icon}</Text>
+        <Ionicons name={icon} size={20} color={colors.primary} style={styles.promiseIcon} />
         <Text style={styles.promiseLabel}>{text}</Text>
       </View>
     </View>
@@ -113,10 +114,10 @@ function PromiseRow({ icon, text }: { icon: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
-  promiseLabel: { fontSize: 15, fontWeight: "600", color: "#111827" },
+  promiseLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   outer: {
     flex: 1,
-    backgroundColor: "#FAFAFE",
+    backgroundColor: colors.card,
   },
   centerer: {
     flex: 1,
@@ -147,18 +148,18 @@ const styles = StyleSheet.create({
   betaText: { fontSize: 11, fontWeight: "900", color: TEAL, letterSpacing: 1 },
 
   title: {
-    fontSize: 26, fontWeight: "900", color: "#1A1830",
+    fontSize: 26, fontWeight: "900", color: colors.text,
     marginTop: 12, textAlign: "center",
   },
   subtitle: {
-    fontSize: 14, color: "#8E8AA3",
+    fontSize: 14, color: colors.textSub,
     textAlign: "center", lineHeight: 22, marginTop: 8,
   },
 
   promiseGroup: { width: "100%", gap: 10, marginTop: 24 },
   promiseRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#FFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8E4F4",
+    backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
     paddingHorizontal: 16, paddingVertical: 14,
   },
   promiseLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -171,9 +172,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.38, shadowRadius: 16, elevation: 10,
   },
   guestBtn: { height: 56, alignItems: "center", justifyContent: "center" },
-  guestBtnText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
-  guestNote: { textAlign: "center", marginTop: 10, fontSize: 12, color: "#A0A0B0" },
+  guestBtnText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  guestNote: { textAlign: "center", marginTop: 10, fontSize: 12, color: colors.textMuted },
 
-  footer: { marginTop: 20, fontSize: 11, color: "#A0A0B0", textAlign: "center", lineHeight: 18 },
+  footer: { marginTop: 20, fontSize: 11, color: colors.textMuted, textAlign: "center", lineHeight: 18 },
   link: { color: TEAL, fontWeight: "600" },
 });

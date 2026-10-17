@@ -23,6 +23,8 @@ export function toSafeWebUrl(input: string): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
   if (!/^https?:\/\//i.test(withScheme)) return null;
   const host = withScheme.replace(/^https?:\/\//i, "").split(/[/?#]/)[0];
+  // Single character class + optional port: linear-time, not a ReDoS risk.
+  // eslint-disable-next-line security/detect-unsafe-regex
   if (!host || !/^[a-z0-9.-]+(:\d+)?$/i.test(host) || !host.includes(".")) return null;
   return withScheme;
 }

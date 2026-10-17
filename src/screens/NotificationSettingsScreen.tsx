@@ -157,7 +157,7 @@ function SwitchRow({
         value={value}
         onValueChange={onChange}
         trackColor={{ false: colors.border, true: colors.primary + "88" }}
-        thumbColor={value ? colors.primary : "#FFFFFF"}
+        thumbColor={value ? colors.primary : colors.white}
       />
     </View>
   );

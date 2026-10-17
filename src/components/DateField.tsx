@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, Pressable, TextInput } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import { birthdayToDate, formatBirthday, formatLongTR, parseISODate, toISODate } from "../utils/dates";
 
@@ -148,5 +148,5 @@ const styles = StyleSheet.create({
   secondaryBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.card, alignItems: "center" },
   secondaryText: { fontSize: 15, fontWeight: "600", color: colors.textSub },
   primaryBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center" },
-  primaryText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
+  primaryText: { fontSize: 15, fontWeight: "700", color: colors.white },
 });

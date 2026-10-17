@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   StatusBar,
   FlatList,
 } from "react-native";
@@ -28,7 +27,8 @@ import { toSafeWebUrl } from "../utils/links";
 import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { addContact } from "../data/contacts";
+import { addContact, loadContacts } from "../data/contacts";
+import { isDuplicateContact } from "../utils/duplicateContact";
 import { loadSettings } from "../data/userSettings";
 import {
   DEFAULT_RELATIONSHIPS,
@@ -42,6 +42,7 @@ import { radius } from "../theme/radius";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { showToast } from "../components/Toast";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
+import { confirmDialog, infoDialog } from "../utils/confirm";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,8 @@ export default function AddContactScreen({ navigation }: Props) {
   const [discardModal, setDiscard]  = useState(false);
   const [importedName, setImported] = useState("");
   const [customLastContact, setCustomLastContact] = useState(false);
-  const [notesOpen, setNotesOpen]   = useState(false);
+  const [moreOpen, setMoreOpen]     = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customInterval, setCustomInterval] = useState(false);
   const [customIntervalText, setCustomIntervalText] = useState("");
@@ -190,7 +192,7 @@ export default function AddContactScreen({ navigation }: Props) {
       showToast("Rehber izni verilmedi");
       setPermissionModal(true);
     } else if (error instanceof ContactsUnavailableError) {
-      Alert.alert("Rehber kullanılamıyor", error.message);
+      infoDialog("Rehber kullanılamıyor", error.message);
     } else {
       showToast("Bir sorun oluştu. Lütfen tekrar dene.");
     }
@@ -211,7 +213,7 @@ export default function AddContactScreen({ navigation }: Props) {
     try {
       const data = await listDeviceContactsAsync();
       if (!data.length) {
-        Alert.alert("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
+        infoDialog("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
         return;
       }
       setDeviceContacts(data);
@@ -247,8 +249,8 @@ export default function AddContactScreen({ navigation }: Props) {
   const birthdayValid = !form.birthday.trim() || BIRTHDAY_RE.test(form.birthday.trim());
   // Rehberden aktarılan kişilerde ilişki türü zorunlu değil — formu doldurmadan hızlıca kaydedilebilsin.
   const relationshipRequired = !importedName;
-  const canSave = !!form.fullName.trim() && emailValid && birthdayValid
-    && (!relationshipRequired || !!form.relationship);
+  // Kaydet hep tıklanabilir; eksik alan varsa hata mesajı alanın altında görünür.
+  const canSave = !saving;
 
   const validate = () => {
     const e: Partial<Record<keyof ContactForm, string>> = {};
@@ -261,16 +263,28 @@ export default function AddContactScreen({ navigation }: Props) {
     return !Object.keys(e).length;
   };
 
-  const handleSave = async () => {
-    if (!validate()) return;
+  const persist = async () => {
+    setSaving(true);
     try {
+      const socials = [
+        ...(form.linkedin?.trim() ? [{ platform: "LinkedIn", handle: form.linkedin.trim() }] : []),
+        ...(form.instagram.trim() ? [{ platform: "Instagram", handle: form.instagram.trim() }] : []),
+        ...form.socials.filter((x) => x.handle.trim()),
+      ];
       await addContact({
         ...form,
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        socials,
         website: form.website.trim() ? toSafeWebUrl(form.website) ?? "" : "",
         tags: selectedTags.join(", "),
-        lastContactDate: form.lastContactDate || toISODate(new Date()),
+        // Son görüşme bilinmiyorsa uydurma; hatırlatma aralığı bugünden başlasın.
+        lastContactDate: form.lastContactDate,
+        reminderIntervalStart: form.lastContactDate ? undefined : toISODate(new Date()),
       });
     } catch {
+      setSaving(false);
       showToast("Kişi kaydedilemedi. Lütfen tekrar dene.");
       return;
     }
@@ -278,6 +292,27 @@ export default function AddContactScreen({ navigation }: Props) {
     showToast("Kişi kaydedildi");
     // Hatırlatıcının işe yaraması için izni tam bu anda iste
     if (form.reminderEnabled !== false) ensureNotificationPermissionAsync();
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (!validate()) {
+      showToast("Eksik veya hatalı alanları kontrol et");
+      return;
+    }
+    const existing = await loadContacts();
+    if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing)) {
+      confirmDialog(
+        "Bu kişi zaten kayıtlı olabilir",
+        "Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?",
+        [
+          { text: "Vazgeç", style: "cancel" },
+          { text: "Yine de ekle", onPress: persist },
+        ]
+      );
+      return;
+    }
+    persist();
   };
 
   const handleBack = () => {
@@ -288,7 +323,7 @@ export default function AddContactScreen({ navigation }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* App bar */}
       <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
@@ -346,8 +381,8 @@ export default function AddContactScreen({ navigation }: Props) {
             </View>
           ) : null}
 
-          {/* ── Section 2: Basic info ── */}
-          <SectionLabel title="Temel Bilgiler" />
+          {/* ── Essentials ── */}
+          <Text style={styles.requiredLegend}>* zorunlu alan</Text>
 
           <FieldGroup>
             <Field
@@ -360,85 +395,13 @@ export default function AddContactScreen({ navigation }: Props) {
             />
             <Divider />
             <Field
-              label="Şirket / Kurum"
-              value={form.company}
-              placeholder="Acme A.Ş."
-              onChangeText={v => set("company", v)}
-            />
-            <Divider />
-            <Field
-              label="Unvan / Pozisyon"
-              value={form.jobTitle}
-              placeholder="Yazılım Mühendisi"
-              onChangeText={v => set("jobTitle", v)}
-            />
-            <Divider />
-            <View style={{ paddingTop: 12 }}>
-              <DateField
-                label="Doğum Tarihi"
-                format="birthday"
-                value={form.birthday}
-                error={errors.birthday}
-                placeholder="Tarih seç"
-                maximumDate={new Date()}
-                onChange={v => set("birthday", v)}
-              />
-            </View>
-            <Divider />
-            <Field
-              label="Şehir"
-              value={form.city}
-              placeholder="İstanbul"
-              onChangeText={v => set("city", v)}
-            />
-          </FieldGroup>
-
-          <FieldGroup>
-            <Field
               label="Telefon"
               value={form.phone}
               placeholder="+90 5xx xxx xx xx"
               keyboardType="phone-pad"
               onChangeText={v => set("phone", v)}
             />
-            <Divider />
-            <Field
-              label="E-posta"
-              value={form.email}
-              error={errors.email}
-              placeholder="ornek@email.com"
-              keyboardType="email-address"
-              onChangeText={v => set("email", v)}
-            />
-            <Divider />
-            <Field
-              label="Web sitesi"
-              value={form.website}
-              error={errors.website}
-              placeholder="https://..."
-              keyboardType="url"
-              onChangeText={v => set("website", v)}
-            />
-            <Divider />
-            <Field
-              label="LinkedIn"
-              value={form.linkedin ?? ""}
-              placeholder="linkedin.com/in/kullanici"
-              autoCapitalize="none"
-              onChangeText={v => set("linkedin", v)}
-            />
-            <Divider />
-            <Field
-              label="Instagram"
-              value={form.instagram}
-              placeholder="@kullanici"
-              autoCapitalize="none"
-              onChangeText={v => set("instagram", v)}
-            />
           </FieldGroup>
-
-          {/* ── Section 3: Relationship ── */}
-          <SectionLabel title="İlişki" />
 
           <ChipSection
             label="Bu kişi senin için kim?"
@@ -449,71 +412,6 @@ export default function AddContactScreen({ navigation }: Props) {
             onSelect={v => set("relationship", v === form.relationship ? "" : v)}
             onManage={() => setRelationshipManagerOpen(true)}
           />
-
-          <FieldGroup>
-            <Field
-              label="Yakınlık"
-              value={form.closenessTag ?? ""}
-              placeholder="örn. Çok yakın, Yüzeysel"
-              onChangeText={v => set("closenessTag", v)}
-            />
-          </FieldGroup>
-
-          <ChipSection
-            label="Nerede tanıştınız?"
-            chips={MET_WHERE}
-            selected={form.metWhere}
-            onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
-          />
-
-          <ChipSection
-            label="Öncelik"
-            chips={PRIORITIES}
-            selected={form.priority}
-            onSelect={v => set("priority", v === form.priority ? "" : v)}
-            colorMap={{ Düşük: "#6B7280", Orta: "#D97706", Yüksek: "#DC2626" }}
-          />
-
-          {/* ── Section 4: Activity & reminders ── */}
-          <SectionLabel title="Son İletişim ve Hatırlatıcı" />
-
-          <ChipSection
-            label="En son ne zaman görüştünüz?"
-            chips={LAST_CONTACT_OPTIONS}
-            selected={form.lastContactDate}
-            onSelect={v => {
-              if (v === "Özel tarih") {
-                setCustomLastContact(true);
-                return;
-              }
-              setCustomLastContact(false);
-              const map: Record<string, string> = {
-                "Bugün":       toISODate(new Date()),
-                "Dün":         daysAgo(1),
-                "1 hafta önce": daysAgo(7),
-                "1 ay önce":   daysAgo(30),
-              };
-              set("lastContactDate", map[v] ?? v);
-            }}
-            displayMap={{
-              [toISODate(new Date())]: "Bugün",
-              [daysAgo(1)]: "Dün",
-              [daysAgo(7)]: "1 hafta önce",
-              [daysAgo(30)]: "1 ay önce",
-            }}
-          />
-
-          {customLastContact || (form.lastContactDate && ![toISODate(new Date()), daysAgo(1), daysAgo(7), daysAgo(30)].includes(form.lastContactDate)) ? (
-            <View style={styles.card}>
-              <DateField
-                label="Son görüşme tarihi"
-                format="iso"
-                value={form.lastContactDate}
-                maximumDate={new Date()}
-                onChange={v => set("lastContactDate", v)}
-              />
-            </View>
-          ) : null}
 
           <View style={styles.card}>
             <Text style={styles.chipLabel}>Tekrar ne zaman hatırlatayım?</Text>
@@ -562,7 +460,7 @@ export default function AddContactScreen({ navigation }: Props) {
                   }}
                   keyboardType="number-pad"
                   placeholder="30"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.placeholder}
                   maxLength={4}
                 />
                 <Text style={styles.customIntervalLabel}>günde bir iletişime geç</Text>
@@ -570,8 +468,150 @@ export default function AddContactScreen({ navigation }: Props) {
             )}
           </View>
 
-          {/* ── Section 5: Tags ── */}
-          <SectionLabel title="Etiketler" />
+          <ChipSection
+            label="En son ne zaman görüştünüz?"
+            chips={LAST_CONTACT_OPTIONS}
+            selected={form.lastContactDate}
+            onSelect={v => {
+              if (v === "Özel tarih") {
+                setCustomLastContact(true);
+                return;
+              }
+              setCustomLastContact(false);
+              const map: Record<string, string> = {
+                "Bugün":       toISODate(new Date()),
+                "Dün":         daysAgo(1),
+                "1 hafta önce": daysAgo(7),
+                "1 ay önce":   daysAgo(30),
+              };
+              set("lastContactDate", map[v] ?? v);
+            }}
+            displayMap={{
+              [toISODate(new Date())]: "Bugün",
+              [daysAgo(1)]: "Dün",
+              [daysAgo(7)]: "1 hafta önce",
+              [daysAgo(30)]: "1 ay önce",
+            }}
+          />
+
+          {customLastContact || (form.lastContactDate && ![toISODate(new Date()), daysAgo(1), daysAgo(7), daysAgo(30)].includes(form.lastContactDate)) ? (
+            <View style={styles.card}>
+              <DateField
+                label="Son görüşme tarihi"
+                format="iso"
+                value={form.lastContactDate}
+                maximumDate={new Date()}
+                onChange={v => set("lastContactDate", v)}
+              />
+            </View>
+          ) : null}
+
+          {/* ── Optional details ── */}
+          <TouchableOpacity
+            style={styles.moreToggle}
+            onPress={() => setMoreOpen(o => !o)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: moreOpen }}
+          >
+            <Text style={styles.moreToggleText}>{moreOpen ? "Daha az bilgi" : "Daha fazla bilgi"}</Text>
+            <Text style={styles.moreToggleHint}>İş, doğum günü, e-posta, sosyal medya, notlar</Text>
+          </TouchableOpacity>
+
+          {moreOpen ? (
+            <>
+              <FieldGroup>
+                <Field
+                  label="Şirket / Kurum"
+                  value={form.company}
+                  placeholder="Acme A.Ş."
+                  onChangeText={v => set("company", v)}
+                />
+                <Divider />
+                <Field
+                  label="Unvan / Pozisyon"
+                  value={form.jobTitle}
+                  placeholder="Yazılım Mühendisi"
+                  onChangeText={v => set("jobTitle", v)}
+                />
+                <Divider />
+                <View style={{ paddingTop: 12 }}>
+                  <DateField
+                    label="Doğum Tarihi"
+                    format="birthday"
+                    value={form.birthday}
+                    error={errors.birthday}
+                    placeholder="Tarih seç"
+                    maximumDate={new Date()}
+                    onChange={v => set("birthday", v)}
+                  />
+                </View>
+                <Divider />
+                <Field
+                  label="Şehir"
+                  value={form.city}
+                  placeholder="İstanbul"
+                  onChangeText={v => set("city", v)}
+                />
+              </FieldGroup>
+
+              <FieldGroup>
+                <Field
+                  label="E-posta"
+                  value={form.email}
+                  error={errors.email}
+                  placeholder="ornek@email.com"
+                  keyboardType="email-address"
+                  onChangeText={v => set("email", v)}
+                />
+                <Divider />
+                <Field
+                  label="Web sitesi"
+                  value={form.website}
+                  error={errors.website}
+                  placeholder="https://..."
+                  keyboardType="url"
+                  onChangeText={v => set("website", v)}
+                />
+                <Divider />
+                <Field
+                  label="LinkedIn"
+                  value={form.linkedin ?? ""}
+                  placeholder="linkedin.com/in/kullanici"
+                  autoCapitalize="none"
+                  onChangeText={v => set("linkedin", v)}
+                />
+                <Divider />
+                <Field
+                  label="Instagram"
+                  value={form.instagram}
+                  placeholder="@kullanici"
+                  autoCapitalize="none"
+                  onChangeText={v => set("instagram", v)}
+                />
+              </FieldGroup>
+
+          <ChipSection
+            label="Nerede tanıştınız?"
+            chips={MET_WHERE}
+            selected={form.metWhere}
+            onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
+          />
+          <ChipSection
+            label="Öncelik"
+            chips={PRIORITIES}
+            selected={form.priority}
+            onSelect={v => set("priority", v === form.priority ? "" : v)}
+            colorMap={{ Düşük: colors.textSub, Orta: colors.warning, Yüksek: colors.danger }}
+          />
+          <FieldGroup>
+            <Field
+              label="Yakınlık"
+              value={form.closenessTag ?? ""}
+              placeholder="örn. Çok yakın, Yüzeysel"
+              onChangeText={v => set("closenessTag", v)}
+            />
+          </FieldGroup>
 
           <View style={styles.card}>
             <Text style={styles.chipLabel}>Önerilen etiketler</Text>
@@ -594,42 +634,22 @@ export default function AddContactScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* ── Section 6: Notes ── */}
-          <SectionLabel title="Notlar" />
 
-          <View style={styles.card}>
-            <TextInput
-              style={styles.notesInput}
-              value={form.notes}
-              onChangeText={v => set("notes", v)}
-              placeholder="İlk izlenim, ortak ilgi alanları, önemli detaylar..."
-              placeholderTextColor={colors.textMuted}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.optionalToggle}
-            onPress={() => setNotesOpen(p => !p)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.optionalToggleText}>
-              {notesOpen ? "Ek bilgileri gizle" : "+ Aile, hediye ve kişisel notlar"}
-            </Text>
-          </TouchableOpacity>
-
-          {notesOpen && (
-            <View style={styles.card}>
-              <TextInput
-                style={styles.notesInput}
-                placeholder="Aile bilgisi, hediye fikirleri, özel günler..."
-                placeholderTextColor={colors.textMuted}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-          )}
+              <View style={styles.card}>
+                <Text style={styles.chipLabel}>Notlar</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  value={form.notes}
+                  onChangeText={v => set("notes", v)}
+                  placeholder="İlk izlenim, ortak ilgi alanları, aile, hediye fikirleri..."
+                  placeholderTextColor={colors.placeholder}
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel="Notlar"
+                />
+              </View>
+            </>
+          ) : null}
 
           <View style={{ height: 120 }} />
         </ScrollView>
@@ -644,8 +664,10 @@ export default function AddContactScreen({ navigation }: Props) {
             onPress={handleSave}
             activeOpacity={0.85}
             disabled={!canSave}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSave, busy: saving }}
           >
-            <Text style={styles.saveBtnText}>Kişiyi Kaydet</Text>
+            <Text style={styles.saveBtnText}>{saving ? "Kaydediliyor…" : "Kişiyi Kaydet"}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -700,14 +722,6 @@ function daysAgo(n: number) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionLabel({ title }: { title: string }) {
-  return (
-    <View style={styles.sectionLabel}>
-      <Text style={styles.sectionLabelText}>{title}</Text>
-    </View>
-  );
-}
-
 function FieldGroup({ children }: { children: React.ReactNode }) {
   return <View style={styles.card}>{children}</View>;
 }
@@ -729,14 +743,15 @@ function Field({
     <View style={styles.field}>
       <View style={styles.fieldTop}>
         <Text style={styles.fieldLabel}>{label}</Text>
-        {required && <View style={styles.requiredDot} />}
+        {required && <Text style={styles.requiredMark} accessibilityLabel="zorunlu">*</Text>}
       </View>
       <TextInput
+        accessibilityLabel={required ? `${label}, zorunlu` : label}
         style={[styles.fieldInput, error && styles.fieldInputError]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.placeholder}
         multiline={multiline}
         keyboardType={keyboardType ?? "default"}
         textAlignVertical={multiline ? "top" : "center"}
@@ -762,7 +777,7 @@ function ChipSection({
     <View style={styles.card}>
       <View style={styles.fieldTop}>
         <Text style={styles.chipLabel}>{label}</Text>
-        {required && <View style={styles.requiredDot} />}
+        {required && <Text style={styles.requiredMark} accessibilityLabel="zorunlu">*</Text>}
       </View>
       <View style={styles.chipRow}>
         {chips.map(chip => {
@@ -837,7 +852,7 @@ function ManageOptionsModal({
               value={text}
               onChangeText={setText}
               placeholder="Yeni seçenek yaz..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               onSubmitEditing={handleAdd}
               returnKeyType="done"
             />
@@ -1068,25 +1083,31 @@ const styles = StyleSheet.create({
   // Field (grouped inside card)
   field: { paddingVertical: 4 },
   fieldTop: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub },
-  requiredDot: {
-    width: 5, height: 5, borderRadius: 3,
-    backgroundColor: colors.primary,
+  fieldLabel: { fontSize: 14, fontWeight: "600", color: colors.textSub },
+  requiredMark: { fontSize: 15, fontWeight: "800", color: colors.danger, marginTop: -2 },
+  requiredLegend: { fontSize: 13, color: colors.textSub, marginBottom: 8, marginTop: 4 },
+  moreToggle: {
+    marginTop: 4, marginBottom: 12, padding: 14, minHeight: 56,
+    borderRadius: radius.card, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primaryBorder,
+    backgroundColor: colors.primarySoft, justifyContent: "center",
   },
+  moreToggleText: { fontSize: 15, fontWeight: "800", color: colors.primary },
+  moreToggleHint: { fontSize: 13, color: colors.textSub, marginTop: 2 },
   fieldInput: {
-    fontSize: 15, color: colors.text,
-    paddingVertical: 0, minHeight: 28,
+    fontSize: 16, color: colors.text,
+    minHeight: 48, paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.bg,
   },
-  fieldInputError: { color: colors.danger },
-  fieldError: { fontSize: 11, color: colors.danger, marginTop: 4, fontWeight: "500" },
+  fieldInputError: { borderColor: colors.danger },
+  fieldError: { fontSize: 13, color: colors.danger, marginTop: 4, fontWeight: "600" },
 
-  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 10 },
+  divider: { height: 12 },
 
   // Chips
-  chipLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub, marginBottom: 10 },
+  chipLabel: { fontSize: 14, fontWeight: "600", color: colors.textSub, marginBottom: 10 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 14, paddingVertical: 8, minHeight: 40, justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.card,
@@ -1095,7 +1116,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  chipText: { fontSize: 13, color: colors.textSub, fontWeight: "500" },
+  chipText: { fontSize: 14, color: colors.textSub, fontWeight: "600" },
   chipTextActive: { color: colors.primary, fontWeight: "700" },
   chipAddBtn: {
     width: 34, height: 34,
@@ -1127,8 +1148,6 @@ const styles = StyleSheet.create({
   },
 
   // Optional toggle
-  optionalToggle: { alignSelf: "flex-start", marginBottom: spacing.sm },
-  optionalToggleText: { fontSize: 13, color: colors.primary, fontWeight: "600" },
 
   // Bottom bar
   bottomBar: {
@@ -1160,11 +1179,11 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   saveBtnOff: { backgroundColor: colors.primary + "55" },
-  saveBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF", letterSpacing: 0.2 },
+  saveBtnText: { fontSize: 15, fontWeight: "800", color: colors.white, letterSpacing: 0.2 },
 
   // Modal
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
@@ -1187,7 +1206,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  modalPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  modalPrimaryText: { color: colors.white, fontWeight: "800", fontSize: 15 },
   modalSecondary: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.danger + "50",
@@ -1211,7 +1230,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   manageAddBtnOff: { backgroundColor: colors.primary + "55" },
-  manageAddBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  manageAddBtnText: { color: colors.white, fontSize: 14, fontWeight: "700" },
   manageList: { width: "100%", marginBottom: 14 },
   manageListRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  primaryBtnText: { color: colors.white, fontWeight: "800", fontSize: 15 },
   secondaryBtn: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,

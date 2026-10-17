@@ -1,6 +1,6 @@
-import { Alert } from "react-native";
 import { showToast } from "../components/Toast";
 import { exportBackupAsync, pickBackupAsync, restoreBackupAsync, wipeAllDataAsync } from "./backup";
+import { confirmDialog, infoDialog } from "../utils/confirm";
 
 /** UI flows around backup/restore/wipe, shared by Profile and Privacy screens. */
 
@@ -10,7 +10,7 @@ export async function runExportBackup() {
     if (count === 0) showToast("Yedek oluşturuldu (henüz kişi yok)");
   } catch (error) {
     console.warn("Yedek alınamadı:", error);
-    Alert.alert("Yedek alınamadı", "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar dene.");
+    infoDialog("Yedek alınamadı", "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar dene.");
   }
 }
 
@@ -19,7 +19,7 @@ export async function runRestoreBackup(onDone?: () => void) {
   try {
     backup = await pickBackupAsync();
   } catch (error) {
-    Alert.alert("Yedek açılamadı", error instanceof Error ? error.message : "Dosya okunamadı.");
+    infoDialog("Yedek açılamadı", error instanceof Error ? error.message : "Dosya okunamadı.");
     return;
   }
   if (!backup) return;
@@ -30,10 +30,10 @@ export async function runRestoreBackup(onDone?: () => void) {
       showToast(mode === "replace" ? `${added} kişi geri yüklendi` : `${added} yeni kişi eklendi`);
       onDone?.();
     } catch {
-      Alert.alert("Geri yükleme başarısız", "Veriler okunamadı veya kaydedilemedi.");
+      infoDialog("Geri yükleme başarısız", "Veriler okunamadı veya kaydedilemedi.");
     }
   };
-  Alert.alert(
+  confirmDialog(
     "Yedeği geri yükle",
     `Bu yedekte ${count} kişi var. Mevcut kişilerinle birleştirmek mi, yoksa tamamen değiştirmek mi istersin?`,
     [
@@ -43,7 +43,7 @@ export async function runRestoreBackup(onDone?: () => void) {
         text: "Değiştir",
         style: "destructive",
         onPress: () =>
-          Alert.alert("Emin misin?", "Cihazdaki tüm kişiler silinip yedektekilerle değiştirilecek.", [
+          confirmDialog("Emin misin?", "Cihazdaki tüm kişiler silinip yedektekilerle değiştirilecek.", [
             { text: "Vazgeç", style: "cancel" },
             { text: "Değiştir", style: "destructive", onPress: () => restore("replace") },
           ]),
@@ -54,7 +54,7 @@ export async function runRestoreBackup(onDone?: () => void) {
 
 /** Two-step confirmation, then erases everything and calls onWiped. */
 export function confirmWipeAllData(onWiped: () => void) {
-  Alert.alert(
+  confirmDialog(
     "Tüm verileri sil",
     "Kişilerin, notların, görüşme geçmişin, kartvizitin ve ayarların bu cihazdan kalıcı olarak silinecek. Bu işlem geri alınamaz.",
     [
@@ -67,7 +67,7 @@ export function confirmWipeAllData(onWiped: () => void) {
         text: "Sil",
         style: "destructive",
         onPress: () =>
-          Alert.alert("Son onay", "Tüm veriler silinsin mi?", [
+          confirmDialog("Son onay", "Tüm veriler silinsin mi?", [
             { text: "Vazgeç", style: "cancel" },
             {
               text: "Evet, hepsini sil",
@@ -78,7 +78,7 @@ export function confirmWipeAllData(onWiped: () => void) {
                   onWiped();
                   showToast("Tüm veriler silindi");
                 } catch {
-                  Alert.alert("Silinemedi", "Veriler silinirken bir sorun oluştu. Lütfen tekrar dene.");
+                  infoDialog("Silinemedi", "Veriler silinirken bir sorun oluştu. Lütfen tekrar dene.");
                 }
               },
             },

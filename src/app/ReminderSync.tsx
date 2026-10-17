@@ -13,9 +13,19 @@ import { navigationRef } from "../navigation/navigationRef";
 import { addDays, toISODate } from "../utils/dates";
 import { showToast } from "../components/Toast";
 
-async function resync() {
+async function resyncNow() {
   const [contacts, settings] = await Promise.all([loadContacts(), loadSettings()]);
   await syncRemindersAsync(contacts, settings);
+}
+
+// Bursts of writes (bulk import, undo) re-plan once instead of N times.
+let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+function resync() {
+  if (resyncTimer) clearTimeout(resyncTimer);
+  resyncTimer = setTimeout(() => {
+    resyncTimer = null;
+    resyncNow();
+  }, 600);
 }
 
 async function openContact(contactId: string) {
@@ -33,7 +43,7 @@ async function openContact(contactId: string) {
  */
 export default function ReminderSync() {
   useEffect(() => {
-    setupNotificationsAsync().then(resync);
+    setupNotificationsAsync().then(resyncNow);
 
     const unsubContacts = subscribeContacts(() => { resync(); });
     const unsubSettings = subscribeSettings(() => { resync(); });

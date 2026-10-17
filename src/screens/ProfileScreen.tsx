@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import { loadSettings, saveSettings, updateSettings } from "../data/userSettings";
 import { runExportBackup, runRestoreBackup } from "../data/backupActions";
@@ -20,19 +21,20 @@ import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
+import { colors } from "../theme/colors";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const TEAL      = "#00B5AC";
-const TEAL_SOFT = "#E6FAF8";
-const TEAL_DARK = "#008E88";
-const TEXT      = "#111827";
-const TEXTSUB   = "#6B7280";
-const TEXTMUTED = "#9CA3AF";
-const BORDER    = "#E5E7EB";
-const BORDER_SOFT = "#F3F4F6";
-const BG        = "#FFFFFF";
-const CARD      = "#FFFFFF";
-const DANGER    = "#DC2626";
+const TEAL      = colors.primary;
+const TEAL_SOFT = colors.primarySoft;
+const TEAL_DARK = colors.primaryDark;
+const TEXT      = colors.text;
+const TEXTSUB   = colors.textSub;
+const TEXTMUTED = colors.textMuted;
+const BORDER    = colors.border;
+const BORDER_SOFT = colors.borderLight;
+const BG        = colors.white;
+const CARD      = colors.white;
+const DANGER    = colors.danger;
 
 const THRESHOLD_OPTIONS = [7, 14, 21, 30];
 
@@ -152,7 +154,7 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.healthLabelRow}>
               <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
               <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.healthInfoIcon}>ⓘ</Text>
+                <Ionicons name="information-circle-outline" size={18} color={colors.textSub} accessibilityLabel="İlişki sağlığı nasıl hesaplanır?" />
               </TouchableOpacity>
             </View>
             <Text style={styles.healthSub}>Bağlantı genel durumu</Text>
@@ -240,7 +242,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] })}
             activeOpacity={0.75}
           >
-            <View style={[styles.iconWrap, { backgroundColor: "#F3F0FF" }]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
               <RestartIcon />
             </View>
             <View style={styles.rowInfo}>
@@ -464,9 +466,9 @@ function ClockIcon() {
 function DownloadIcon() {
   return (
     <View style={{ alignItems: "center" }}>
-      <View style={{ width: 1.5, height: 8, backgroundColor: "#16A34A", borderRadius: 1 }} />
-      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#16A34A", marginTop: -1 }} />
-      <View style={{ width: 12, height: 1.5, backgroundColor: "#16A34A", marginTop: 2, borderRadius: 1 }} />
+      <View style={{ width: 1.5, height: 8, backgroundColor: colors.success, borderRadius: 1 }} />
+      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: colors.success, marginTop: -1 }} />
+      <View style={{ width: 12, height: 1.5, backgroundColor: colors.success, marginTop: 2, borderRadius: 1 }} />
     </View>
   );
 }
@@ -483,8 +485,8 @@ function UploadIcon() {
 
 function RestartIcon() {
   return (
-    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#7C3AED", borderTopColor: "transparent", alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 4, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: "#7C3AED", position: "absolute", top: -3, right: -1 }} />
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: colors.accent, borderTopColor: "transparent", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 4, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: colors.accent, position: "absolute", top: -3, right: -1 }} />
     </View>
   );
 }
@@ -508,7 +510,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBF0",
+    borderBottomColor: colors.borderLight,
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
       android: { elevation: 2 },
@@ -562,7 +564,7 @@ const styles = StyleSheet.create({
   healthLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   healthInfoIcon: { fontSize: 12, color: TEXTMUTED },
   healthSub:   { fontSize: 11, color: TEXTSUB, marginTop: 2 },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: "#F3F4F6", marginTop: 10, overflow: "hidden" },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: colors.borderLight, marginTop: 10, overflow: "hidden" },
   barFill:  { height: 6, borderRadius: 3 },
   healthRight: { flexDirection: "row", alignItems: "flex-end" },
   healthScore:  { fontSize: 28, fontWeight: "700", letterSpacing: -0.5 },
@@ -635,7 +637,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingVertical: 13, paddingHorizontal: 14,
     borderRadius: 12, marginBottom: 8,
-    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: BORDER,
   },
   optionActive:    { backgroundColor: TEAL_SOFT, borderColor: TEAL + "60" },
   optionText:      { fontSize: 15, fontWeight: "500", color: TEXT },

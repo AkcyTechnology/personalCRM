@@ -40,5 +40,5 @@ const styles = StyleSheet.create({
     height: 48, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
   },
-  closeBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  closeBtnText: { fontSize: 14, fontWeight: "700", color: colors.white },
 });

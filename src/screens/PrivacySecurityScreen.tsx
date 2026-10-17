@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
 import { loadSettings, updateSettings } from "../data/userSettings";
 import { confirmWipeAllData, runExportBackup, runRestoreBackup } from "../data/backupActions";
@@ -9,6 +9,7 @@ import { authenticateAsync, canUseAppLockAsync } from "../utils/biometrics";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { infoDialog } from "../utils/confirm";
 
 const BG = colors.bg;
 const CARD = colors.card;
@@ -32,7 +33,7 @@ export default function PrivacySecurityScreen({ navigation }: any) {
 
   const toggleAppLock = async (value: boolean) => {
     if (value && !lockSupported) {
-      Alert.alert(
+      infoDialog(
         "Cihaz kilidi gerekli",
         "Uygulama kilidini kullanmak için önce cihazında Face ID, parmak izi veya bir ekran şifresi ayarlamalısın."
       );
@@ -79,7 +80,7 @@ export default function PrivacySecurityScreen({ navigation }: any) {
               value={appLock}
               onValueChange={toggleAppLock}
               trackColor={{ false: BORDER, true: colors.primary }}
-              thumbColor="#FFFFFF"
+              thumbColor={colors.white}
               accessibilityLabel="Uygulama kilidi"
             />
           </View>

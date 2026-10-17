@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { loadSettings, subscribeSettings } from "../data/userSettings";
 import { authenticateAsync } from "../utils/biometrics";
 import { colors } from "../theme/colors";
@@ -109,5 +109,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "800", color: colors.text },
   sub: { fontSize: 15, color: colors.textSub, marginTop: 6, textAlign: "center" },
   btn: { marginTop: 28, backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
-  btnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  btnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
 });

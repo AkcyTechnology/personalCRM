@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { loadSettings, saveSettings } from "../data/userSettings";
+import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
@@ -44,9 +44,8 @@ export default function ProfileSettingsScreen({ navigation }: any) {
       city: city.trim(),
     });
     setSaving(false);
-    Alert.alert("Kaydedildi", "Profil bilgilerin güncellendi.", [
-      { text: "Tamam", onPress: () => navigation.goBack() },
-    ]);
+    showToast("Profil bilgilerin güncellendi");
+    navigation.goBack();
   };
 
   return (
@@ -143,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { color: "#fff", fontSize: 30, fontWeight: "700" },
+  avatarText: { color: colors.white, fontSize: 30, fontWeight: "700" },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -171,7 +170,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  saveBtnText: { color: colors.white, fontSize: 15, fontWeight: "700" },
   linkRow: {
     backgroundColor: colors.card,
     borderRadius: radius.card,

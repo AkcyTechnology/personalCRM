@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   planCardActive: {
     borderColor: PURPLE,
-    backgroundColor: "#F8F5FF",
+    backgroundColor: colors.accentSoft,
   },
   planTop: {
     flexDirection: "row",
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   planPrice: { fontSize: 22, fontWeight: "900", color: TEXT },
   planPeriod: { fontSize: 13, color: MUTED },
   currentBadge: {
-    backgroundColor: "#EDE9FF",
+    backgroundColor: colors.accentSoft,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
   },
-  upgradeBtnText: { color: "#fff", fontSize: 14, fontWeight: "900" },
+  upgradeBtnText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "800",

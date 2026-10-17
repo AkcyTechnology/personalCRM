@@ -13,8 +13,8 @@ import {
 import AppHeader from "../components/AppHeader";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { deleteContact as deleteContactById, deleteInteraction, getContact, markContacted, updateContact } from "../data/contacts";
-import { Ionicons } from "@expo/vector-icons";
+import { addContacts, deleteContact as deleteContactById, deleteInteraction, getContact, markContacted, updateContact } from "../data/contacts";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import DateField from "../components/DateField";
 import LogInteractionModal, { interactionMeta } from "../components/LogInteractionModal";
 import { openEmail, openPhoneCall, openWhatsApp as openWhatsAppLink, openWebUrl, socialProfileUrl } from "../utils/links";
@@ -25,9 +25,11 @@ import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { effectiveIntervalDays, intervalLabel, INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { healthScore as centralHealthScore, healthScoreColor } from "../utils/healthScore";
-import { showToast } from "../components/Toast";
+import { showToast, showUndoToast } from "../components/Toast";
+import { hapticSuccess, hapticWarning } from "../utils/haptics";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
+import { confirmDialog } from "../utils/confirm";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PersonDetail">;
 type TabKey = "timeline" | "info";
@@ -53,7 +55,6 @@ const MUTED = colors.textSub;
 const GREEN = colors.success;
 const ORANGE = colors.warning;
 const RED = colors.danger;
-const BLUE = "#2563EB";
 const PINK = colors.secondary;
 
 function initials(name?: string) {
@@ -145,7 +146,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
     if (initialContact.id) {
       getContact(initialContact.id).then((fresh) => fresh && setContact(fresh as EditableContact));
     }
-  }, []);
+  }, [initialContact.id]);
 
   // Arama / WhatsApp / e-postadan dönünce "Görüştün mü?" diye sor
   useEffect(() => {
@@ -309,6 +310,12 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   const logInteraction = async (type: InteractionType, note: string, date: string) => {
     setLogOpen(false);
     if (!contact.id) return;
+    const snapshot = {
+      interactions: contact.interactions,
+      lastContactDate: contact.lastContactDate,
+      reminderIntervalStart: contact.reminderIntervalStart,
+      snoozedUntil: contact.snoozedUntil,
+    };
     try {
       const saved = await markContacted(contact.id, type, note, date);
       if (saved) {
@@ -316,25 +323,49 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         setForm((prev) => ({ ...prev, lastContactDate: saved.lastContactDate }));
         navigation.setParams({ contact: saved });
       }
-      showToast("Görüşme kaydedildi");
+      hapticSuccess();
+      showUndoToast("Görüşme kaydedildi", async () => {
+        const restored = await updateContact(contact.id!, snapshot);
+        if (restored) {
+          setContact(restored as EditableContact);
+          setForm((prev) => ({ ...prev, lastContactDate: restored.lastContactDate }));
+        }
+      });
     } catch {
       showToast("Kaydedilemedi. Lütfen tekrar dene.");
     }
   };
 
-  const removeInteraction = async (interactionId: string) => {
+  const removeInteraction = (interactionId: string) => {
     if (!contact.id) return;
-    const saved = await deleteInteraction(contact.id, interactionId);
-    if (saved) setContact(saved as EditableContact);
+    confirmDialog("Görüşme kaydı silinsin mi?", undefined, [
+      { text: "Vazgeç", style: "cancel" },
+      {
+        text: "Sil",
+        style: "destructive",
+        onPress: async () => {
+          const before = contact.interactions;
+          const saved = await deleteInteraction(contact.id!, interactionId);
+          if (!saved) return;
+          setContact(saved as EditableContact);
+          showUndoToast("Görüşme kaydı silindi", async () => {
+            const restored = await updateContact(contact.id!, { interactions: before });
+            if (restored) setContact(restored as EditableContact);
+          });
+        },
+      },
+    ]);
   };
 
   const deleteContact = async () => {
     if (!contact.id) return;
     try {
+      const snapshot: ContactForm = { ...contact };
       await deleteContactById(contact.id);
       setShowDeleteConfirm(false);
+      hapticWarning();
       navigation.goBack();
-      showToast("Kişi silindi");
+      showUndoToast("Kişi silindi", () => { addContacts([snapshot]); });
     } catch {
       showToast("Silinemedi. Lütfen tekrar dene.");
     }
@@ -374,9 +405,9 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
           ) : (
             <>
               <Text style={styles.name}>{contact.fullName}</Text>
-              <Text style={styles.subtitle}>
-                {[contact.jobTitle, contact.company].filter(Boolean).join(" · ") || "Kişi bilgisi eklenebilir"}
-              </Text>
+              {contact.jobTitle || contact.company ? (
+                <Text style={styles.subtitle}>{[contact.jobTitle, contact.company].filter(Boolean).join(" · ")}</Text>
+              ) : null}
               {contact.relationship ? (
                 <View style={styles.relationPill}>
                   <Text style={styles.relationText}>{contact.relationship}</Text>
@@ -390,10 +421,10 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
               <View style={styles.healthLabelRow}>
                 <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
                 <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={styles.healthInfoIcon}>ⓘ</Text>
+                  <Ionicons name="information-circle-outline" size={18} color={MUTED} accessibilityLabel="İlişki sağlığı nasıl hesaplanır?" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.healthSub}>{days === null ? "Son iletişim tarihi eklenmemiş" : `${days} gündür iletişim yok`}</Text>
+              <Text style={styles.healthSub}>{days === null ? "Henüz görüşme kaydı yok" : days === 0 ? "Bugün görüşüldü" : `${days} gündür görüşülmedi`}</Text>
             </View>
             <View style={[styles.healthCircle, { borderColor: scoreColor }]}> 
               <Text style={[styles.healthScore, { color: scoreColor }]}>{score === null ? "—" : score}</Text>
@@ -414,7 +445,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={`${contact.fullName} ile görüştüm`}
           >
-            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
             <Text style={styles.contactedText}>Görüştüm</Text>
           </TouchableOpacity>
         </View>
@@ -427,6 +458,9 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         {activeTab === "timeline" ? (
           <View>
             <Text style={styles.sectionTitle}>İlişki Geçmişi</Text>
+            {(contact.interactions?.length ?? 0) > 0 ? (
+              <Text style={styles.historyHint}>Bir kaydı silmek için üzerine basılı tut</Text>
+            ) : null}
             <View style={styles.timelineCard}>
               {timeline.map((item, index) => (
                 <TouchableOpacity
@@ -439,7 +473,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
                 >
                   <View style={styles.timelineRail}>
                     <View style={[styles.timelineDot, { backgroundColor: item.color }]}>
-                      <Ionicons name={item.icon} size={14} color="#FFFFFF" />
+                      <Ionicons name={item.icon} size={14} color={colors.white} />
                     </View>
                     {index < timeline.length - 1 ? <View style={styles.timelineLine} /> : null}
                   </View>
@@ -463,7 +497,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
             ) : (
               <View style={styles.cardSoft}>
                 <Text style={contact.notes ? styles.notes : styles.emptyText}>
-                  {contact.notes || "Henüz not yok. Düzenle’ye basarak not ekleyebilirsin."}
+                  {contact.notes || "Henüz not yok"}
                 </Text>
               </View>
             )}
@@ -558,10 +592,10 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
       <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.confirmCard}>
-            <View style={styles.warningIcon}><Text style={styles.warningText}>!</Text></View>
+            <View style={styles.warningIcon}><Ionicons name="warning" size={24} color={colors.danger} /></View>
             <Text style={styles.confirmTitle}>Bu kişiyi silmek istiyor musun?</Text>
             <Text style={styles.confirmDesc}>
-              {contact.fullName} ile ilgili tüm ilişki geçmişi, notlar ve kayıtlı bilgiler silinecek. Bu işlem geri alınamaz.
+              {contact.fullName} ve tüm notları, görüşme geçmişi silinecek. Hemen ardından “Geri al” diyebilirsin.
             </Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDeleteConfirm(false)} activeOpacity={0.75}>
@@ -766,11 +800,12 @@ const styles = StyleSheet.create({
   actionItem: { alignItems: "center", width: "24%" },
   disabled: { opacity: 0.35 },
   actionBox: { width: 55, height: 55, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  historyHint: { fontSize: 13, color: MUTED, marginTop: -6, marginBottom: 10 },
   contactedBtn: {
     width: "100%", marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14,
   },
-  contactedText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  contactedText: { color: colors.white, fontSize: 16, fontWeight: "800" },
   actionLabel: { marginTop: 7, fontSize: 11.5, color: MUTED, fontWeight: "800", textAlign: "center" },
 
   tabsWrap: {
@@ -843,7 +878,7 @@ const styles = StyleSheet.create({
   intervalOptions: { width: "100%", gap: 8, marginTop: 18, marginBottom: 16 },
   intervalOption: {
     paddingVertical: 13, borderRadius: 14,
-    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: BORDER,
     alignItems: "center",
   },
   intervalOptionActive: { backgroundColor: colors.primarySoft, borderColor: PURPLE + "60" },

@@ -1,5 +1,6 @@
 import { View, StyleSheet } from "react-native";
 import qrcode from "qrcode-generator";
+import { colors } from "../theme/colors";
 
 type Props = {
   value: string;
@@ -8,7 +9,7 @@ type Props = {
   backgroundColor?: string;
 };
 
-export default function QrCode({ value, size = 96, color = "#111827", backgroundColor = "#FFFFFF" }: Props) {
+export default function QrCode({ value, size = 96, color = colors.text, backgroundColor = colors.white }: Props) {
   const qr = qrcode(0, "M");
   qr.addData(value || " ");
   qr.make();

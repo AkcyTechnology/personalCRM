@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -17,6 +16,7 @@ import {
 import { secureGetItem, secureSetItem, secureRemoveItem } from "../storage/secureStorage";
 import QrCode from "../components/QrCode";
 import { showToast } from "../components/Toast";
+import { confirmDialog } from "../utils/confirm";
 import { colors } from "../theme/colors";
 
 type BusinessCardForm = {
@@ -101,7 +101,7 @@ export default function BusinessCardScreen({ navigation }: any) {
 
   const saveCard = async () => {
     if (!isValid) {
-      Alert.alert("Eksik bilgi", "Kartvizit oluşturmak için en az ad soyad alanını doldurmalısın.");
+      showToast("Kartvizit için ad soyad gerekli");
       return;
     }
 
@@ -124,9 +124,9 @@ export default function BusinessCardScreen({ navigation }: any) {
       setHasCard(true);
       setMode("view");
 
-      Alert.alert("Kartvizit hazır", "Dijital kartvizitin başarıyla kaydedildi.");
+      showToast("Kartvizit kaydedildi");
     } catch {
-      Alert.alert("Hata", "Kartvizit kaydedilemedi. Lütfen tekrar dene.");
+      showToast("Kartvizit kaydedilemedi. Lütfen tekrar dene.");
     }
   };
 
@@ -139,7 +139,7 @@ export default function BusinessCardScreen({ navigation }: any) {
         message: cardSummary(),
       });
     } catch {
-      Alert.alert("Hata", "Paylaşım başlatılamadı.");
+      showToast("Paylaşım başlatılamadı");
     }
   };
 
@@ -149,7 +149,7 @@ export default function BusinessCardScreen({ navigation }: any) {
   };
 
   const resetCard = () => {
-    Alert.alert("Kartviziti sıfırla", "Kartvizit bilgilerini temizlemek istediğine emin misin?", [
+    confirmDialog("Kartviziti sıfırla", "Kartvizit bilgilerini temizlemek istediğine emin misin?", [
       {
         text: "Vazgeç",
         style: "cancel",
@@ -571,7 +571,7 @@ function Input({
       <TextInput
         style={[styles.input, multiline && styles.inputMultiline]}
         placeholder={placeholder}
-        placeholderTextColor="#9AA3B2"
+        placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
@@ -598,7 +598,7 @@ function VisibilityRow({
         value={value}
         onValueChange={onChange}
         trackColor={{ false: colors.border, true: colors.primary + "88" }}
-        thumbColor={value ? colors.primary : "#FFFFFF"}
+        thumbColor={value ? colors.primary : colors.white}
       />
     </View>
   );
@@ -619,26 +619,26 @@ function getInitials(name: string) {
 const TOP_SAFE =
   Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 10 : 54;
 
-const TEAL = "#00B5AC";
-const TEAL_DARK = "#008E88";
-const TEXT = "#111827";
-const SUB = "#687084";
-const BORDER = "#E8ECF3";
-const SOFT = "#F8FAFC";
+const TEAL = colors.primary;
+const TEAL_DARK = colors.primaryDark;
+const TEXT = colors.text;
+const SUB = colors.textSub;
+const BORDER = colors.borderLight;
+const SOFT = colors.card;
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
   },
 
   appBar: {
     paddingTop: TOP_SAFE,
     paddingHorizontal: 18,
     paddingBottom: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F2F6",
+    borderBottomColor: colors.borderLight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     minWidth: 64,
     height: 36,
     borderRadius: 12,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 24,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
@@ -728,12 +728,12 @@ const styles = StyleSheet.create({
   },
 
   cardPreview: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
-    shadowColor: "#64748B",
+    shadowColor: colors.textSub,
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
@@ -813,9 +813,9 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     padding: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   },
   qrModalBox: {
     width: "100%", maxWidth: 340,
-    backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24,
+    backgroundColor: colors.white, borderRadius: 24, padding: 24,
     alignItems: "center",
   },
   qrModalTitle: { fontSize: 17, fontWeight: "700", color: TEXT, textAlign: "center" },
@@ -860,11 +860,11 @@ const styles = StyleSheet.create({
   qrModalCodeWrap: {
     marginTop: 20, padding: 16,
     borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
   },
   qrModalClose: {
     marginTop: 20, width: "100%", height: 48,
-    borderRadius: 14, backgroundColor: "#F3F4F6",
+    borderRadius: 14, backgroundColor: colors.borderLight,
     alignItems: "center", justifyContent: "center",
   },
   qrModalCloseText: { fontSize: 14, fontWeight: "700", color: TEXT },
@@ -885,13 +885,13 @@ const styles = StyleSheet.create({
   },
 
   actionButtonLight: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: BORDER,
   },
 
   actionButtonText: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -904,9 +904,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: "#F3FFFE",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
   },
 
   infoTitle: {
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
   },
 
   dangerButtonText: {
-    color: "#EF4444",
+    color: colors.danger,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -937,9 +937,9 @@ const styles = StyleSheet.create({
   editHero: {
     padding: 18,
     borderRadius: 20,
-    backgroundColor: "#F3FFFE",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
   },
 
   editHeroIcon: {
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 16,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 10,
   },
-  visibilityLabel: { fontSize: 13, color: "#4B5565", fontWeight: "600" },
+  visibilityLabel: { fontSize: 13, color: colors.textSub, fontWeight: "600" },
 
   inputLabelRow: {
     marginBottom: 7,
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
 
   inputLabel: {
     fontSize: 13,
-    color: "#4B5565",
+    color: colors.textSub,
     fontWeight: "600",
   },
 
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
   },
 
   requiredText: {
@@ -1075,7 +1075,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     fontSize: 14,
     color: TEXT,
@@ -1092,7 +1092,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
     padding: 16,
   },
 
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 15,
     fontWeight: "700",
   },

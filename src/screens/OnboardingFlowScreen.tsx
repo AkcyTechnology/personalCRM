@@ -19,8 +19,8 @@ import { colors } from "../theme/colors";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 
 const PURPLE = colors.primary;
-const BG     = "#FAFEFE";
-const CARD   = "#FFFFFF";
+const BG     = colors.card;
+const CARD   = colors.white;
 const BORDER = colors.border;
 const TEXT   = colors.text;
 const MUTED  = colors.textSub;
@@ -54,7 +54,7 @@ function GradientBtn({
       style={[s.btnShadow, disabled && s.btnDisabled]}
     >
       <LinearGradient
-        colors={["#4DD9CF", PURPLE]}
+        colors={[colors.gradientFrom, PURPLE]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.btn}
@@ -345,7 +345,7 @@ const s = StyleSheet.create({
   },
 
   // Progress bar
-  progressTrack: { height: 3, backgroundColor: "#E8E4F4" },
+  progressTrack: { height: 3, backgroundColor: colors.borderLight },
   progressFill: { height: 3, backgroundColor: PURPLE },
 
   // Image — width 100% of panel, height set dynamically
@@ -377,7 +377,7 @@ const s = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.45 },
   btn: { height: 56, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  btnText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
+  btnText: { color: colors.white, fontSize: 16, fontWeight: "800" },
 
   // Goals / purpose list
   goalsList: { width: "100%", gap: 10, marginBottom: 16, marginTop: 4 },
@@ -401,7 +401,7 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   goalCheckActive: { backgroundColor: PURPLE, borderColor: PURPLE },
-  goalCheckMark: { color: "#FFF", fontSize: 12, fontWeight: "900" },
+  goalCheckMark: { color: colors.white, fontSize: 12, fontWeight: "900" },
 
   // Field labels
   fieldWrap: { width: "100%", marginBottom: 16 },

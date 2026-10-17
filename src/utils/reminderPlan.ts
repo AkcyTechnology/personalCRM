@@ -99,7 +99,7 @@ export function planReminders(
     if (candidate?.id) {
       // Bir sonraki perşembe akşamı — hafta ortası en çok cevap alınan an.
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let offset = (4 - today.getDay() + 7) % 7;
+      const offset = (4 - today.getDay() + 7) % 7;
       let date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset, NUDGE_HOUR, 0, 0, 0);
       if (date.getTime() <= now.getTime()) date = addDays(date, 7);
       dated.push({

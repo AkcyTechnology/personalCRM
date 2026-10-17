@@ -7,6 +7,7 @@ import PeopleScreen from "../screens/PeopleScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import InsightsScreen from "../screens/InsightsScreen";
 import BottomTabBar from "../components/BottomTabBar";
+import { colors } from "../theme/colors";
 
 type Tab = "Home" | "People" | "Insights" | "Profile";
 
@@ -41,7 +42,7 @@ export default function MainTabs({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.white,
   },
   screen: {
     flex: 1,

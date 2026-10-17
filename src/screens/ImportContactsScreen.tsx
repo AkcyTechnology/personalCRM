@@ -34,7 +34,7 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const palette = ["#00B5AC", "#7C3AED", "#0369A1", colors.success, colors.warning];
+  const palette = [colors.primary, colors.accent, "#0369A1", colors.success, colors.warning];
   let h = 0;
   for (const c of name) h += c.charCodeAt(0);
   return palette[h % palette.length];
@@ -106,7 +106,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
+    setSelectedIds(() => {
       if (allSelectableSelected) return new Set();
       return new Set(selectableContacts.map((dc) => dc.id));
     });
@@ -167,13 +167,13 @@ export default function ImportContactsScreen({ navigation }: Props) {
         </View>
       ) : loadState === "ready" && deviceContacts.length === 0 ? (
         <EmptyState
-          icon="👤"
+          icon="person-outline"
           title="Rehber boş"
           description="Cihazında kayıtlı kişi bulunamadı."
         />
       ) : loadState === "denied" ? (
         <EmptyState
-          icon="🔒"
+          icon="lock-closed-outline"
           title="Rehber izni gerekli"
           description="Kişileri görebilmek için rehber erişimine izin vermelisin."
           buttonLabel="İzni tekrar iste"
@@ -181,7 +181,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
         />
       ) : loadState === "error" ? (
         <EmptyState
-          icon="⚠️"
+          icon="alert-circle-outline"
           title="Bir sorun oluştu"
           description={errorMessage || "Rehber okunamadı. Lütfen tekrar dene."}
           buttonLabel="Tekrar dene"
@@ -260,7 +260,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
               disabled={selectedIds.size === 0 || saving}
             >
               {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.addBtnText}>
                   {selectedIds.size > 0
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxTick: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  checkboxTick: { color: colors.white, fontSize: 14, fontWeight: "800" },
 
   bottomBar: {
     position: "absolute",
@@ -365,5 +365,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addBtnOff: { backgroundColor: colors.primary + "55" },
-  addBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  addBtnText: { color: colors.white, fontSize: 15, fontWeight: "700" },
 });

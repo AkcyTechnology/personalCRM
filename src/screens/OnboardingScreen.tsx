@@ -118,7 +118,7 @@ export default function OnboardingScreen({ navigation }: any) {
             <View style={styles.btnShadow}>
               <TouchableOpacity onPress={handleNext} activeOpacity={0.85} style={styles.btnTouch}>
                 <LinearGradient
-                  colors={["#4DD9CF", TEAL]}
+                  colors={[colors.gradientFrom, TEAL]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.btn}
@@ -138,7 +138,7 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FAFEFE",
+    backgroundColor: colors.card,
     overflow: "hidden",
   },
 
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: {
-    color: "#FFF",
+    color: colors.white,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.2,
