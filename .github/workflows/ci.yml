@@ -19,6 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test -- --ci
       # Remaining "high" advisories sit in the Expo/Metro build toolchain
       # (not shipped in the app) and only clear with SDK upgrades; Dependabot
