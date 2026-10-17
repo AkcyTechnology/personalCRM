@@ -1,0 +1,36 @@
+# Core journey on a real device / emulator (requires a dev or release build).
+#   maestro test .maestro/core-journey.yaml
+# Status: NOT EXECUTED in CI — no emulator available in the audit environment.
+appId: com.tugceulucn.personalCRM
+---
+- launchApp:
+    clearState: true
+- tapOn: "Atla"
+- tapOn: "Başlayalım"
+- tapOn: "Devam et"
+- tapOn:
+    text: "Ad Soyad"
+- inputText: "Maestro Test"
+- tapOn: "Devam"
+- tapOn: "Networking yapmak"
+- tapOn:
+    text: "Devam.*"
+- tapOn: "Uygulamaya geç"
+- assertVisible: "İlk kişini ekle"
+- tapOn:
+    id: "Yeni kişi ekle"
+    optional: true
+- tapOn:
+    text: "Kişi ekle"
+    optional: true
+- tapOn: "Ahmet Yılmaz"
+- inputText: "Ahmet Yılmaz"
+- tapOn: "Arkadaş"
+- tapOn: "1 ay önce"
+- tapOn: "Kişiyi Kaydet"
+- assertVisible: "Bugün 1 kişi seni bekliyor"
+- tapOn: "Görüştüm"
+- tapOn: "Arama"
+- tapOn: "Kaydet"
+- assertVisible: "Geri al"
+- assertVisible: "Bugün her şey yolunda ✓"

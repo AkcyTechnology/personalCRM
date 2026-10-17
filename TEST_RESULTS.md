@@ -1,0 +1,94 @@
+# Test Sonuçları
+
+**Ortam:**
+- Linux bulut konteyneri, Node v22.22.0, npm 10.9.4
+- Chromium (Playwright 1.x, `/opt/pw-browsers/chromium`)
+- **Android emülatörü, iOS simülatörü ve fiziksel cihaz YOK**
+
+Aşağıdaki sonuçların hepsi gerçekten çalıştırılan komutların çıktısından alındı. Sadece kod okunarak "geçti" denen bir sonuç yok.
+
+## 1. Statik kontroller
+
+| Kontrol | Komut | Sonuç |
+|---|---|---|
+| TypeScript | `npx tsc --noEmit` | ✅ 0 hata |
+| ESLint (typescript-eslint + security + react-hooks) | `npx eslint .` | ✅ 0 sorun |
+| Sır taraması | `detect-secrets scan …` | ✅ 0 bulgu |
+| Bağımlılık taraması | `npm audit --omit=dev` | ⚠️ 40 açık (13 moderate, 27 high, 0 critical). Ayrıntılar SECURITY_REPORT.md içinde |
+
+## 2. Birim ve entegrasyon testleri (Jest, `jest-expo` preset)
+
+Komut: `npx jest --ci`
+
+```
+Test Suites: 8 passed, 8 total
+Tests:       41 passed, 41 total
+```
+
+| Dosya | Kapsam |
+|---|---|
+| `__tests__/storage.test.ts` | Şifreleme: gidiş-dönüş, değiştirilmiş veriyi reddetme, diskte `enc1:` öneki, eski düz metin verinin taşınması. Kişi CRUD: aynı isimli iki kişiden yalnızca hedefin güncellenmesi/silinmesi. `markContacted` geçmiş kaydı. Yedek dosyası doğrulama |
+| `__tests__/backup.test.ts` | Yedekte uygulama kilidi ayarının dışarı aktarılmaması; birleştirme ve değiştirme ile geri yükleme; geri yüklemede cihazdaki kilit ayarının korunması; tüm verileri silme |
+| `__tests__/notifications.test.ts` | `expo-notifications` mock'uyla: tüm bildirimleri iptal edip yeniden planlama; kategori, `contactId` ve tetikleyici türleri; izin yoksa hiçbir şey planlamama; bildirimde not/telefon olmaması |
+| `__tests__/reminderPlan.test.ts` | Takip tarihi, gecikmiş kişi için ertesi sabah, erteleme, kapalı hatırlatıcı, kategori ayarları, iOS'un 64 bildirim sınırı |
+| `__tests__/healthScore.test.ts` | Yeni skor formülü; tarihi olmayan kişilerin hesaba katılmaması; ertelenenlerin "yolunda" sayılması |
+| `__tests__/links.test.ts` | WhatsApp numarası normalleştirme; tehlikeli şemaların (`javascript:`, `file:`, `intent:`) engellenmesi; sosyal profil adresleri |
+| `__tests__/dates.test.ts` | Yerel tarih (UTC kayması olmadan), doğum günü ayrıştırma, bir sonraki doğum günü |
+| `__tests__/duplicateContact.test.ts` | Telefon, e-posta ve isim normalleştirmesiyle mükerrer tespiti |
+
+**Performans ölçümü:** 1000 kişi, ~1 MB veri. Şifreleme 93.6 ms, çözme 41.6 ms (Node V8 JIT, 5 ölçüm ortalaması). Cihazdaki Hermes motorunda **ÖLÇÜLMEDİ**.
+
+## 3. Uçtan uca test (Playwright, web derlemesi)
+
+**Komutlar:**
+```
+npx expo export --platform web --output-dir <dir>
+python3 -m http.server 8765 -d <dir>
+CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/web-smoke.js
+```
+
+**Sonuç:** ✅ **29/29 adım geçti**, çalışma anında hata yok, çıkış kodu 0.
+
+| # | Adım | Sonuç |
+|---|---|---|
+| 1–7 | Onboarding: tanıtımı atlama, kullanım şartları sayfası, başlangıç, karşılama, profil, hedefler, bitiriş | PASS |
+| 8 | Ana sayfa boş durum ekranı | PASS |
+| 9–12 | Kişi ekleme: boş kaydetmede doğrulama mesajı, temel alanları doldurma, kaydetme | PASS |
+| 13–14 | Ana sayfadaki bekleyen sayısının gerçek veriden gelmesi; zil rozetinin erişilebilirlik etiketi | PASS |
+| 15–18 | "Bugün" kartından "Görüştüm" → "Geri al" balonu → geri alma bekleyen durumu geri getiriyor → tekrar kaydetme | PASS |
+| 19 | Mükerrer kişi uyarısı (web onayı) ve kaydetme | PASS |
+| 20–22 | Kişiler: 2 kişi listeleniyor; "Bekleyen" filtresi; arama ve temizleme | PASS |
+| 23–24 | Detay: geçmişte not görünüyor; geri dönüş | PASS |
+| 25 | Detaydan silme → "Geri al" → kişi geri geliyor | PASS |
+| 26–28 | Gizlilik ekranı; gizlilik politikası; tüm verileri silme (localStorage'da `crm_contacts` kalmıyor, Onboarding açılıyor) | PASS |
+| 29 | iPhone SE (320 px) genişliğinde yatay taşma yok | PASS |
+
+**Bu testin yakaladığı ve düzeltilen hatalar:**
+- **FUN-07:** Bildirim balonundaki yarış durumu.
+- **FUN-15:** Arama temizleme butonunun taşması.
+
+## 4. Derleme doğrulaması
+
+| Platform | Komut | Sonuç |
+|---|---|---|
+| Android (Hermes) | `npx expo export --platform android` | ✅ Çıkış 0. Toplam 5.9 MB (öncesi 9.8 MB); `.hbc` paketi 3.8 MB (öncesi 4.1 MB) |
+| iOS (Hermes) | `npx expo export --platform ios` | ✅ Çıkış 0. Toplam 5.9 MB; `.hbc` paketi 3.8 MB |
+| Web | `npx expo export --platform web` | ✅ Çıkış 0. Toplam 4.6 MB; JS 2.4 MB |
+| Android manifest | `npx expo prebuild --platform android --no-install` (geçici kopyada) | ✅ İzinler ve yedekleme ayarı doğrulandı |
+| Yerel APK/IPA | `eas build` / Gradle / Xcode | ❌ **NOT TESTED.** Android SDK, Xcode ve EAS erişimi yok |
+
+## 5. Test edilmeyenler (NOT TESTED)
+
+| Alan | Neden |
+|---|---|
+| Maestro mobil uçtan uca testi (`.maestro/core-journey.yaml`) | Emülatör/cihaz yok. Akış yazıldı ama çalıştırılmadı |
+| Bildirimlerin cihaza gerçekten gelmesi; "Görüştüm" bildirim aksiyonu | Cihaz yok |
+| Face ID / parmak izi ile uygulama kilidi | Cihaz yok |
+| iOS Keychain / Android Keystore ile anahtar saklama | Cihaz yok (jest'te mock'landı) |
+| Rehber seçici ve toplu aktarma | Cihaz yok (web'de rehber modülü yok) |
+| Kaydırma hareketi (ReanimatedSwipeable) | Web'de dokunmatik hareket testi yapılmadı |
+| Haptik geri bildirim, Android geri tuşu | Cihaz yok |
+| Sistem yazı boyutu ve ekran okuyucu (VoiceOver/TalkBack) | Cihaz yok |
+| Kötü ağ / çevrimdışı | Uygulama ağ kullanmıyor; test gerekmiyor |
+| İki farklı kullanıcıyla veri izolasyonu, API/kimlik doğrulama/veritabanı izin testleri | **N/A:** backend ve hesap sistemi yok; tek yerel kullanıcı |
+| Semgrep | Kural sunucusuna erişim engelli |
