@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { loadSettings, saveSettings } from "../data/userSettings";
+import { GOALS } from "../data/goals";
 import { colors } from "../theme/colors";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 
@@ -26,12 +27,7 @@ const MUTED  = colors.textSub;
 
 const TOTAL_STEPS = 3;
 
-const PURPOSES = [
-  { key: "personal",     label: "Kişisel ilişkilerimi takip etmek",         icon: "❤️" },
-  { key: "professional", label: "İş bağlantılarımı takip etmek",            icon: "💼" },
-  { key: "networking",   label: "Networking yapmak",                       icon: "🤝" },
-  { key: "occasions",    label: "Özel günleri ve hatırlatıcıları takip etmek", icon: "🎂" },
-];
+const PURPOSES = GOALS;
 
 const LATER = "Daha sonra ayarla";
 

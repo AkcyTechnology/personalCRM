@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGetItem, secureSetItem } from "../storage/secureStorage";
 
 const KEY = "crm_user_settings";
 
@@ -16,6 +16,9 @@ export type UserSettings = {
   notif_followUp: boolean;
   notif_weeklySummary: boolean;
   notif_smartNudge: boolean;
+  /** Require Face ID / fingerprint / device passcode to open the app. */
+  appLockEnabled: boolean;
+  acceptedTermsAt?: string;
 };
 
 const DEFAULTS: UserSettings = {
@@ -29,11 +32,20 @@ const DEFAULTS: UserSettings = {
   notif_followUp: true,
   notif_weeklySummary: false,
   notif_smartNudge: true,
+  appLockEnabled: false,
 };
+
+type Listener = (settings: UserSettings) => void;
+const listeners = new Set<Listener>();
+
+export function subscribeSettings(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 export async function loadSettings(): Promise<UserSettings> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await secureGetItem(KEY);
     if (!raw) return DEFAULTS;
     return { ...DEFAULTS, ...JSON.parse(raw) };
   } catch {
@@ -43,6 +55,15 @@ export async function loadSettings(): Promise<UserSettings> {
 
 export async function saveSettings(settings: UserSettings): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(settings));
-  } catch {}
+    await secureSetItem(KEY, JSON.stringify(settings));
+    listeners.forEach((l) => l(settings));
+  } catch (error) {
+    console.warn("Ayarlar kaydedilemedi:", error);
+  }
+}
+
+export async function updateSettings(patch: Partial<UserSettings>): Promise<UserSettings> {
+  const next = { ...(await loadSettings()), ...patch };
+  await saveSettings(next);
+  return next;
 }

@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet, Linking } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from "react-native";
+import { copyWithAutoClear } from "../utils/clipboard";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
 import type { ContactForm } from "../screens/AddContactScreen";
 import { generateMessage, TONE_LABELS, type MessageTone } from "../utils/messageSuggestion";
 import { showToast } from "./Toast";
+import { openWhatsApp as openWhatsAppLink } from "../utils/links";
 
 type Props = {
   visible: boolean;
   contact: ContactForm | null;
   onClose: () => void;
+  /** Called right before leaving the app to send the message. */
+  onExternalSend?: () => void;
 };
 
-export default function MessageComposer({ visible, contact, onClose }: Props) {
+export default function MessageComposer({ visible, contact, onClose, onExternalSend }: Props) {
   const [tone, setTone] = useState<MessageTone>("samimi");
   const [message, setMessage] = useState("");
   const [variant, setVariant] = useState(0);
@@ -35,14 +38,15 @@ export default function MessageComposer({ visible, contact, onClose }: Props) {
   };
 
   const copyMessage = async () => {
-    await Clipboard.setStringAsync(message);
-    showToast("Mesaj kopyalandı");
+    await copyWithAutoClear(message);
+    showToast("Mesaj kopyalandı · 90 sn sonra panodan silinir");
   };
 
   const openWhatsApp = () => {
     if (!contact?.phone) return;
-    const cleaned = contact.phone.replace(/[^0-9]/g, "");
-    Linking.openURL(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`);
+    onExternalSend?.();
+    onClose();
+    openWhatsAppLink(contact.phone, message);
   };
 
   const canWhatsApp = !!contact?.phone;

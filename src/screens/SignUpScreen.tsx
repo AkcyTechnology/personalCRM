@@ -1,10 +1,11 @@
 import {
   View, Text, Image, StyleSheet, TouchableOpacity,
-  ScrollView, useWindowDimensions,
+  ScrollView, useWindowDimensions, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../theme/colors";
+import { updateSettings } from "../data/userSettings";
 
 const TEAL = colors.primary;
 
@@ -44,19 +45,23 @@ export default function SignUpScreen({ navigation }: any) {
             Senin için önemli olan kişilerle{"\n"}bağını hiç kaybetme.
           </Text>
 
-          {/* Disabled login options */}
-          <View style={styles.disabledGroup}>
-            <DisabledBtn icon="🍎" label="Apple ile devam et" />
-            <DisabledBtn icon="G" label="Google ile devam et" isGoogle />
-            <DisabledBtn icon="✉" label="E-posta ile devam et" />
+          {/* Privacy promises */}
+          <View style={styles.promiseGroup}>
+            <PromiseRow icon="🔒" text={Platform.OS === "web" ? "Verilerin yalnızca bu cihazda saklanır" : "Verilerin cihazında şifreli saklanır"} />
+            <PromiseRow icon="📵" text="Hesap yok, sunucu yok, reklam yok" />
+            <PromiseRow icon="🗑️" text="İstediğin an tek dokunuşla hepsini sil" />
           </View>
 
           {/* Primary CTA */}
           <View style={styles.guestWrap}>
             <TouchableOpacity
-              onPress={() => navigation.navigate("Welcome")}
+              onPress={async () => {
+                await updateSettings({ acceptedTermsAt: new Date().toISOString() });
+                navigation.navigate("Welcome");
+              }}
               activeOpacity={0.85}
               style={styles.guestTouch}
+              accessibilityRole="button"
             >
               <LinearGradient
                 colors={["#4DD9CF", TEAL]}
@@ -64,19 +69,31 @@ export default function SignUpScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.guestBtn}
               >
-                <Text style={styles.guestBtnText}>Misafir olarak devam et</Text>
+                <Text style={styles.guestBtnText}>Başlayalım</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.guestNote}>Beta sürecinde hesap gerekmez.</Text>
+            <Text style={styles.guestNote}>Hesap oluşturman gerekmez.</Text>
           </View>
 
           {/* Footer */}
           <Text style={styles.footer}>
             Devam ederek{" "}
-            <Text style={styles.link}>Kullanım Şartları</Text>
+            <Text
+              style={styles.link}
+              onPress={() => navigation.navigate("Legal", { doc: "terms" })}
+              accessibilityRole="link"
+            >
+              Kullanım Şartları
+            </Text>
             {"'"}nı ve{" "}
-            <Text style={styles.link}>Gizlilik Politikası</Text>
-            {"'"}nı kabul etmiş olursun.{"\n"}Verilerin şifrelenir ve asla satılmaz.
+            <Text
+              style={styles.link}
+              onPress={() => navigation.navigate("Legal", { doc: "privacy" })}
+              accessibilityRole="link"
+            >
+              Gizlilik Politikası
+            </Text>
+            {"'"}nı kabul etmiş olursun.{"\n"}Verilerin asla satılmaz.
           </Text>
         </ScrollView>
       </View>
@@ -84,25 +101,19 @@ export default function SignUpScreen({ navigation }: any) {
   );
 }
 
-function DisabledBtn({
-  icon, label, isGoogle,
-}: {
-  icon: string; label: string; isGoogle?: boolean;
-}) {
+function PromiseRow({ icon, text }: { icon: string; text: string }) {
   return (
-    <View style={styles.disabledBtn}>
-      <View style={styles.disabledLeft}>
-        <Text style={[styles.disabledIcon, isGoogle && styles.googleIcon]}>{icon}</Text>
-        <Text style={styles.disabledLabel}>{label}</Text>
-      </View>
-      <View style={styles.comingSoonPill}>
-        <Text style={styles.comingSoonText}>Yakında</Text>
+    <View style={styles.promiseRow}>
+      <View style={styles.promiseLeft}>
+        <Text style={styles.promiseIcon}>{icon}</Text>
+        <Text style={styles.promiseLabel}>{text}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  promiseLabel: { fontSize: 15, fontWeight: "600", color: "#111827" },
   outer: {
     flex: 1,
     backgroundColor: "#FAFAFE",
@@ -144,21 +155,14 @@ const styles = StyleSheet.create({
     textAlign: "center", lineHeight: 22, marginTop: 8,
   },
 
-  disabledGroup: { width: "100%", gap: 10, marginTop: 24, opacity: 0.5 },
-  disabledBtn: {
+  promiseGroup: { width: "100%", gap: 10, marginTop: 24 },
+  promiseRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: "#FFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8E4F4",
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  disabledLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  disabledIcon: { fontSize: 18, width: 24, textAlign: "center" },
-  googleIcon: { fontWeight: "900", fontSize: 17, color: "#4285F4" },
-  disabledLabel: { fontSize: 14, fontWeight: "700", color: "#1A1830" },
-  comingSoonPill: {
-    backgroundColor: colors.primarySoft, borderRadius: 999,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  comingSoonText: { fontSize: 11, fontWeight: "700", color: TEAL },
+  promiseLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  promiseIcon: { fontSize: 18, width: 24, textAlign: "center" },
 
   guestWrap: { width: "100%", marginTop: 18 },
   guestTouch: {

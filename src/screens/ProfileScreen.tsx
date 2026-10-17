@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Alert,
   Platform,
   StatusBar,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { loadSettings, saveSettings } from "../data/userSettings";
+import { loadSettings, saveSettings, updateSettings } from "../data/userSettings";
+import { runExportBackup, runRestoreBackup } from "../data/backupActions";
+import { GOALS } from "../data/goals";
+import { isDue } from "../utils/reminderInterval";
 import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
@@ -33,12 +35,6 @@ const CARD      = "#FFFFFF";
 const DANGER    = "#DC2626";
 
 const THRESHOLD_OPTIONS = [7, 14, 21, 30];
-const LANGUAGE_OPTIONS: { code: "tr" | "en" | "es" | "de"; label: string; native: string }[] = [
-  { code: "tr", label: "Türkçe",  native: "TR" },
-  { code: "en", label: "English", native: "EN" },
-  { code: "es", label: "Español", native: "ES" },
-  { code: "de", label: "Deutsch", native: "DE" },
-];
 
 const TOP_SAFE = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
 
@@ -61,8 +57,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [threshold,      setThreshold]      = useState(14);
   const [thresholdOpen,  setThresholdOpen]  = useState(false);
-  const [languageOpen,   setLanguageOpen]   = useState(false);
-  const [language,       setLanguage]       = useState<"tr" | "en" | "es" | "de">("tr");
+  const [goals,          setGoals]          = useState<string[]>([]);
   const [userName,       setUserName]       = useState("");
   const [email,          setEmail]          = useState("");
   const [contactsList,   setContactsList]   = useState<ContactForm[]>([]);
@@ -78,11 +73,11 @@ export default function ProfileScreen({ navigation }: any) {
         setThreshold(t);
         setUserName(s.userName || "");
         setEmail(s.email || "");
-        setLanguage(s.language || "tr");
+        setGoals(s.goals || []);
         setContactsList(contacts);
         setTotalContacts(contacts.length);
         setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
-        setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= t).length);
+        setNeedsAttention(contacts.filter(c => isDue(c, t)).length);
       });
     }, [])
   );
@@ -94,42 +89,25 @@ export default function ProfileScreen({ navigation }: any) {
     await saveSettings({ ...s, reachOutThresholdDays: val });
     const contacts = await loadContacts();
     setContactsList(contacts);
-    setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= val).length);
+    setNeedsAttention(contacts.filter(c => isDue(c, val)).length);
   };
 
-  const handleLanguageSelect = async (code: "tr" | "en" | "es" | "de") => {
-    setLanguage(code);
-    setLanguageOpen(false);
-    const s = await loadSettings();
-    await saveSettings({ ...s, language: code });
+  const toggleGoal = async (key: string) => {
+    const next = goals.includes(key) ? goals.filter(g => g !== key) : [...goals, key];
+    setGoals(next);
+    await updateSettings({ goals: next });
   };
 
-  const handleExport = async () => {
+  const reload = async () => {
     const contacts = await loadContacts();
-    if (!contacts.length) { Alert.alert("Kişi yok", "Dışa aktarılacak kişi bulunamadı."); return; }
-    const lines = contacts.map((c, i) =>
-      [`--- Kişi ${i + 1} ---`, `Ad: ${c.fullName}`, `İlişki: ${c.relationship || "-"}`,
-       `Şirket: ${c.company || "-"}`, `Telefon: ${c.phone || "-"}`, `E-posta: ${c.email || "-"}`,
-       `Son görüşme: ${c.lastContactDate || "-"}`, `Notlar: ${c.notes || "-"}`].join("\n")
-    ).join("\n\n");
-    try {
-      const FileSystem = require("expo-file-system");
-      const Sharing = require("expo-sharing");
-      const path = FileSystem.documentDirectory + "kisiler.txt";
-      await FileSystem.writeAsStringAsync(path, lines, { encoding: FileSystem.EncodingType.UTF8 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(path, { mimeType: "text/plain", dialogTitle: "Kişileri paylaş" });
-      } else {
-        Alert.alert("Kaydedildi", `Dosya: ${path}`);
-      }
-    } catch {
-      Alert.alert("Kişiler hazır", `${contacts.length} kişi hazır.\n\n` + lines.slice(0, 400), [{ text: "Tamam" }]);
-    }
+    setContactsList(contacts);
+    setTotalContacts(contacts.length);
+    setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
+    setNeedsAttention(contacts.filter(c => isDue(c, threshold)).length);
   };
 
   const health = averageHealthScore(contactsList, threshold);
   const healthColor = healthScoreColor(health);
-  const currentLang = LANGUAGE_OPTIONS.find(l => l.code === language);
 
   return (
     <View style={styles.screen}>
@@ -213,7 +191,7 @@ export default function ProfileScreen({ navigation }: any) {
           <RowItem
             icon={<StarIcon />}
             title="Abonelik"
-            sub="Plan ve ödeme yönetimi"
+            sub="Beta · tüm özellikler ücretsiz"
             onPress={() => navigation.navigate("ManageSubscription")}
             last
           />
@@ -240,27 +218,12 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.rowItem, styles.rowBorder]}
-            onPress={() => setLanguageOpen(true)}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: "#EEF2FF" }]}>
-              <GlobeIcon />
-            </View>
-            <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Dil</Text>
-              <Text style={styles.rowSub}>Uygulama dili</Text>
-            </View>
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>{currentLang?.native ?? "TR"}</Text>
-            </View>
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.rowItem, styles.rowBorder]}
-            onPress={() => navigation.navigate("AddContact")}
+            onPress={() => navigation.navigate("ImportContacts")}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
             <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
               <UploadIcon />
@@ -288,16 +251,33 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.rowItem}
-            onPress={handleExport}
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={runExportBackup}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
             <View style={[styles.iconWrap, { backgroundColor: "#F0FDF4" }]}>
               <DownloadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Verileri dışa aktar</Text>
-              <Text style={styles.rowSub}>.txt formatında dışa aktar</Text>
+              <Text style={styles.rowTitle}>Yedek al</Text>
+              <Text style={styles.rowSub}>Tüm verileri .json dosyası olarak kaydet</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.rowItem}
+            onPress={() => runRestoreBackup(reload)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+          >
+            <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
+              <UploadIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>Yedekten geri yükle</Text>
+              <Text style={styles.rowSub}>Daha önce aldığın yedeği içe aktar</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -313,10 +293,26 @@ export default function ProfileScreen({ navigation }: any) {
           <DataRow label="Ulaş eşiği"           value={`${threshold} gün`} last />
         </View>
 
-        {/* ── Sign out ── */}
-        <TouchableOpacity style={styles.signOutBtn} disabled activeOpacity={0.6}>
-          <Text style={styles.signOutText}>Çıkış Yap</Text>
-        </TouchableOpacity>
+        {/* ── Hedefler ── */}
+        <SectionLabel title="Hedeflerin" />
+
+        <View style={[styles.card, styles.goalsCard]}>
+          {GOALS.map(g => {
+            const active = goals.includes(g.key);
+            return (
+              <TouchableOpacity
+                key={g.key}
+                style={[styles.goalChip, active && styles.goalChipActive]}
+                onPress={() => toggleGoal(g.key)}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: active }}
+              >
+                <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>{g.icon} {g.short}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
       </ScrollView>
 
@@ -333,23 +329,6 @@ export default function ProfileScreen({ navigation }: any) {
             label={`${val} gün`}
             active={threshold === val}
             onPress={() => handleThresholdSelect(val)}
-          />
-        ))}
-      </PickerModal>
-
-      {/* ── Language modal ── */}
-      <PickerModal
-        visible={languageOpen}
-        title="Dil Seçin"
-        desc="Uygulama dilini seçin"
-        onClose={() => setLanguageOpen(false)}
-      >
-        {LANGUAGE_OPTIONS.map(opt => (
-          <PickerOption
-            key={opt.code}
-            label={`${opt.native}  ${opt.label}`}
-            active={language === opt.code}
-            onPress={() => handleLanguageSelect(opt.code)}
           />
         ))}
       </PickerModal>
@@ -482,14 +461,6 @@ function ClockIcon() {
   );
 }
 
-function GlobeIcon() {
-  return (
-    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#6366F1", alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 14, height: 1.5, backgroundColor: "#6366F1", position: "absolute" }} />
-    </View>
-  );
-}
-
 function DownloadIcon() {
   return (
     <View style={{ alignItems: "center" }}>
@@ -521,6 +492,14 @@ function RestartIcon() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  goalsCard: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 14 },
+  goalChip: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1, borderColor: BORDER, backgroundColor: BG,
+  },
+  goalChipActive: { borderColor: TEAL, backgroundColor: TEAL_SOFT },
+  goalChipText: { fontSize: 14, color: TEXTSUB, fontWeight: "600" },
+  goalChipTextActive: { color: TEAL_DARK },
   screen: { flex: 1, backgroundColor: BG },
 
   // Header
@@ -636,12 +615,6 @@ const styles = StyleSheet.create({
   dataValue: { fontSize: 13, fontWeight: "600", color: TEXT },
 
   // Sign out
-  signOutBtn: {
-    marginTop: 20, height: 48, borderRadius: 14,
-    backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA",
-    alignItems: "center", justifyContent: "center", opacity: 0.5,
-  },
-  signOutText: { color: DANGER, fontSize: 14, fontWeight: "600" },
 
   // Modal
   overlay: {

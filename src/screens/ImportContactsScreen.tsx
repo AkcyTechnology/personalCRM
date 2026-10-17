@@ -14,19 +14,15 @@ import AppHeader from "../components/AppHeader";
 import EmptyState from "../components/EmptyState";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { showToast } from "../components/Toast";
-import { addContact, loadContacts } from "../data/contacts";
+import { addContacts, loadContacts } from "../data/contacts";
+import { ContactsPermissionError, ContactsUnavailableError, listDeviceContactsAsync, type DeviceContact } from "../utils/deviceContacts";
+import { todayISO } from "../utils/dates";
+import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { ContactForm } from "./AddContactScreen";
 import { isDuplicateContact } from "../utils/duplicateContact";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
-
-type DeviceContact = {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-};
 
 function initials(name: string) {
   return name
@@ -57,46 +53,25 @@ export default function ImportContactsScreen({ navigation }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [permissionModal, setPermissionModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const fetchDeviceContacts = useCallback(async () => {
     setLoadState("loading");
     try {
-      const Contacts = require("expo-contacts/legacy");
-
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== "granted") {
+      const [mapped, savedContacts] = await Promise.all([listDeviceContactsAsync(), loadContacts()]);
+      setExistingContacts(savedContacts);
+      setDeviceContacts(mapped);
+      setLoadState("ready");
+    } catch (error) {
+      if (error instanceof ContactsPermissionError) {
         setLoadState("denied");
         setPermissionModal(true);
         return;
       }
-
-      const [{ data }, savedContacts] = await Promise.all([
-        Contacts.getContactsAsync({
-          fields: [
-            Contacts.Fields.Name,
-            Contacts.Fields.PhoneNumbers,
-            Contacts.Fields.Emails,
-          ],
-          sort: Contacts.SortTypes.FirstName,
-        }),
-        loadContacts(),
-      ]);
-
-      const mapped: DeviceContact[] = (data || [])
-        .filter((c: any) => !!c.name)
-        .map((c: any, i: number) => ({
-          id: c.id ?? String(i),
-          name: c.name,
-          phone: c.phoneNumbers?.[0]?.number ?? "",
-          email: c.emails?.[0]?.email ?? "",
-        }));
-
-      setExistingContacts(savedContacts);
-      setDeviceContacts(mapped);
-      setLoadState("ready");
-    } catch {
+      setErrorMessage(
+        error instanceof ContactsUnavailableError ? error.message : "Rehber okunamadı. Lütfen tekrar dene."
+      );
       setLoadState("error");
-      showToast("Rehber okunamadı. Lütfen tekrar dene.");
     }
   }, []);
 
@@ -142,12 +117,13 @@ export default function ImportContactsScreen({ navigation }: Props) {
     setSaving(true);
     try {
       const toAdd = deviceContacts.filter((dc) => selectedIds.has(dc.id));
-      for (const dc of toAdd) {
-        const newContact: ContactForm = {
+      const today = todayISO();
+      await addContacts(
+        toAdd.map((dc): ContactForm => ({
           fullName: dc.name,
-          company: "",
-          jobTitle: "",
-          birthday: "",
+          company: dc.company,
+          jobTitle: dc.jobTitle,
+          birthday: /^\d{2}\/\d{2}\/\d{4}$/.test(dc.birthday) ? dc.birthday : "",
           relationship: "",
           metWhere: "",
           phone: dc.phone.replace(/\s+/g, " ").trim(),
@@ -155,15 +131,17 @@ export default function ImportContactsScreen({ navigation }: Props) {
           website: "",
           instagram: "",
           city: "",
-          socials: [{ platform: "LinkedIn", handle: "" }],
+          socials: [],
           tags: "",
           priority: "",
           notes: "",
           reminderFreq: "",
-          lastContactDate: new Date().toISOString().split("T")[0],
-        };
-        await addContact(newContact);
-      }
+          // Son görüşmeyi bilmiyoruz; hatırlatma aralığı bugünden başlar.
+          lastContactDate: "",
+          reminderIntervalStart: today,
+        }))
+      );
+      ensureNotificationPermissionAsync();
       showToast(
         toAdd.length === 1 ? "1 kişi eklendi" : `${toAdd.length} kişi eklendi`
       );
@@ -205,7 +183,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
         <EmptyState
           icon="⚠️"
           title="Bir sorun oluştu"
-          description="Rehber okunamadı. Lütfen tekrar dene."
+          description={errorMessage || "Rehber okunamadı. Lütfen tekrar dene."}
           buttonLabel="Tekrar dene"
           onPress={fetchDeviceContacts}
         />

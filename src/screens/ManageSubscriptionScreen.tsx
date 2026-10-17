@@ -3,8 +3,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Alert,
 } from "react-native";
 import AppHeader from "../components/AppHeader";
 import { colors } from "../theme/colors";
@@ -17,23 +15,15 @@ const BORDER = colors.border;
 const TEXT = colors.text;
 const MUTED = colors.textSub;
 
-const PLANS = [
-  {
-    id: "free",
-    name: "Ücretsiz",
-    price: "₺0",
-    period: "/ ay",
-    features: ["50 kişiye kadar", "Temel hatırlatıcılar", "Manuel notlar"],
-    current: true,
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    price: "₺49",
-    period: "/ ay",
-    features: ["Sınırsız kişi", "Yapay zeka önerileri", "Gelişmiş analizler", "Öncelikli destek"],
-    current: false,
-  },
+const BETA_FEATURES = [
+  "Sınırsız kişi",
+  "Hatırlatıcılar ve doğum günü bildirimleri",
+  "Görüşme geçmişi ve notlar",
+  "Mesaj önerileri",
+  "İçgörüler ve ilişki sağlığı",
+  "Dijital kartvizit ve QR kod",
+  "Şifreli depolama ve uygulama kilidi",
+  "Yedek alma ve geri yükleme",
 ];
 
 export default function ManageSubscriptionScreen({ navigation }: any) {
@@ -41,64 +31,34 @@ export default function ManageSubscriptionScreen({ navigation }: any) {
     <View style={styles.screen}>
       <AppHeader type="settings" centerTitle="Abonelik" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.currentLabel}>Mevcut planın: Ücretsiz</Text>
+        <Text style={styles.currentLabel}>Mevcut planın</Text>
 
-        {PLANS.map((plan) => (
-          <View
-            key={plan.id}
-            style={[styles.planCard, plan.current && styles.planCardActive]}
-          >
-            <View style={styles.planTop}>
-              <View>
-                <Text style={[styles.planName, plan.current && { color: PURPLE }]}>{plan.name}</Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.planPrice}>{plan.price}</Text>
-                  <Text style={styles.planPeriod}>{plan.period}</Text>
-                </View>
+        <View style={[styles.planCard, styles.planCardActive]}>
+          <View style={styles.planTop}>
+            <View>
+              <Text style={[styles.planName, { color: PURPLE }]}>Beta · Ücretsiz</Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.planPrice}>₺0</Text>
               </View>
-              {plan.current && (
-                <View style={styles.currentBadge}>
-                  <Text style={styles.currentBadgeText}>Mevcut</Text>
-                </View>
-              )}
             </View>
-
-            <View style={styles.featureList}>
-              {plan.features.map((f) => (
-                <View key={f} style={styles.featureRow}>
-                  <Text style={styles.featureCheck}>✓</Text>
-                  <Text style={styles.featureText}>{f}</Text>
-                </View>
-              ))}
+            <View style={styles.currentBadge}>
+              <Text style={styles.currentBadgeText}>Aktif</Text>
             </View>
-
-            {!plan.current && (
-              <TouchableOpacity
-                style={styles.upgradeBtn}
-                activeOpacity={0.8}
-                onPress={() => Alert.alert("Premium", "Bu özellik yakında aktif olacak.")}
-              >
-                <Text style={styles.upgradeBtnText}>Premium'a Geç</Text>
-              </TouchableOpacity>
-            )}
           </View>
-        ))}
 
-        <Text style={styles.sectionLabel}>FATURALAMA GEÇMİŞİ</Text>
+          <Text style={styles.featureText}>
+            Beta süresince tüm özellikler herkese açık ve ücretsiz. Kart bilgisi istemiyoruz, otomatik yenilenen bir ödeme yok.
+          </Text>
 
-        <View style={styles.card}>
-          <Text style={styles.emptyBilling}>Henüz fatura geçmişin yok.</Text>
+          <View style={styles.featureList}>
+            {BETA_FEATURES.map((f) => (
+              <View key={f} style={styles.featureRow}>
+                <Text style={styles.featureCheck}>✓</Text>
+                <Text style={styles.featureText}>{f}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-
-        <TouchableOpacity
-          style={styles.cancelRow}
-          activeOpacity={0.7}
-          onPress={() =>
-            Alert.alert("İptal", "Ücretsiz plandayken iptal edilecek bir abonelik yok.")
-          }
-        >
-          <Text style={styles.cancelText}>Aboneliği iptal et</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );

@@ -82,7 +82,14 @@ function TabItem({ label, icon, active, onPress }: {
   label: string; icon: React.ReactNode; active: boolean; onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.tabItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+    >
       {icon}
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
     </TouchableOpacity>
@@ -117,6 +124,8 @@ export default function BottomTabBar({ activeTab, onTabPress, onAddPress }: Prop
             onPress={onAddPress}
             activeOpacity={0.82}
             style={styles.addBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Yeni kişi ekle"
           >
             <Text style={styles.addIcon}>+</Text>
           </TouchableOpacity>

@@ -10,7 +10,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { loadSettings, saveSettings } from "../data/userSettings";
-import { ensureNotificationPermissionAsync } from "../utils/notifications";
+import { ensureNotificationPermissionAsync, notificationsUnavailable } from "../utils/notifications";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
@@ -76,6 +76,13 @@ export default function NotificationSettingsScreen({ navigation }: any) {
     <View style={styles.screen}>
       <AppHeader type="settings" centerTitle="Bildirim Ayarları" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {notificationsUnavailable ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>
+              Expo Go (Android) bildirimleri desteklemiyor. Hatırlatıcıların gelmesi için uygulamanın development build veya mağaza sürümünü kullan.
+            </Text>
+          </View>
+        ) : null}
         <Text style={styles.sectionLabel}>HATIRLATICILAR</Text>
 
         <View style={styles.card}>
@@ -157,6 +164,8 @@ function SwitchRow({
 }
 
 const styles = StyleSheet.create({
+  notice: { backgroundColor: colors.warningSoft, borderRadius: 12, padding: 14, marginBottom: 16 },
+  noticeText: { fontSize: 13, lineHeight: 19, color: colors.text },
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.xxl, paddingBottom: 60 },
   sectionLabel: {

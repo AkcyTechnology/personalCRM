@@ -15,7 +15,17 @@ import {
 } from "react-native";
 import { useState, useCallback, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Contacts from "expo-contacts/legacy";
+import {
+  ContactsPermissionError,
+  ContactsUnavailableError,
+  listDeviceContactsAsync,
+  pickDeviceContactAsync,
+  type DeviceContact,
+} from "../utils/deviceContacts";
+import DateField from "../components/DateField";
+import { toISODate } from "../utils/dates";
+import { toSafeWebUrl } from "../utils/links";
+import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { addContact } from "../data/contacts";
@@ -36,6 +46,16 @@ import PermissionDeniedModal from "../components/PermissionDeniedModal";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SocialEntry = { platform: string; handle: string };
+
+export type InteractionType = "call" | "whatsapp" | "email" | "meeting" | "message" | "other";
+
+export type Interaction = {
+  id:    string;
+  /** YYYY-MM-DD */
+  date:  string;
+  type:  InteractionType;
+  note?: string;
+};
 
 export type ContactForm = {
   id?:                    string;
@@ -65,6 +85,7 @@ export type ContactForm = {
   createdAt?:             string;
   updatedAt?:             string;
   order?:                 number;
+  interactions?:          Interaction[];
 };
 
 const EMPTY: ContactForm = {
@@ -119,12 +140,13 @@ export default function AddContactScreen({ navigation }: Props) {
   const [errors, setErrors]         = useState<Partial<Record<keyof ContactForm, string>>>({});
   const [discardModal, setDiscard]  = useState(false);
   const [importedName, setImported] = useState("");
+  const [customLastContact, setCustomLastContact] = useState(false);
   const [notesOpen, setNotesOpen]   = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customInterval, setCustomInterval] = useState(false);
   const [customIntervalText, setCustomIntervalText] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [deviceContacts, setDeviceContacts] = useState<Contacts.ExistingContact[]>([]);
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [permissionModal, setPermissionModal] = useState(false);
   const [customRelationships, setCustomRelationships] = useState<string[]>([]);
   const [relationshipManagerOpen, setRelationshipManagerOpen] = useState(false);
@@ -163,49 +185,53 @@ export default function AddContactScreen({ navigation }: Props) {
   };
 
   // ── Import from contacts ───────────────────────────────────────────────────
-  const handleImport = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== "granted") {
-        showToast("Rehber izni verilmedi");
-        setPermissionModal(true);
-        return;
-      }
-      const { data } = await Contacts.getContactsAsync({
-        fields: [
-          Contacts.Fields.Name,
-          Contacts.Fields.PhoneNumbers,
-          Contacts.Fields.Emails,
-          Contacts.Fields.Company,
-          Contacts.Fields.JobTitle,
-        ],
-        sort: Contacts.SortTypes.FirstName,
-      });
-      if (!data?.length) {
-        Alert.alert("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
-        return;
-      }
-      setDeviceContacts(data.filter((c) => !!c.name));
-      setPickerVisible(true);
-    } catch {
+  const handleContactsError = (error: unknown) => {
+    if (error instanceof ContactsPermissionError) {
+      showToast("Rehber izni verilmedi");
+      setPermissionModal(true);
+    } else if (error instanceof ContactsUnavailableError) {
+      Alert.alert("Rehber kullanılamıyor", error.message);
+    } else {
       showToast("Bir sorun oluştu. Lütfen tekrar dene.");
     }
   };
 
-  const handlePickDeviceContact = (picked: Contacts.ExistingContact) => {
-    const name    = picked.name ?? "";
-    const phone   = picked.phoneNumbers?.[0]?.number ?? "";
-    const email   = picked.emails?.[0]?.email ?? "";
-    const company = picked.company ?? "";
-    const title   = picked.jobTitle ?? "";
+  const handleImport = async () => {
+    try {
+      // Önce sistemin kişi seçicisi: yalnızca seçilen kişi uygulamaya gelir.
+      const picked = await pickDeviceContactAsync();
+      if (picked) handlePickDeviceContact(picked);
+      return;
+    } catch (error) {
+      if (error instanceof ContactsPermissionError || error instanceof ContactsUnavailableError) {
+        return handleContactsError(error);
+      }
+    }
+    // Sistem seçicisi yoksa uygulama içi listeye düş
+    try {
+      const data = await listDeviceContactsAsync();
+      if (!data.length) {
+        Alert.alert("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
+        return;
+      }
+      setDeviceContacts(data);
+      setPickerVisible(true);
+    } catch (error) {
+      handleContactsError(error);
+    }
+  };
+
+  const handlePickDeviceContact = (picked: DeviceContact) => {
+    const { name, phone, email, company, jobTitle: title, birthday } = picked;
     if (name) {
       setForm(prev => ({
         ...prev,
         fullName: name,
-        phone: phone.trim(),
-        email: email.trim(),
-        company: company.trim() || prev.company,
-        jobTitle: title.trim() || prev.jobTitle,
+        phone,
+        email,
+        company: company || prev.company,
+        jobTitle: title || prev.jobTitle,
+        birthday: /^\d{2}\/\d{2}\/\d{4}$/.test(birthday) ? birthday : prev.birthday,
       }));
       setImported(name);
       setErrors({});
@@ -230,19 +256,28 @@ export default function AddContactScreen({ navigation }: Props) {
     if (relationshipRequired && !form.relationship) e.relationship = "İlişki türü seçin.";
     if (!emailValid)          e.email = "Geçerli bir e-posta adresi gir.";
     if (!birthdayValid)       e.birthday = "Tarihi GG/AA/YYYY biçiminde gir.";
+    if (form.website.trim() && !toSafeWebUrl(form.website)) e.website = "Geçerli bir web adresi gir (https://…).";
     setErrors(e);
     return !Object.keys(e).length;
   };
 
   const handleSave = async () => {
     if (!validate()) return;
-    await addContact({
-      ...form,
-      tags: selectedTags.join(", "),
-      lastContactDate: form.lastContactDate || new Date().toISOString().split("T")[0],
-    });
+    try {
+      await addContact({
+        ...form,
+        website: form.website.trim() ? toSafeWebUrl(form.website) ?? "" : "",
+        tags: selectedTags.join(", "),
+        lastContactDate: form.lastContactDate || toISODate(new Date()),
+      });
+    } catch {
+      showToast("Kişi kaydedilemedi. Lütfen tekrar dene.");
+      return;
+    }
     navigation.goBack();
     showToast("Kişi kaydedildi");
+    // Hatırlatıcının işe yaraması için izni tam bu anda iste
+    if (form.reminderEnabled !== false) ensureNotificationPermissionAsync();
   };
 
   const handleBack = () => {
@@ -338,13 +373,17 @@ export default function AddContactScreen({ navigation }: Props) {
               onChangeText={v => set("jobTitle", v)}
             />
             <Divider />
-            <Field
-              label="Doğum Tarihi"
-              value={form.birthday}
-              error={errors.birthday}
-              placeholder="GG / AA / YYYY"
-              onChangeText={v => set("birthday", v)}
-            />
+            <View style={{ paddingTop: 12 }}>
+              <DateField
+                label="Doğum Tarihi"
+                format="birthday"
+                value={form.birthday}
+                error={errors.birthday}
+                placeholder="Tarih seç"
+                maximumDate={new Date()}
+                onChange={v => set("birthday", v)}
+              />
+            </View>
             <Divider />
             <Field
               label="Şehir"
@@ -373,8 +412,9 @@ export default function AddContactScreen({ navigation }: Props) {
             />
             <Divider />
             <Field
-              label="Website"
+              label="Web sitesi"
               value={form.website}
+              error={errors.website}
               placeholder="https://..."
               keyboardType="url"
               onChangeText={v => set("website", v)}
@@ -442,8 +482,13 @@ export default function AddContactScreen({ navigation }: Props) {
             chips={LAST_CONTACT_OPTIONS}
             selected={form.lastContactDate}
             onSelect={v => {
+              if (v === "Özel tarih") {
+                setCustomLastContact(true);
+                return;
+              }
+              setCustomLastContact(false);
               const map: Record<string, string> = {
-                "Bugün":       new Date().toISOString().split("T")[0],
+                "Bugün":       toISODate(new Date()),
                 "Dün":         daysAgo(1),
                 "1 hafta önce": daysAgo(7),
                 "1 ay önce":   daysAgo(30),
@@ -451,12 +496,24 @@ export default function AddContactScreen({ navigation }: Props) {
               set("lastContactDate", map[v] ?? v);
             }}
             displayMap={{
-              [new Date().toISOString().split("T")[0]]: "Bugün",
+              [toISODate(new Date())]: "Bugün",
               [daysAgo(1)]: "Dün",
               [daysAgo(7)]: "1 hafta önce",
               [daysAgo(30)]: "1 ay önce",
             }}
           />
+
+          {customLastContact || (form.lastContactDate && ![toISODate(new Date()), daysAgo(1), daysAgo(7), daysAgo(30)].includes(form.lastContactDate)) ? (
+            <View style={styles.card}>
+              <DateField
+                label="Son görüşme tarihi"
+                format="iso"
+                value={form.lastContactDate}
+                maximumDate={new Date()}
+                onChange={v => set("lastContactDate", v)}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.card}>
             <Text style={styles.chipLabel}>Tekrar ne zaman hatırlatayım?</Text>
@@ -638,7 +695,7 @@ function initials(name: string) {
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().split("T")[0];
+  return toISODate(d);
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -846,8 +903,8 @@ function DiscardModal({ visible, onKeep, onDiscard }: {
 
 function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
   visible: boolean;
-  contacts: Contacts.ExistingContact[];
-  onSelect: (c: Contacts.ExistingContact) => void;
+  contacts: DeviceContact[];
+  onSelect: (c: DeviceContact) => void;
   onClose: () => void;
 }) {
   return (
@@ -872,7 +929,7 @@ function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || "İsimsiz"}</Text>
                   <Text style={styles.pickerRowSub} numberOfLines={1}>
-                    {item.phoneNumbers?.[0]?.number || item.emails?.[0]?.email || ""}
+                    {item.phone || item.email || ""}
                   </Text>
                 </View>
               </TouchableOpacity>

@@ -5,9 +5,10 @@ import AppHeader from "../components/AppHeader";
 import EmptyState from "../components/EmptyState";
 import SnoozeModal from "../components/SnoozeModal";
 import MessageComposer from "../components/MessageComposer";
-import { loadContacts, saveContacts } from "../data/contacts";
+import { loadContacts, markContacted, snoozeContact } from "../data/contacts";
+import LogInteractionModal from "../components/LogInteractionModal";
 import { loadSettings } from "../data/userSettings";
-import type { ContactForm } from "./AddContactScreen";
+import type { ContactForm, InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { isSnoozed, isDue, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
 import { showToast } from "../components/Toast";
@@ -106,18 +107,31 @@ export default function RemindersScreen({ navigation }: any) {
   const goToContact = (contact: ContactForm) => navigation.navigate("PersonDetail", { contact });
 
   const handleSnoozeConfirm = useCallback(async (date: string) => {
-    if (!snoozeTarget) return;
-    const all = await loadContacts();
-    const updated = all.map((c) => {
-      const sameId = snoozeTarget.id && c.id === snoozeTarget.id;
-      const samePerson = c.fullName === snoozeTarget.fullName && (c.email || "") === (snoozeTarget.email || "");
-      return sameId || samePerson ? { ...c, snoozedUntil: date } : c;
-    });
-    await saveContacts(updated);
-    setContacts(updated);
+    if (!snoozeTarget?.id) return;
+    try {
+      await snoozeContact(snoozeTarget.id, date);
+      setContacts(await loadContacts());
+      showToast("Hatırlatma ertelendi");
+    } catch {
+      showToast("Ertelenemedi. Lütfen tekrar dene.");
+    }
     setSnoozeTarget(null);
-    showToast("Hatırlatma ertelendi");
   }, [snoozeTarget]);
+
+  const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
+
+  const handleLog = useCallback(async (type: InteractionType, note: string, date: string) => {
+    const target = logTarget;
+    setLogTarget(null);
+    if (!target?.id) return;
+    try {
+      await markContacted(target.id, type, note, date);
+      setContacts(await loadContacts());
+      showToast("Görüşme kaydedildi");
+    } catch {
+      showToast("Kaydedilemedi. Lütfen tekrar dene.");
+    }
+  }, [logTarget]);
 
   const isEmpty = priority.length === 0 && upcoming.length === 0;
 
@@ -162,18 +176,27 @@ export default function RemindersScreen({ navigation }: any) {
                   </View>
                   <View style={styles.cardActionsCol}>
                     <TouchableOpacity
+                      style={styles.messageBtn}
+                      onPress={() => setLogTarget(contact)}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${contact.fullName} ile görüştüm`}
+                    >
+                      <Text style={styles.messageBtnText}>Görüştüm ✓</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={styles.rescheduleBtn}
                       onPress={() => setSnoozeTarget(contact)}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.rescheduleBtnText}>Yeniden planla</Text>
+                      <Text style={styles.rescheduleBtnText}>Ertele</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.messageBtn}
+                      style={styles.rescheduleBtn}
                       onPress={() => setComposerTarget(contact)}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.messageBtnText}>Mesaj hazırla</Text>
+                      <Text style={styles.rescheduleBtnText}>Mesaj hazırla</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -215,6 +238,13 @@ export default function RemindersScreen({ navigation }: any) {
         contactName={snoozeTarget?.fullName ?? ""}
         onCancel={() => setSnoozeTarget(null)}
         onConfirm={handleSnoozeConfirm}
+      />
+
+      <LogInteractionModal
+        visible={!!logTarget}
+        contactName={logTarget?.fullName ?? ""}
+        onClose={() => setLogTarget(null)}
+        onSave={handleLog}
       />
 
       <MessageComposer

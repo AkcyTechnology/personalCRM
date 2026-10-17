@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGetItem, secureSetItem, secureRemoveItem } from "../storage/secureStorage";
 import QrCode from "../components/QrCode";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
@@ -67,7 +67,7 @@ export default function BusinessCardScreen({ navigation }: any) {
 
   const loadCard = async () => {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await secureGetItem(STORAGE_KEY);
 
       if (!raw) {
         setMode("edit");
@@ -119,7 +119,7 @@ export default function BusinessCardScreen({ navigation }: any) {
         linkedin: form.linkedin.trim(),
       };
 
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+      await secureSetItem(STORAGE_KEY, JSON.stringify(cleaned));
       setForm(cleaned);
       setHasCard(true);
       setMode("view");
@@ -158,7 +158,7 @@ export default function BusinessCardScreen({ navigation }: any) {
         text: "Sıfırla",
         style: "destructive",
         onPress: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
+          await secureRemoveItem(STORAGE_KEY);
           setForm(initialForm);
           setHasCard(false);
           setMode("edit");
@@ -244,32 +244,6 @@ export default function BusinessCardScreen({ navigation }: any) {
             </Text>
           </View>
 
-          <View style={styles.photoRow}>
-            <TouchableOpacity
-              style={styles.mediaBox}
-              activeOpacity={0.8}
-              onPress={() => showToast("Bu özellik yakında eklenecek")}
-            >
-              <View style={styles.mediaIcon}>
-                <Text style={styles.mediaIconText}>+</Text>
-              </View>
-              <Text style={styles.mediaTitle}>Fotoğraf ekle</Text>
-              <Text style={styles.mediaSub}>Opsiyonel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.mediaBox}
-              activeOpacity={0.8}
-              onPress={() => showToast("Bu özellik yakında eklenecek")}
-            >
-              <View style={styles.mediaIcon}>
-                <Text style={styles.mediaIconText}>□</Text>
-              </View>
-              <Text style={styles.mediaTitle}>Logo ekle</Text>
-              <Text style={styles.mediaSub}>Opsiyonel</Text>
-            </TouchableOpacity>
-          </View>
-
           <Section title="Temel bilgiler">
             <Input
               label="Ad Soyad"
@@ -321,7 +295,7 @@ export default function BusinessCardScreen({ navigation }: any) {
             />
 
             <Input
-              label="Website"
+              label="Web sitesi"
               placeholder="www.site.com"
               value={form.website}
               onChangeText={(v) => updateField("website", v)}
@@ -357,7 +331,7 @@ export default function BusinessCardScreen({ navigation }: any) {
               onChange={(v) => setForm((prev) => ({ ...prev, showEmail: v }))}
             />
             <VisibilityRow
-              label="Website göster"
+              label="Web sitesini göster"
               value={form.showWebsite}
               onChange={(v) => setForm((prev) => ({ ...prev, showWebsite: v }))}
             />
@@ -399,7 +373,7 @@ export default function BusinessCardScreen({ navigation }: any) {
             <Text style={styles.qrModalTitle}>{form.fullName || "Kartvizit"}</Text>
             <Text style={styles.qrModalSub}>Bu QR kodu okutarak kartvizit bilgilerine ulaşabilirsin.</Text>
             <View style={styles.qrModalCodeWrap}>
-              <QrCode value={cardSummary()} size={220} />
+              <QrCode value={businessCardVCard(form)} size={220} />
             </View>
             <TouchableOpacity style={styles.qrModalClose} onPress={() => setQrModalOpen(false)} activeOpacity={0.75}>
               <Text style={styles.qrModalCloseText}>Kapat</Text>
@@ -411,6 +385,34 @@ export default function BusinessCardScreen({ navigation }: any) {
   );
 }
 
+function vcardEscape(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
+}
+
+/** vCard 3.0 payload so scanning the QR offers to save the contact. */
+function businessCardVCard(form: BusinessCardForm) {
+  const parts = form.fullName.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts.pop()! : "";
+  const first = parts.join(" ");
+  return [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `N:${vcardEscape(last)};${vcardEscape(first)};;;`,
+    `FN:${vcardEscape(form.fullName.trim())}`,
+    form.company ? `ORG:${vcardEscape(form.company)}` : "",
+    form.title ? `TITLE:${vcardEscape(form.title)}` : "",
+    form.showPhone && form.phone ? `TEL;TYPE=CELL:${form.phone.replace(/[^\d+]/g, "")}` : "",
+    form.showEmail && form.email ? `EMAIL:${vcardEscape(form.email)}` : "",
+    form.showWebsite && form.website ? `URL:${vcardEscape(form.website)}` : "",
+    form.showLinkedin && form.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${vcardEscape(form.linkedin)}` : "",
+    form.showAddress && form.address ? `ADR:;;${vcardEscape(form.address)};;;;` : "",
+    form.about ? `NOTE:${vcardEscape(form.about)}` : "",
+    "END:VCARD",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function businessCardSummary(form: BusinessCardForm) {
   return [
     form.fullName,
@@ -419,7 +421,7 @@ function businessCardSummary(form: BusinessCardForm) {
     "",
     form.showPhone && form.phone ? `Telefon: ${form.phone}` : "",
     form.showEmail && form.email ? `E-posta: ${form.email}` : "",
-    form.showWebsite && form.website ? `Website: ${form.website}` : "",
+    form.showWebsite && form.website ? `Web sitesi: ${form.website}` : "",
     form.showLinkedin && form.linkedin ? `LinkedIn: ${form.linkedin}` : "",
     form.showAddress && form.address ? `Adres: ${form.address}` : "",
   ]
@@ -456,7 +458,7 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
 
           <CardLine label="E-posta" value={form.showEmail ? form.email : ""} />
           <CardLine label="Telefon" value={form.showPhone ? form.phone : ""} />
-          <CardLine label="Website" value={form.showWebsite ? form.website : ""} />
+          <CardLine label="Web sitesi" value={form.showWebsite ? form.website : ""} />
           <CardLine label="LinkedIn" value={form.showLinkedin ? form.linkedin : ""} />
           <CardLine label="Adres" value={form.showAddress ? form.address : ""} />
         </View>
@@ -467,7 +469,7 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
           </View>
 
           <View style={styles.qrBox}>
-            <QrCode value={businessCardSummary(form)} size={66} />
+            <QrCode value={businessCardVCard(form)} size={66} />
           </View>
 
           <Text style={styles.qrText}>QR Kart</Text>
@@ -789,7 +791,7 @@ const styles = StyleSheet.create({
   },
 
   cardLineLabel: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     color: "#8A93A5",
     fontWeight: "600",
   },
@@ -1063,7 +1065,7 @@ const styles = StyleSheet.create({
   },
 
   requiredText: {
-    fontSize: 10,
+    fontSize: 11,
     color: TEAL_DARK,
     fontWeight: "700",
   },

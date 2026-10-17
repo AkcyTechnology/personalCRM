@@ -93,6 +93,8 @@ function BackButton({ onPress }: { onPress?: () => void }) {
       onPress={onPress}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel="Geri"
     >
       <Text style={styles.backIcon}>‹</Text>
       <Text style={styles.backLabel}>Geri</Text>
@@ -102,7 +104,13 @@ function BackButton({ onPress }: { onPress?: () => void }) {
 
 function IconButton({ label, onPress }: { label: string; color?: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.iconBtn} onPress={onPress} activeOpacity={0.82}>
+    <TouchableOpacity
+      style={styles.iconBtn}
+      onPress={onPress}
+      activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={label === "+" || label === "＋" ? "Ekle" : label}
+    >
       <Text style={{ fontSize: 22, color: "#FFFFFF", fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
         {label}
       </Text>
@@ -116,6 +124,8 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
       onPress={onPress}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={label === "+" || label === "＋" ? "Ekle" : label}
     >
       <Text style={[styles.textBtn, { color: color ?? colors.primary }]}>{label}</Text>
     </TouchableOpacity>

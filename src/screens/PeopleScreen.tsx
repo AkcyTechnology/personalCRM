@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     borderColor: TEAL + "40",
   },
   filterPillText: { fontSize: 12, fontWeight: "700", color: TEAL },
-  filterPillClear: { fontSize: 10, color: TEAL, fontWeight: "700" },
+  filterPillClear: { fontSize: 11, color: TEAL, fontWeight: "700" },
 
   // Manual sort hint
   manualHintRow: {
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  tagText: { fontSize: 10, color: TEAL, fontWeight: "600" },
+  tagText: { fontSize: 11, color: TEAL, fontWeight: "600" },
   cardRight: { alignItems: "flex-end", gap: 5, flexShrink: 0 },
   relBadge: {
     paddingHorizontal: 8,

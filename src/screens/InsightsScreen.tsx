@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
 
   healthBadgeLabel: {
     marginTop: 1,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
     color: SUB,
   },

@@ -9,8 +9,9 @@ import {
   StatusBar,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import * as Clipboard from "expo-clipboard";
-import { loadContacts, saveContacts } from "../data/contacts";
+import { copyWithAutoClear } from "../utils/clipboard";
+import { loadContacts, markContacted, snoozeContact, subscribeContacts } from "../data/contacts";
+import LogInteractionModal from "../components/LogInteractionModal";
 import { loadSettings } from "../data/userSettings";
 import messageSuggestions from "./messageSuggestions.json";
 import type { ContactForm } from "./AddContactScreen";
@@ -108,6 +109,7 @@ export default function HomeScreen({ navigation }: any) {
   const [snoozeVisible, setSnoozeVisible] = useState(false);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
   const [composerVisible, setComposerVisible] = useState(false);
+  const [logVisible, setLogVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,6 +118,8 @@ export default function HomeScreen({ navigation }: any) {
         setThreshold(s.reachOutThresholdDays || 14);
         setUserName(s.userName || "");
       });
+      // Bildirimden "Görüştüm" gibi arka planda yapılan değişiklikler
+      return subscribeContacts(setContacts);
     }, [])
   );
 
@@ -179,15 +183,27 @@ export default function HomeScreen({ navigation }: any) {
     setSnoozeVisible(false);
     const target = dashboard.focusContact;
     if (!target) return;
-    const all = await loadContacts();
-    const updated = all.map((c) => {
-      const sameId = target.id && c.id === target.id;
-      const samePerson = c.fullName === target.fullName && (c.email || "") === (target.email || "");
-      return sameId || samePerson ? { ...c, snoozedUntil: date } : c;
-    });
-    await saveContacts(updated);
-    setContacts(updated);
-    showToast("Hatırlatma ertelendi");
+    if (!target?.id) return;
+    try {
+      await snoozeContact(target.id, date);
+      setContacts(await loadContacts());
+      showToast("Hatırlatma ertelendi");
+    } catch {
+      showToast("Ertelenemedi. Lütfen tekrar dene.");
+    }
+  }, [dashboard.focusContact]);
+
+  const handleLogInteraction = useCallback(async (type: import("./AddContactScreen").InteractionType, note: string, date: string) => {
+    setLogVisible(false);
+    const target = dashboard.focusContact;
+    if (!target?.id) return;
+    try {
+      await markContacted(target.id, type, note, date);
+      setContacts(await loadContacts());
+      showToast(`${target.fullName.split(" ")[0]} ile görüşme kaydedildi`);
+    } catch {
+      showToast("Kaydedilemedi. Lütfen tekrar dene.");
+    }
   }, [dashboard.focusContact]);
 
   if (contacts.length === 0) {
@@ -324,15 +340,27 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.messageButton}
                 activeOpacity={0.8}
-                onPress={() => setComposerVisible(true)}
+                onPress={() => setLogVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${dashboard.focusContact.fullName} ile görüştüm`}
               >
-                <Text style={styles.messageButtonText}>Mesaj hazırla</Text>
+                <Text style={styles.messageButtonText}>Görüştüm ✓</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                activeOpacity={0.8}
+                onPress={() => setComposerVisible(true)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.secondaryButtonText}>Mesaj hazırla</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.8}
                 onPress={() => setSnoozeVisible(true)}
+                accessibilityRole="button"
               >
                 <Text style={styles.secondaryButtonText}>Ertele</Text>
               </TouchableOpacity>
@@ -410,6 +438,13 @@ export default function HomeScreen({ navigation }: any) {
 
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
 
+      <LogInteractionModal
+        visible={logVisible}
+        contactName={dashboard.focusContact?.fullName ?? ""}
+        onClose={() => setLogVisible(false)}
+        onSave={handleLogInteraction}
+      />
+
       <MessageComposer
         visible={composerVisible}
         contact={dashboard.focusContact ?? null}
@@ -434,7 +469,7 @@ function HomeTopBar({
     <View style={styles.topBar}>
       <View style={styles.topBarRow}>
         <View style={styles.greetingWrap}>
-          <Text style={styles.greeting}>Merhaba, {userName || "Tuğçe"}</Text>
+          <Text style={styles.greeting}>{userName ? `Merhaba, ${userName.split(" ")[0]}` : "Merhaba 👋"}</Text>
           <Text style={styles.greetingSub}>
             {subtitle.includes("Bugün") ? (
               <>
@@ -473,8 +508,8 @@ function DailyMessageCard({ suggestion, empty }: { suggestion: DailySuggestion; 
   const [revealed, setRevealed] = useState(false);
 
   const copyMessage = async () => {
-    await Clipboard.setStringAsync(suggestion.message);
-    showToast("Mesaj kopyalandı");
+    await copyWithAutoClear(suggestion.message);
+    showToast("Mesaj kopyalandı · 90 sn sonra panodan silinir");
   };
 
   if (empty && !revealed) {
