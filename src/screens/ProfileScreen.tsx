@@ -16,6 +16,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { loadSettings, saveSettings, updateSettings } from "../data/userSettings";
 import { runExportBackup, runRestoreBackup } from "../data/backupActions";
 import { GOALS } from "../data/goals";
+import { t } from "../i18n";
 import { isDue } from "../utils/reminderInterval";
 import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
@@ -59,6 +60,10 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [threshold,      setThreshold]      = useState(14);
   const [thresholdOpen,  setThresholdOpen]  = useState(false);
+  const [goalOpen,       setGoalOpen]       = useState(false);
+  const [languageOpen,   setLanguageOpen]   = useState(false);
+  const [weeklyGoal,     setWeeklyGoal]     = useState(3);
+  const [language,       setLanguage]       = useState<"system" | "tr" | "en">("system");
   const [goals,          setGoals]          = useState<string[]>([]);
   const [userName,       setUserName]       = useState("");
   const [email,          setEmail]          = useState("");
@@ -76,6 +81,8 @@ export default function ProfileScreen({ navigation }: any) {
         setUserName(s.userName || "");
         setEmail(s.email || "");
         setGoals(s.goals || []);
+        setWeeklyGoal(s.weeklyGoal || 3);
+        setLanguage(s.language || "system");
         setContactsList(contacts);
         setTotalContacts(contacts.length);
         setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
@@ -124,8 +131,8 @@ export default function ProfileScreen({ navigation }: any) {
 
           {/* Name + email */}
           <View style={styles.headerInfo}>
-            <Text style={styles.headerName} numberOfLines={1}>{userName || "Profil"}</Text>
-            <Text style={styles.headerEmail} numberOfLines={1}>{email || "Hesap ayarları"}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{userName || t("Profil")}</Text>
+            <Text style={styles.headerEmail} numberOfLines={1}>{email || t("Hesap ayarları")}</Text>
           </View>
 
           {/* Edit button */}
@@ -134,7 +141,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate("ProfileSettings")}
             activeOpacity={0.8}
           >
-            <Text style={styles.editBtnText}>Düzenle</Text>
+            <Text style={styles.editBtnText}>{t("Düzenle")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -143,21 +150,26 @@ export default function ProfileScreen({ navigation }: any) {
 
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
-          <StatCard value={totalContacts}  label="Toplam kişi" />
-          <StatCard value={weeklyContacts} label="Bu hafta" />
-          <StatCard value={needsAttention} label="Bekleyen" danger={needsAttention > 0} />
+          <StatCard value={totalContacts}  label={t("Toplam kişi")} />
+          <StatCard value={weeklyContacts} label={t("Bu hafta")} />
+          <StatCard value={needsAttention} label={t("Yeniden bağlan")} danger={needsAttention > 0} />
         </View>
 
         {/* ── Health bar ── */}
         <View style={styles.healthCard}>
           <View style={styles.healthLeft}>
             <View style={styles.healthLabelRow}>
-              <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
-              <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="information-circle-outline" size={18} color={colors.textSub} accessibilityLabel="İlişki sağlığı nasıl hesaplanır?" />
+              <Text style={styles.healthLabel}>{t("Bağlantın")}</Text>
+              <TouchableOpacity
+                onPress={() => setHealthInfoOpen(true)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t("Bağlantın nasıl hesaplanır?")}
+                >
+                <Ionicons name="information-circle-outline" size={18} color={colors.textSub} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.healthSub}>Bağlantı genel durumu</Text>
+            <Text style={styles.healthSub}>{t("Bağlantı genel durumu")}</Text>
             <View style={styles.barTrack}>
               <View style={[styles.barFill, { width: `${health}%` as any, backgroundColor: healthColor }]} />
             </View>
@@ -169,38 +181,38 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         {/* ── Hesap ── */}
-        <SectionLabel title="Hesap" />
+        <SectionLabel title={t("Hesap")} />
 
         <View style={styles.card}>
           <RowItem
             icon={<PersonIcon />}
-            title="Profil Ayarları"
-            sub="Ad, e-posta ve profil bilgileri"
+            title={t("Profil Ayarları")}
+            sub={t("Ad, e-posta ve profil bilgileri")}
             onPress={() => navigation.navigate("ProfileSettings")}
           />
           <RowItem
             icon={<BellIcon />}
-            title="Bildirim Ayarları"
-            sub="Hatırlatma ve bildirim tercihleri"
+            title={t("Bildirim Ayarları")}
+            sub={t("Hatırlatma ve bildirim tercihleri")}
             onPress={() => navigation.navigate("NotificationSettings")}
           />
           <RowItem
             icon={<ShieldIcon />}
-            title="Gizlilik ve Güvenlik"
-            sub="Veri ve güvenlik kontrolleri"
+            title={t("Gizlilik ve Güvenlik")}
+            sub={t("Veri ve güvenlik kontrolleri")}
             onPress={() => navigation.navigate("PrivacySecurity")}
           />
           <RowItem
             icon={<StarIcon />}
-            title="Abonelik"
-            sub="Beta · tüm özellikler ücretsiz"
+            title={t("Abonelik")}
+            sub={t("Beta · tüm özellikler ücretsiz")}
             onPress={() => navigation.navigate("ManageSubscription")}
             last
           />
         </View>
 
         {/* ── Uygulama ── */}
-        <SectionLabel title="Uygulama" />
+        <SectionLabel title={t("Uygulama")} />
 
         <View style={styles.card}>
           <TouchableOpacity
@@ -212,12 +224,48 @@ export default function ProfileScreen({ navigation }: any) {
               <ClockIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Ulaş Eşiği</Text>
-              <Text style={styles.rowSub}>Son {threshold} günde görüşülmeyenler</Text>
+              <Text style={styles.rowTitle}>{t("Varsayılan görüşme sıklığı")}</Text>
+              <Text style={styles.rowSub}>{t("{days} gündür görüşmediğin kişileri hatırlat", { days: threshold })}</Text>
             </View>
             <View style={styles.pill}>
               <Text style={styles.pillText}>{threshold}g</Text>
             </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setGoalOpen(true)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Haftalık hedef: {count} kişi", { count: weeklyGoal })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.warningSoft }]}>
+              <Ionicons name="flame-outline" size={20} color={colors.warning} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Haftalık hedef")}</Text>
+              <Text style={styles.rowSub}>{t("Her hafta kaç kişiyle bağ kurmak istersin?")}</Text>
+            </View>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{weeklyGoal}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setLanguageOpen(true)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Dil: {language}", { language: languageLabel(language) })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="language-outline" size={20} color={colors.accent} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Dil")}</Text>
+              <Text style={styles.rowSub}>{languageLabel(language)}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
 
@@ -231,8 +279,8 @@ export default function ProfileScreen({ navigation }: any) {
               <UploadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Kişileri içe aktar</Text>
-              <Text style={styles.rowSub}>Rehberden kişi aktar</Text>
+              <Text style={styles.rowTitle}>{t("Kişileri içe aktar")}</Text>
+              <Text style={styles.rowSub}>{t("Rehberden kişi aktar")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -246,8 +294,8 @@ export default function ProfileScreen({ navigation }: any) {
               <RestartIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Onboarding'i tekrar göster</Text>
-              <Text style={styles.rowSub}>Tanıtım ekranlarını yeniden izle</Text>
+              <Text style={styles.rowTitle}>{t("Onboarding'i tekrar göster")}</Text>
+              <Text style={styles.rowSub}>{t("Tanıtım ekranlarını yeniden izle")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -262,8 +310,8 @@ export default function ProfileScreen({ navigation }: any) {
               <DownloadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Yedek al</Text>
-              <Text style={styles.rowSub}>Tüm verileri .json dosyası olarak kaydet</Text>
+              <Text style={styles.rowTitle}>{t("Yedek al")}</Text>
+              <Text style={styles.rowSub}>{t("Tüm verileri .json dosyası olarak kaydet")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -278,25 +326,25 @@ export default function ProfileScreen({ navigation }: any) {
               <UploadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Yedekten geri yükle</Text>
-              <Text style={styles.rowSub}>Daha önce aldığın yedeği içe aktar</Text>
+              <Text style={styles.rowTitle}>{t("Yedekten geri yükle")}</Text>
+              <Text style={styles.rowSub}>{t("Daha önce aldığın yedeği içe aktar")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Veri Özeti ── */}
-        <SectionLabel title="Veri Özeti" />
+        <SectionLabel title={t("Veri Özeti")} />
 
         <View style={styles.card}>
-          <DataRow label="Toplam kişi"         value={`${totalContacts}`} />
-          <DataRow label="Bu hafta iletişim"    value={`${weeklyContacts}`} />
-          <DataRow label="Ulaşılması gereken"   value={`${needsAttention}`} />
-          <DataRow label="Ulaş eşiği"           value={`${threshold} gün`} last />
+          <DataRow label={t("Toplam kişi")}         value={`${totalContacts}`} />
+          <DataRow label={t("Bu hafta iletişim")}    value={`${weeklyContacts}`} />
+          <DataRow label={t("Görüşmek isteyebileceğin")}   value={`${needsAttention}`} />
+          <DataRow label={t("Varsayılan sıklık")}           value={t("{days} gün", { days: threshold })} last />
         </View>
 
         {/* ── Hedefler ── */}
-        <SectionLabel title="Hedeflerin" />
+        <SectionLabel title={t("Hedeflerin")} />
 
         <View style={[styles.card, styles.goalsCard]}>
           {GOALS.map(g => {
@@ -310,7 +358,7 @@ export default function ProfileScreen({ navigation }: any) {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: active }}
               >
-                <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>{g.icon} {g.short}</Text>
+                <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>{g.icon} {t(g.short)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -321,16 +369,55 @@ export default function ProfileScreen({ navigation }: any) {
       {/* ── Threshold modal ── */}
       <PickerModal
         visible={thresholdOpen}
-        title="Ulaş Eşiği"
-        desc="Kaç gün görüşülmeyenler listeye girsin?"
+        title={t("Varsayılan görüşme sıklığı")}
+        desc={t("Kişilere varsayılan olarak ne sıklıkla ulaşmak istersin?")}
         onClose={() => setThresholdOpen(false)}
       >
         {THRESHOLD_OPTIONS.map(val => (
           <PickerOption
             key={val}
-            label={`${val} gün`}
+            label={t("{days} gün", { days: val })}
             active={threshold === val}
             onPress={() => handleThresholdSelect(val)}
+          />
+        ))}
+      </PickerModal>
+
+      <PickerModal
+        visible={goalOpen}
+        title={t("Haftalık hedef")}
+        desc={t("Her hafta kaç kişiyle bağ kurmak istersin?")}
+        onClose={() => setGoalOpen(false)}
+      >
+        {[1, 2, 3, 5, 7].map(val => (
+          <PickerOption
+            key={val}
+            label={t("{count} kişi", { count: val })}
+            active={weeklyGoal === val}
+            onPress={async () => {
+              setWeeklyGoal(val);
+              setGoalOpen(false);
+              await updateSettings({ weeklyGoal: val });
+            }}
+          />
+        ))}
+      </PickerModal>
+
+      <PickerModal
+        visible={languageOpen}
+        title={t("Dil")}
+        desc={t("Uygulama dilini seç")}
+        onClose={() => setLanguageOpen(false)}
+      >
+        {(["system", "tr", "en"] as const).map(code => (
+          <PickerOption
+            key={code}
+            label={languageLabel(code)}
+            active={language === code}
+            onPress={async () => {
+              setLanguageOpen(false);
+              await updateSettings({ language: code });
+            }}
           />
         ))}
       </PickerModal>
@@ -338,6 +425,12 @@ export default function ProfileScreen({ navigation }: any) {
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
+}
+
+function languageLabel(code: "system" | "tr" | "en") {
+  if (code === "tr") return "Türkçe";
+  if (code === "en") return "English";
+  return t("Telefonun dili");
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────

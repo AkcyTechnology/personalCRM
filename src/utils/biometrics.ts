@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { t } from "../i18n";
 
 type LA = typeof import("expo-local-authentication");
 
@@ -23,14 +24,14 @@ export async function canUseAppLockAsync(): Promise<boolean> {
   }
 }
 
-export async function authenticateAsync(reason = "Connectly'nin kilidini aç"): Promise<boolean> {
+export async function authenticateAsync(reason?: string): Promise<boolean> {
   const LA = getModule();
   if (!LA) return true;
   try {
     const result = await LA.authenticateAsync({
-      promptMessage: reason,
-      cancelLabel: "Vazgeç",
-      fallbackLabel: "Cihaz şifresini kullan",
+      promptMessage: reason ?? t("Connectly'nin kilidini aç"),
+      cancelLabel: t("Vazgeç"),
+      fallbackLabel: t("Cihaz şifresini kullan"),
       disableDeviceFallback: false,
     });
     return result.success;

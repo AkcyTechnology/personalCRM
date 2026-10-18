@@ -43,6 +43,7 @@ import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { showToast } from "../components/Toast";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { confirmDialog, infoDialog } from "../utils/confirm";
+import { t, tv } from "../i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -189,12 +190,12 @@ export default function AddContactScreen({ navigation }: Props) {
   // ── Import from contacts ───────────────────────────────────────────────────
   const handleContactsError = (error: unknown) => {
     if (error instanceof ContactsPermissionError) {
-      showToast("Rehber izni verilmedi");
+      showToast(t("Rehber izni verilmedi"));
       setPermissionModal(true);
     } else if (error instanceof ContactsUnavailableError) {
-      infoDialog("Rehber kullanılamıyor", error.message);
+      infoDialog(t("Rehber kullanılamıyor"), error.message);
     } else {
-      showToast("Bir sorun oluştu. Lütfen tekrar dene.");
+      showToast(t("Bir sorun oluştu. Lütfen tekrar dene."));
     }
   };
 
@@ -213,7 +214,7 @@ export default function AddContactScreen({ navigation }: Props) {
     try {
       const data = await listDeviceContactsAsync();
       if (!data.length) {
-        infoDialog("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
+        infoDialog(t("Rehber boş"), t("Cihazında kayıtlı kişi bulunamadı."));
         return;
       }
       setDeviceContacts(data);
@@ -254,11 +255,11 @@ export default function AddContactScreen({ navigation }: Props) {
 
   const validate = () => {
     const e: Partial<Record<keyof ContactForm, string>> = {};
-    if (!form.fullName.trim()) e.fullName = "Ad Soyad zorunlu.";
-    if (relationshipRequired && !form.relationship) e.relationship = "İlişki türü seçin.";
-    if (!emailValid)          e.email = "Geçerli bir e-posta adresi gir.";
-    if (!birthdayValid)       e.birthday = "Tarihi GG/AA/YYYY biçiminde gir.";
-    if (form.website.trim() && !toSafeWebUrl(form.website)) e.website = "Geçerli bir web adresi gir (https://…).";
+    if (!form.fullName.trim()) e.fullName = t("Ad Soyad zorunlu.");
+    if (relationshipRequired && !form.relationship) e.relationship = t("İlişki türü seçin.");
+    if (!emailValid)          e.email = t("Geçerli bir e-posta adresi gir.");
+    if (!birthdayValid)       e.birthday = t("Tarihi GG/AA/YYYY biçiminde gir.");
+    if (form.website.trim() && !toSafeWebUrl(form.website)) e.website = t("Geçerli bir web adresi gir (https://…).");
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -285,11 +286,11 @@ export default function AddContactScreen({ navigation }: Props) {
       });
     } catch {
       setSaving(false);
-      showToast("Kişi kaydedilemedi. Lütfen tekrar dene.");
+      showToast(t("Kişi kaydedilemedi. Lütfen tekrar dene."));
       return;
     }
     navigation.goBack();
-    showToast("Kişi kaydedildi");
+    showToast(t("Kişi kaydedildi"));
     // Hatırlatıcının işe yaraması için izni tam bu anda iste
     if (form.reminderEnabled !== false) ensureNotificationPermissionAsync();
   };
@@ -297,17 +298,15 @@ export default function AddContactScreen({ navigation }: Props) {
   const handleSave = async () => {
     if (saving) return;
     if (!validate()) {
-      showToast("Eksik veya hatalı alanları kontrol et");
+      showToast(t("Eksik veya hatalı alanları kontrol et"));
       return;
     }
     const existing = await loadContacts();
     if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing)) {
-      confirmDialog(
-        "Bu kişi zaten kayıtlı olabilir",
-        "Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?",
+      confirmDialog(t("Bu kişi zaten kayıtlı olabilir"), t("Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?"),
         [
-          { text: "Vazgeç", style: "cancel" },
-          { text: "Yine de ekle", onPress: persist },
+          { text: t("Vazgeç"), style: "cancel" },
+          { text: t("Yine de ekle"), onPress: persist },
         ]
       );
       return;
@@ -328,9 +327,9 @@ export default function AddContactScreen({ navigation }: Props) {
       {/* App bar */}
       <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={handleBack} style={styles.appBarSide} activeOpacity={0.7}>
-          <Text style={styles.appBarBack}>Geri</Text>
+          <Text style={styles.appBarBack}>{t("Geri")}</Text>
         </TouchableOpacity>
-        <Text style={styles.appBarTitle}>Kişi Ekle</Text>
+        <Text style={styles.appBarTitle}>{t("Kişi Ekle")}</Text>
         <TouchableOpacity
           onPress={handleSave}
           style={styles.appBarSide}
@@ -338,7 +337,7 @@ export default function AddContactScreen({ navigation }: Props) {
           disabled={!canSave}
         >
           <Text style={[styles.appBarSave, !canSave && styles.appBarSaveDisabled]}>
-            Kaydet
+            {t("Kaydet")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -360,8 +359,8 @@ export default function AddContactScreen({ navigation }: Props) {
               <ContactBookIcon />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.importTitle}>Rehberden kişi seç</Text>
-              <Text style={styles.importSub}>Telefon rehberinden bilgileri hızlıca aktar</Text>
+              <Text style={styles.importTitle}>{t("Rehberden kişi seç")}</Text>
+              <Text style={styles.importSub}>{t("Telefon rehberinden bilgileri hızlıca aktar")}</Text>
             </View>
             <ChevronRight />
           </TouchableOpacity>
@@ -376,35 +375,35 @@ export default function AddContactScreen({ navigation }: Props) {
                 {form.phone ? <Text style={styles.importedPhone}>{form.phone}</Text> : null}
               </View>
               <View style={styles.importedBadge}>
-                <Text style={styles.importedBadgeText}>Aktarıldı</Text>
+                <Text style={styles.importedBadgeText}>{t("Aktarıldı")}</Text>
               </View>
             </View>
           ) : null}
 
           {/* ── Essentials ── */}
-          <Text style={styles.requiredLegend}>* zorunlu alan</Text>
+          <Text style={styles.requiredLegend}>{t("* zorunlu alan")}</Text>
 
           <FieldGroup>
             <Field
-              label="Ad Soyad"
+              label={t("Ad Soyad")}
               required
               value={form.fullName}
               error={errors.fullName}
-              placeholder="Ahmet Yılmaz"
+              placeholder={t("Ahmet Yılmaz")}
               onChangeText={v => set("fullName", v)}
             />
             <Divider />
             <Field
-              label="Telefon"
+              label={t("Telefon")}
               value={form.phone}
-              placeholder="+90 5xx xxx xx xx"
+              placeholder={t("+90 5xx xxx xx xx")}
               keyboardType="phone-pad"
               onChangeText={v => set("phone", v)}
             />
           </FieldGroup>
 
           <ChipSection
-            label="Bu kişi senin için kim?"
+            label={t("Bu kişi senin için kim?")}
             required={relationshipRequired}
             error={errors.relationship}
             chips={relationships}
@@ -414,7 +413,7 @@ export default function AddContactScreen({ navigation }: Props) {
           />
 
           <View style={styles.card}>
-            <Text style={styles.chipLabel}>Tekrar ne zaman hatırlatayım?</Text>
+            <Text style={styles.chipLabel}>{t("Tekrar ne zaman hatırlatayım?")}</Text>
             <View style={styles.chipRow}>
               {INTERVAL_PRESETS.map(preset => {
                 const active = !customInterval && form.reminderIntervalDays === preset.days;
@@ -428,9 +427,11 @@ export default function AddContactScreen({ navigation }: Props) {
                       set("reminderIntervalDays", preset.days);
                     }}
                     activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {preset.label}
+                      {t(preset.label)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -439,16 +440,18 @@ export default function AddContactScreen({ navigation }: Props) {
                 style={[styles.chip, customInterval && styles.chipActive]}
                 onPress={() => setCustomInterval(true)}
                 activeOpacity={0.75}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: customInterval }}
               >
                 <Text style={[styles.chipText, customInterval && styles.chipTextActive]}>
-                  {CUSTOM_INTERVAL}
+                  {t(CUSTOM_INTERVAL)}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {customInterval && (
               <View style={styles.customIntervalRow}>
-                <Text style={styles.customIntervalLabel}>Her</Text>
+                <Text style={styles.customIntervalLabel}>{t("Her")}</Text>
                 <TextInput
                   style={styles.customIntervalInput}
                   value={customIntervalText}
@@ -463,13 +466,13 @@ export default function AddContactScreen({ navigation }: Props) {
                   placeholderTextColor={colors.placeholder}
                   maxLength={4}
                 />
-                <Text style={styles.customIntervalLabel}>günde bir iletişime geç</Text>
+                <Text style={styles.customIntervalLabel}>{t("günde bir iletişime geç")}</Text>
               </View>
             )}
           </View>
 
           <ChipSection
-            label="En son ne zaman görüştünüz?"
+            label={t("En son ne zaman görüştünüz?")}
             chips={LAST_CONTACT_OPTIONS}
             selected={form.lastContactDate}
             onSelect={v => {
@@ -497,7 +500,7 @@ export default function AddContactScreen({ navigation }: Props) {
           {customLastContact || (form.lastContactDate && ![toISODate(new Date()), daysAgo(1), daysAgo(7), daysAgo(30)].includes(form.lastContactDate)) ? (
             <View style={styles.card}>
               <DateField
-                label="Son görüşme tarihi"
+                label={t("Son görüşme tarihi")}
                 format="iso"
                 value={form.lastContactDate}
                 maximumDate={new Date()}
@@ -514,91 +517,91 @@ export default function AddContactScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityState={{ expanded: moreOpen }}
           >
-            <Text style={styles.moreToggleText}>{moreOpen ? "Daha az bilgi" : "Daha fazla bilgi"}</Text>
-            <Text style={styles.moreToggleHint}>İş, doğum günü, e-posta, sosyal medya, notlar</Text>
+            <Text style={styles.moreToggleText}>{moreOpen ? t("Daha az bilgi") : t("Daha fazla bilgi")}</Text>
+            <Text style={styles.moreToggleHint}>{t("İş, doğum günü, e-posta, sosyal medya, notlar")}</Text>
           </TouchableOpacity>
 
           {moreOpen ? (
             <>
               <FieldGroup>
                 <Field
-                  label="Şirket / Kurum"
+                  label={t("Şirket / Kurum")}
                   value={form.company}
-                  placeholder="Acme A.Ş."
+                  placeholder={t("Acme A.Ş.")}
                   onChangeText={v => set("company", v)}
                 />
                 <Divider />
                 <Field
-                  label="Unvan / Pozisyon"
+                  label={t("Unvan / Pozisyon")}
                   value={form.jobTitle}
-                  placeholder="Yazılım Mühendisi"
+                  placeholder={t("Yazılım Mühendisi")}
                   onChangeText={v => set("jobTitle", v)}
                 />
                 <Divider />
                 <View style={{ paddingTop: 12 }}>
                   <DateField
-                    label="Doğum Tarihi"
+                    label={t("Doğum Tarihi")}
                     format="birthday"
                     value={form.birthday}
                     error={errors.birthday}
-                    placeholder="Tarih seç"
+                    placeholder={t("Tarih seç")}
                     maximumDate={new Date()}
                     onChange={v => set("birthday", v)}
                   />
                 </View>
                 <Divider />
                 <Field
-                  label="Şehir"
+                  label={t("Şehir")}
                   value={form.city}
-                  placeholder="İstanbul"
+                  placeholder={t("İstanbul")}
                   onChangeText={v => set("city", v)}
                 />
               </FieldGroup>
 
               <FieldGroup>
                 <Field
-                  label="E-posta"
+                  label={t("E-posta")}
                   value={form.email}
                   error={errors.email}
-                  placeholder="ornek@email.com"
+                  placeholder={t("ornek@email.com")}
                   keyboardType="email-address"
                   onChangeText={v => set("email", v)}
                 />
                 <Divider />
                 <Field
-                  label="Web sitesi"
+                  label={t("Web sitesi")}
                   value={form.website}
                   error={errors.website}
-                  placeholder="https://..."
+                  placeholder={t("https://...")}
                   keyboardType="url"
                   onChangeText={v => set("website", v)}
                 />
                 <Divider />
                 <Field
-                  label="LinkedIn"
+                  label={t("LinkedIn")}
                   value={form.linkedin ?? ""}
-                  placeholder="linkedin.com/in/kullanici"
+                  placeholder={t("linkedin.com/in/kullanici")}
                   autoCapitalize="none"
                   onChangeText={v => set("linkedin", v)}
                 />
                 <Divider />
                 <Field
-                  label="Instagram"
+                  label={t("Instagram")}
                   value={form.instagram}
-                  placeholder="@kullanici"
+                  placeholder={t("@kullanici")}
                   autoCapitalize="none"
                   onChangeText={v => set("instagram", v)}
                 />
               </FieldGroup>
 
           <ChipSection
-            label="Nerede tanıştınız?"
+            label={t("Nerede tanıştınız?")}
             chips={MET_WHERE}
             selected={form.metWhere}
             onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
           />
           <ChipSection
-            label="Öncelik"
+            label={t("Öncelik")}
             chips={PRIORITIES}
             selected={form.priority}
             onSelect={v => set("priority", v === form.priority ? "" : v)}
@@ -606,15 +609,15 @@ export default function AddContactScreen({ navigation }: Props) {
           />
           <FieldGroup>
             <Field
-              label="Yakınlık"
+              label={t("Yakınlık")}
               value={form.closenessTag ?? ""}
-              placeholder="örn. Çok yakın, Yüzeysel"
+              placeholder={t("örn. Çok yakın, Yüzeysel")}
               onChangeText={v => set("closenessTag", v)}
             />
           </FieldGroup>
 
           <View style={styles.card}>
-            <Text style={styles.chipLabel}>Önerilen etiketler</Text>
+            <Text style={styles.chipLabel}>{t("Önerilen etiketler")}</Text>
             <View style={styles.chipRow}>
               {SUGGESTED_TAGS.map(tag => {
                 const active = selectedTags.includes(tag);
@@ -624,9 +627,11 @@ export default function AddContactScreen({ navigation }: Props) {
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => toggleTag(tag)}
                     activeOpacity={0.75}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: active }}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {tag}
+                      {tv(tag)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -636,16 +641,16 @@ export default function AddContactScreen({ navigation }: Props) {
 
 
               <View style={styles.card}>
-                <Text style={styles.chipLabel}>Notlar</Text>
+                <Text style={styles.chipLabel}>{t("Notlar")}</Text>
                 <TextInput
                   style={styles.notesInput}
                   value={form.notes}
                   onChangeText={v => set("notes", v)}
-                  placeholder="İlk izlenim, ortak ilgi alanları, aile, hediye fikirleri..."
+                  placeholder={t("İlk izlenim, ortak ilgi alanları, aile, hediye fikirleri...")}
                   placeholderTextColor={colors.placeholder}
                   multiline
                   textAlignVertical="top"
-                  accessibilityLabel="Notlar"
+                  accessibilityLabel={t("Notlar")}
                 />
               </View>
             </>
@@ -657,7 +662,7 @@ export default function AddContactScreen({ navigation }: Props) {
         {/* Sticky bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 12 }]}>
           <TouchableOpacity style={styles.cancelBtn} onPress={handleBack} activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>İptal</Text>
+            <Text style={styles.cancelBtnText}>{t("İptal")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.saveBtn, !canSave && styles.saveBtnOff]}
@@ -667,7 +672,7 @@ export default function AddContactScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityState={{ disabled: !canSave, busy: saving }}
           >
-            <Text style={styles.saveBtnText}>{saving ? "Kaydediliyor…" : "Kişiyi Kaydet"}</Text>
+            <Text style={styles.saveBtnText}>{saving ? t("Kaydediliyor…") : t("Kişiyi Kaydet")}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -682,8 +687,8 @@ export default function AddContactScreen({ navigation }: Props) {
       {/* Contacts permission modal */}
       <PermissionDeniedModal
         visible={permissionModal}
-        title="Rehbere erişim izni gerekli"
-        description="Telefon rehberinden kişi ekleyebilmek için rehber erişimine izin vermelisin."
+        title={t("Rehbere erişim izni gerekli")}
+        description={t("Telefon rehberinden kişi ekleyebilmek için rehber erişimine izin vermelisin.")}
         onClose={() => setPermissionModal(false)}
       />
 
@@ -698,7 +703,7 @@ export default function AddContactScreen({ navigation }: Props) {
       {/* Relationship options manager */}
       <ManageOptionsModal
         visible={relationshipManagerOpen}
-        title="İlişki türlerini yönet"
+        title={t("İlişki türlerini yönet")}
         customOptions={customRelationships}
         onAdd={handleAddRelationship}
         onRemove={handleRemoveRelationship}
@@ -743,7 +748,7 @@ function Field({
     <View style={styles.field}>
       <View style={styles.fieldTop}>
         <Text style={styles.fieldLabel}>{label}</Text>
-        {required && <Text style={styles.requiredMark} accessibilityLabel="zorunlu">*</Text>}
+        {required && <Text style={styles.requiredMark} accessibilityLabel={t("zorunlu")}>*</Text>}
       </View>
       <TextInput
         accessibilityLabel={required ? `${label}, zorunlu` : label}
@@ -777,7 +782,7 @@ function ChipSection({
     <View style={styles.card}>
       <View style={styles.fieldTop}>
         <Text style={styles.chipLabel}>{label}</Text>
-        {required && <Text style={styles.requiredMark} accessibilityLabel="zorunlu">*</Text>}
+        {required && <Text style={styles.requiredMark} accessibilityLabel={t("zorunlu")}>*</Text>}
       </View>
       <View style={styles.chipRow}>
         {chips.map(chip => {
@@ -794,12 +799,14 @@ function ChipSection({
               ]}
               onPress={() => onSelect(chip)}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isActive }}
             >
               <Text style={[
                 styles.chipText,
                 isActive && (accent ? { color: accent, fontWeight: "600" } : styles.chipTextActive),
               ]}>
-                {chip}
+                {tv(chip)}
               </Text>
             </TouchableOpacity>
           );
@@ -809,6 +816,8 @@ function ChipSection({
             style={styles.chipAddBtn}
             onPress={onManage}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("İlişki türü ekle veya düzenle")}
           >
             <Text style={styles.chipAddBtnText}>+</Text>
           </TouchableOpacity>
@@ -843,7 +852,7 @@ function ManageOptionsModal({
         <Pressable style={styles.modalBox}>
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalDesc}>
-            Kendi seçeneğini ekle veya daha önce eklediklerini kaldır.
+            {t("Kendi seçeneğini ekle veya daha önce eklediklerini kaldır.")}
           </Text>
 
           <View style={styles.manageInputRow}>
@@ -851,7 +860,7 @@ function ManageOptionsModal({
               style={styles.manageInput}
               value={text}
               onChangeText={setText}
-              placeholder="Yeni seçenek yaz..."
+              placeholder={t("Yeni seçenek yaz...")}
               placeholderTextColor={colors.placeholder}
               onSubmitEditing={handleAdd}
               returnKeyType="done"
@@ -862,7 +871,7 @@ function ManageOptionsModal({
               activeOpacity={0.8}
               disabled={!text.trim()}
             >
-              <Text style={styles.manageAddBtnText}>Ekle</Text>
+              <Text style={styles.manageAddBtnText}>{t("Ekle")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -873,19 +882,21 @@ function ManageOptionsModal({
                   <Text style={styles.manageListText} numberOfLines={1}>{opt}</Text>
                   <TouchableOpacity
                     onPress={() => onRemove(opt)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("{name} türünü kaldır", { name: opt })}
                   >
-                    <Text style={styles.manageListRemove}>Kaldır</Text>
+                    <Text style={styles.manageListRemove}>{t("Kaldır")}</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
           ) : (
-            <Text style={styles.manageEmptyText}>Henüz özel seçenek eklemedin.</Text>
+            <Text style={styles.manageEmptyText}>{t("Henüz özel seçenek eklemedin.")}</Text>
           )}
 
           <TouchableOpacity style={styles.modalPrimary} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.modalPrimaryText}>Kapat</Text>
+            <Text style={styles.modalPrimaryText}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -900,15 +911,15 @@ function DiscardModal({ visible, onKeep, onDiscard }: {
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={styles.overlay} onPress={onKeep}>
         <Pressable style={styles.modalBox}>
-          <Text style={styles.modalTitle}>Değişiklikler kaybolacak</Text>
+          <Text style={styles.modalTitle}>{t("Değişiklikler kaybolacak")}</Text>
           <Text style={styles.modalDesc}>
-            Kaydetmeden çıkarsan girdiğin bilgiler silinecek.
+            {t("Kaydetmeden çıkarsan girdiğin bilgiler silinecek.")}
           </Text>
           <TouchableOpacity style={styles.modalPrimary} onPress={onKeep} activeOpacity={0.85}>
-            <Text style={styles.modalPrimaryText}>Düzenlemeye devam et</Text>
+            <Text style={styles.modalPrimaryText}>{t("Düzenlemeye devam et")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.modalSecondary} onPress={onDiscard} activeOpacity={0.75}>
-            <Text style={styles.modalSecondaryText}>Sil ve çık</Text>
+            <Text style={styles.modalSecondaryText}>{t("Sil ve çık")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -926,8 +937,8 @@ function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.pickerBox}>
-          <Text style={styles.modalTitle}>Rehberden Seç</Text>
-          <Text style={styles.modalDesc}>Forma aktarmak istediğin kişiyi seç.</Text>
+          <Text style={styles.modalTitle}>{t("Rehberden Seç")}</Text>
+          <Text style={styles.modalDesc}>{t("Forma aktarmak istediğin kişiyi seç.")}</Text>
           <FlatList
             data={contacts}
             keyExtractor={(item, i) => item.id ?? String(i)}
@@ -942,7 +953,7 @@ function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
                   <Text style={styles.pickerAvatarText}>{initials(item.name || "?")}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || "İsimsiz"}</Text>
+                  <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || t("İsimsiz")}</Text>
                   <Text style={styles.pickerRowSub} numberOfLines={1}>
                     {item.phone || item.email || ""}
                   </Text>
@@ -951,7 +962,7 @@ function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
             )}
           />
           <TouchableOpacity style={styles.modalSecondary} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.modalSecondaryText}>Kapat</Text>
+            <Text style={styles.modalSecondaryText}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

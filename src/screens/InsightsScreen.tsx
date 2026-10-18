@@ -18,6 +18,7 @@ import { colors } from "../theme/colors";
 import { isDue, isSnoozed, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
+import { t, tv } from "../i18n";
 
 const TEAL = colors.primary;
 const TEAL_DARK = colors.primaryDark;
@@ -99,20 +100,20 @@ function nextBirthdayInfo(birthday?: string) {
 
   return {
     daysLeft,
-    label: daysLeft === 0 ? "Bugün" : `${daysLeft} gün kaldı`,
+    label: daysLeft === 0 ? t("Bugün") : t("{days} gün kaldı", { days: daysLeft }),
   };
 }
 
 function contactSubtitle(c: ContactForm) {
-  return [c.jobTitle, c.company].filter(Boolean).join(" · ") || c.relationship || "Kişisel bağlantı";
+  return [c.jobTitle, c.company].filter(Boolean).join(" · ") || c.relationship || t("Kişisel bağlantı");
 }
 
 function dayLabel(days: number) {
-  if (days <= 0) return "Bugün";
-  if (days === 1) return "Dün";
-  if (days >= 9999) return "Tarih yok";
+  if (days <= 0) return t("Bugün");
+  if (days === 1) return t("Dün");
+  if (days >= 9999) return t("Tarih yok");
 
-  return `${days} gün önce`;
+  return t("{days} gün önce", { days });
 }
 
 function toneColor(tone: InsightTone) {
@@ -128,7 +129,7 @@ function toneColor(tone: InsightTone) {
   return map[tone];
 }
 
-export default function InsightsScreen({ navigation }: any) {
+export default function InsightsScreen({ navigation, embedded }: any) {
   const { width } = useWindowDimensions();
 
   const [contacts, setContacts] = useState<ContactForm[]>([]);
@@ -188,7 +189,7 @@ export default function InsightsScreen({ navigation }: any) {
       .sort((a, b) => a.birthday.daysLeft - b.birthday.daysLeft);
 
     const relationshipCounts = contacts.reduce<Record<string, number>>((acc, c) => {
-      const key = (c.relationship || "Diğer").trim() || "Diğer";
+      const key = (c.relationship || t("Diğer")).trim() || t("Diğer");
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
@@ -213,21 +214,19 @@ export default function InsightsScreen({ navigation }: any) {
 
     const focusText =
       needsAttention.length > 0
-        ? `${needsAttention.length} kişi yeniden temas bekliyor`
+        ? t("Görüşmek isteyebileceğin {count} kişi var", { count: needsAttention.length })
         : atRisk.length > 0
-        ? `${atRisk.length} bağlantı takip edilmeli`
-        : "Bağlantıların dengeli görünüyor";
+        ? t("{count} bağı yakında hatırlamak iyi olur", { count: atRisk.length })
+        : t("Bağların güzel görünüyor");
 
     const insightText =
       needsAttention.length > 0
-        ? `${needsAttention[0].fullName} ile ${daysSince(
-            needsAttention[0].lastContactDate
-          )} gündür iletişim yok.`
+        ? t("{name} ile {days} gündür konuşmadınız.", { name: needsAttention[0].fullName, days: daysSince(needsAttention[0].lastContactDate) })
         : atRisk.length > 0
-        ? `${atRisk[0].fullName} için ${effectiveIntervalDays(atRisk[0], threshold) - daysSince(atRisk[0].lastContactDate)} gün kaldı.`
+        ? t("{name} ile görüşme zamanı {days} gün sonra.", { name: atRisk[0].fullName, days: effectiveIntervalDays(atRisk[0], threshold) - daysSince(atRisk[0].lastContactDate) })
         : contactedThisWeek.length > 0
-        ? `Bu hafta ${contactedThisWeek.length} kişiyle temas kurdun.`
-        : "Bu hafta henüz temas görünmüyor.";
+        ? t("Bu hafta {count} kişiyle bağ kurdun.", { count: contactedThisWeek.length })
+        : t("Bu hafta küçük bir merhaba ile başlayabilirsin.");
 
     return {
       contactedThisWeek,
@@ -252,7 +251,7 @@ export default function InsightsScreen({ navigation }: any) {
 
   return (
     <View style={styles.screen}>
-      <InsightsHeader />
+      {embedded ? null : <InsightsHeader />}
 
       <ScrollView
         contentContainerStyle={[
@@ -264,7 +263,7 @@ export default function InsightsScreen({ navigation }: any) {
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.heroKicker}>Genel görünüm</Text>
+              <Text style={styles.heroKicker}>{t("Genel görünüm")}</Text>
               <Text style={styles.heroTitle}>{data.focusText}</Text>
               <Text style={styles.heroDesc}>{data.insightText}</Text>
             </View>
@@ -274,8 +273,8 @@ export default function InsightsScreen({ navigation }: any) {
 
           <View style={styles.heroProgressBlock}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Haftalık hedef</Text>
-              <Text style={styles.progressValue}>
+              <Text style={styles.progressLabel}>{t("Haftalık hedef")}</Text>
+              <Text style={styles.progressValue} accessibilityLabel={t("Haftalık hedef: {done} / {goal}", { done: data.contactedThisWeek.length, goal: data.weeklyGoal })}>
                 {data.contactedThisWeek.length}/{data.weeklyGoal}
               </Text>
             </View>
@@ -286,32 +285,32 @@ export default function InsightsScreen({ navigation }: any) {
 
         <View style={styles.metricsGrid}>
           <MetricCard
-            label="Toplam"
+            label={t("Toplam")}
             value={contacts.length}
             tone="teal"
           />
 
           <MetricCard
-            label="Bu hafta"
+            label={t("Bu hafta")}
             value={data.contactedThisWeek.length}
             tone="green"
           />
 
           <MetricCard
-            label="Bekleyen"
+            label={t("Yeniden bağlan")}
             value={data.needsAttention.length}
             tone="red"
           />
 
           <MetricCard
-            label="Özel gün"
+            label={t("Özel gün")}
             value={data.birthdayList.length}
             tone="amber"
           />
         </View>
 
         <SectionTitle
-          title="Öncelikli bağlantılar"
+          title={t("Görüşmek isteyebileceklerin")}
         />
 
         {priorityList.length > 0 ? (
@@ -325,7 +324,7 @@ export default function InsightsScreen({ navigation }: any) {
                 <PriorityCard
                   key={`${c.fullName}-${i}`}
                   contact={c}
-                  label={isLate ? `${days} gündür yok` : `${interval - days} gün kaldı`}
+                  label={isLate ? t("{days} gündür görüşülmedi", { days }) : t("{days} gün kaldı", { days: interval - days })}
                   tone={isLate ? colors.danger : colors.warning}
                   onPress={() => navigation.navigate("PersonDetail", { contact: c })}
                 />
@@ -334,15 +333,15 @@ export default function InsightsScreen({ navigation }: any) {
           </View>
         ) : (
           <EmptyState
-            title="Bekleyen kimse yok"
-            desc="Harika gidiyorsun!"
+            title={t("Herkesle bağın taze ✨")}
+            desc={t("Harika gidiyorsun!")}
           />
         )}
 
         {data.birthdayList.length > 0 ? (
           <>
             <SectionTitle
-              title="Yaklaşan özel günler"
+              title={t("Yaklaşan özel günler")}
             />
 
             <ScrollView
@@ -363,25 +362,25 @@ export default function InsightsScreen({ navigation }: any) {
         ) : null}
 
         <SectionTitle
-          title="İlişki sağlığı"
+          title={t("Bağlantın")}
           onInfoPress={() => setHealthInfoOpen(true)}
         />
 
         <View style={styles.card}>
           <HealthRow
-            label="Genel sağlık"
+            label={t("Genel sağlık")}
             value={data.averageHealth}
             color={healthScoreColor(data.averageHealth)}
           />
 
           <HealthRow
-            label="Haftalık hedef"
+            label={t("Haftalık hedef")}
             value={data.weeklyProgress}
             color={TEAL}
           />
 
           <HealthRow
-            label="Sağlıklı bağlantılar"
+            label={t("Sağlıklı bağlantılar")}
             value={data.healthyConnections}
             color={colors.accent}
             last
@@ -391,7 +390,7 @@ export default function InsightsScreen({ navigation }: any) {
         {data.relationshipMix.length > 0 ? (
           <>
             <SectionTitle
-              title="Bağlantı dağılımı"
+              title={t("Bağlantı dağılımı")}
             />
 
             <View style={styles.card}>
@@ -412,7 +411,7 @@ export default function InsightsScreen({ navigation }: any) {
         {data.strongConnections.length > 0 ? (
           <>
             <SectionTitle
-              title="Güçlü bağlantılar"
+              title={t("Güçlü bağlantılar")}
             />
 
             <View style={styles.stack}>
@@ -439,7 +438,7 @@ function InsightsHeader() {
   return (
     <View style={styles.appBar}>
       <View style={styles.appBarText}>
-        <Text style={styles.appTitle} accessibilityRole="header">Analiz</Text>
+        <Text style={styles.appTitle} accessibilityRole="header">{t("Analiz")}</Text>
       </View>
     </View>
   );
@@ -449,7 +448,7 @@ function HealthBadge({ value }: { value: number }) {
   return (
     <View style={styles.healthBadge}>
       <Text style={styles.healthBadgeValue}>{value}</Text>
-      <Text style={styles.healthBadgeLabel}>Skor</Text>
+      <Text style={styles.healthBadgeLabel}>{t("Skor")}</Text>
     </View>
   );
 }
@@ -468,7 +467,7 @@ function MetricCard({
   const color = toneColor(tone);
 
   return (
-    <View style={styles.metricCard}>
+    <View style={styles.metricCard} accessible accessibilityLabel={`${label}: ${value}`}>
       <View style={styles.metricTop}>
         <View style={[styles.metricMark, { backgroundColor: color + "18" }]}>
           <View style={[styles.metricDot, { backgroundColor: color }]} />
@@ -499,7 +498,7 @@ function SectionTitle({
           <Text style={styles.sectionTitle}>{title}</Text>
           {onInfoPress ? (
             <TouchableOpacity onPress={onInfoPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.textSub} accessibilityLabel="Bilgi" />
+              <Ionicons name="information-circle-outline" size={18} color={colors.textSub} accessibilityLabel={t("Bilgi")} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -601,7 +600,13 @@ function HealthRow({
   last?: boolean;
 }) {
   return (
-    <View style={[styles.healthRow, !last && styles.rowDivider]}>
+    <View
+      style={[styles.healthRow, !last && styles.rowDivider]}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: clamp(value), text: `${clamp(value)}%` }}
+    >
       <View style={styles.healthRowTop}>
         <Text style={styles.healthRowLabel}>{label}</Text>
         <Text style={[styles.healthRowValue, { color }]}>{value}%</Text>
@@ -650,11 +655,15 @@ function MixRow({
   const pct = total === 0 ? 0 : Math.round((count / total) * 100);
 
   return (
-    <View style={[styles.mixRow, !last && styles.rowDivider]}>
+    <View
+      style={[styles.mixRow, !last && styles.rowDivider]}
+      accessible
+      accessibilityLabel={t("{circle}: {count} kişi, yüzde {pct}", { circle: tv(label), count, pct })}
+    >
       <View style={[styles.mixDot, { backgroundColor: color }]} />
 
       <View style={styles.mixInfo}>
-        <Text style={styles.mixLabel}>{label}</Text>
+        <Text style={styles.mixLabel}>{tv(label)}</Text>
         <View style={styles.mixProgressTrack}>
           <View
             style={[

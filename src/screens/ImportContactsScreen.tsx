@@ -23,6 +23,8 @@ import { isDuplicateContact } from "../utils/duplicateContact";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import { t } from "../i18n";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 function initials(name: string) {
   return name
@@ -69,7 +71,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
         return;
       }
       setErrorMessage(
-        error instanceof ContactsUnavailableError ? error.message : "Rehber okunamadı. Lütfen tekrar dene."
+        error instanceof ContactsUnavailableError ? error.message : t("Rehber okunamadı. Lütfen tekrar dene.")
       );
       setLoadState("error");
     }
@@ -143,11 +145,11 @@ export default function ImportContactsScreen({ navigation }: Props) {
       );
       ensureNotificationPermissionAsync();
       showToast(
-        toAdd.length === 1 ? "1 kişi eklendi" : `${toAdd.length} kişi eklendi`
+        t("{count} kişi eklendi", { count: toAdd.length })
       );
       navigation.goBack();
     } catch {
-      showToast("Bir sorun oluştu. Lütfen tekrar dene.");
+      showToast(t("Bir sorun oluştu. Lütfen tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -157,7 +159,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
     <View style={styles.screen}>
       <AppHeader
         type="settings"
-        centerTitle="Rehberden Aktar"
+        centerTitle={t("Rehberden Aktar")}
         onBack={() => navigation.goBack()}
       />
 
@@ -168,23 +170,23 @@ export default function ImportContactsScreen({ navigation }: Props) {
       ) : loadState === "ready" && deviceContacts.length === 0 ? (
         <EmptyState
           icon="person-outline"
-          title="Rehber boş"
-          description="Cihazında kayıtlı kişi bulunamadı."
+          title={t("Rehber boş")}
+          description={t("Cihazında kayıtlı kişi bulunamadı.")}
         />
       ) : loadState === "denied" ? (
         <EmptyState
           icon="lock-closed-outline"
-          title="Rehber izni gerekli"
-          description="Kişileri görebilmek için rehber erişimine izin vermelisin."
-          buttonLabel="İzni tekrar iste"
+          title={t("Rehber izni gerekli")}
+          description={t("Kişileri görebilmek için rehber erişimine izin vermelisin.")}
+          buttonLabel={t("İzni tekrar iste")}
           onPress={fetchDeviceContacts}
         />
       ) : loadState === "error" ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Bir sorun oluştu"
-          description={errorMessage || "Rehber okunamadı. Lütfen tekrar dene."}
-          buttonLabel="Tekrar dene"
+          title={t("Bir sorun oluştu")}
+          description={errorMessage || t("Rehber okunamadı. Lütfen tekrar dene.")}
+          buttonLabel={t("Tekrar dene")}
           onPress={fetchDeviceContacts}
         />
       ) : (
@@ -192,13 +194,13 @@ export default function ImportContactsScreen({ navigation }: Props) {
           <View style={styles.toolbar}>
             <Text style={styles.toolbarCount}>
               {selectedIds.size > 0
-                ? `${selectedIds.size} kişi seçildi`
-                : `${deviceContacts.length} kişi bulundu`}
+                ? t("{count} kişi seçildi", { count: selectedIds.size })
+                : t("{count} kişi bulundu", { count: deviceContacts.length })}
             </Text>
             {selectableContacts.length > 0 ? (
-              <TouchableOpacity onPress={toggleSelectAll} activeOpacity={0.75}>
+              <TouchableOpacity onPress={toggleSelectAll} activeOpacity={0.75} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={styles.toolbarAction}>
-                  {allSelectableSelected ? "Tümünü kaldır" : "Tümünü seç"}
+                  {allSelectableSelected ? t("Tümünü kaldır") : t("Tümünü seç")}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -219,6 +221,9 @@ export default function ImportContactsScreen({ navigation }: Props) {
                   onPress={() => toggleSelect(item.id)}
                   activeOpacity={isDuplicate ? 1 : 0.7}
                   disabled={isDuplicate}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={[item.name, item.phone || item.email, isDuplicate ? t("zaten ekli") : ""].filter(Boolean).join(", ")}
+                  accessibilityState={{ checked: isSelected, disabled: isDuplicate }}
                 >
                   <View
                     style={[
@@ -234,17 +239,17 @@ export default function ImportContactsScreen({ navigation }: Props) {
                       {item.name}
                     </Text>
                     <Text style={styles.rowSub} numberOfLines={1}>
-                      {item.phone || item.email || "Detay yok"}
+                      {item.phone || item.email || t("Detay yok")}
                     </Text>
                   </View>
 
                   {isDuplicate ? (
                     <View style={styles.duplicateBadge}>
-                      <Text style={styles.duplicateBadgeText}>Zaten ekli</Text>
+                      <Text style={styles.duplicateBadgeText}>{t("Zaten ekli")}</Text>
                     </View>
                   ) : (
                     <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                      {isSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                      {isSelected ? <Ionicons name="checkmark" size={16} color={colors.white} /> : null}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -264,8 +269,8 @@ export default function ImportContactsScreen({ navigation }: Props) {
               ) : (
                 <Text style={styles.addBtnText}>
                   {selectedIds.size > 0
-                    ? `Seçilenleri Ekle (${selectedIds.size})`
-                    : "Kişi seç"}
+                    ? t("Seçilenleri ekle ({count})", { count: selectedIds.size })
+                    : t("Kişi seç")}
                 </Text>
               )}
             </TouchableOpacity>
@@ -275,8 +280,8 @@ export default function ImportContactsScreen({ navigation }: Props) {
 
       <PermissionDeniedModal
         visible={permissionModal}
-        title="Rehbere erişim izni gerekli"
-        description="Rehberindeki kişileri görebilmek için rehber erişimine izin vermelisin."
+        title={t("Rehbere erişim izni gerekli")}
+        description={t("Rehberindeki kişileri görebilmek için rehber erişimine izin vermelisin.")}
         onClose={() => setPermissionModal(false)}
       />
     </View>

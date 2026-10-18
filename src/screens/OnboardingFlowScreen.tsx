@@ -17,6 +17,7 @@ import { loadSettings, saveSettings } from "../data/userSettings";
 import { GOALS } from "../data/goals";
 import { colors } from "../theme/colors";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
+import { t } from "../i18n";
 
 const PURPLE = colors.primary;
 const BG     = colors.card;
@@ -150,14 +151,15 @@ export default function OnboardingFlowScreen({ navigation }: any) {
               style={[s.img, { height: imgH }]}
               resizeMode="contain"
             />
-            <Text style={s.title}>Sana nasıl{"\n"}hitap edelim?</Text>
-            <Text style={s.subtitle}>Bu, deneyimini kişiselleştirmemize yardımcı olur.</Text>
+            <Text style={s.title}>{t("Sana nasıl\nhitap edelim?")}</Text>
+            <Text style={s.subtitle}>{t("Bu, deneyimini kişiselleştirmemize yardımcı olur.")}</Text>
 
             <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Ad Soyad *</Text>
+              <Text style={s.fieldLabel}>{t("Ad Soyad *")}</Text>
               <TextInput
+                accessibilityLabel={t("Ad Soyad, zorunlu")}
                 style={s.input}
-                placeholder="Ad Soyad"
+                placeholder={t("Ad Soyad")}
                 placeholderTextColor={MUTED}
                 value={fullName}
                 onChangeText={setFullName}
@@ -167,10 +169,11 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             </View>
 
             <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>E-posta</Text>
+              <Text style={s.fieldLabel}>{t("E-posta")}</Text>
               <TextInput
+                accessibilityLabel={t("E-posta")}
                 style={s.input}
-                placeholder="ornek@email.com"
+                placeholder={t("ornek@email.com")}
                 placeholderTextColor={MUTED}
                 value={email}
                 onChangeText={setEmail}
@@ -180,10 +183,11 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             </View>
 
             <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Telefon</Text>
+              <Text style={s.fieldLabel}>{t("Telefon")}</Text>
               <TextInput
+                accessibilityLabel={t("Telefon")}
                 style={s.input}
-                placeholder="+90 5xx xxx xx xx"
+                placeholder={t("+90 5xx xxx xx xx")}
                 placeholderTextColor={MUTED}
                 value={phone}
                 onChangeText={setPhone}
@@ -192,10 +196,11 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             </View>
 
             <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Şehir</Text>
+              <Text style={s.fieldLabel}>{t("Şehir")}</Text>
               <TextInput
+                accessibilityLabel={t("Şehir")}
                 style={s.input}
-                placeholder="İstanbul"
+                placeholder={t("İstanbul")}
                 placeholderTextColor={MUTED}
                 value={city}
                 onChangeText={setCity}
@@ -203,7 +208,7 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             </View>
 
             <GradientBtn
-              label="Devam"
+              label={t("Devam")}
               onPress={async () => { await saveBasicInfo(); setStep(1); }}
               disabled={!valid}
             />
@@ -222,8 +227,8 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             contentContainerStyle={[s.scrollContent, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={[s.title, { marginTop: 8 }]}>Uygulamayı ne için{"\n"}kullanacaksın?</Text>
-            <Text style={s.subtitle}>Birden fazla seçim yapabilirsin.</Text>
+            <Text style={[s.title, { marginTop: 8 }]}>{t("Uygulamayı ne için\nkullanacaksın?")}</Text>
+            <Text style={s.subtitle}>{t("Birden fazla seçim yapabilirsin.")}</Text>
 
             <View style={s.goalsList}>
               {PURPOSES.map(p => {
@@ -234,11 +239,13 @@ export default function OnboardingFlowScreen({ navigation }: any) {
                     style={[s.goalRow, active && s.goalRowActive]}
                     onPress={() => togglePurpose(p.key)}
                     activeOpacity={0.75}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: active }}
                   >
                     <View style={[s.goalIcon, active && s.goalIconActive]}>
                       <Text style={s.goalEmoji}>{p.icon}</Text>
                     </View>
-                    <Text style={[s.goalLabel, active && s.goalLabelActive]}>{p.label}</Text>
+                    <Text style={[s.goalLabel, active && s.goalLabelActive]}>{t(p.label)}</Text>
                     <View style={[s.goalCheck, active && s.goalCheckActive]}>
                       {active && <Text style={s.goalCheckMark}>✓</Text>}
                     </View>
@@ -253,7 +260,7 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             <GradientBtn
               label={
                 purposes.length > 0
-                  ? `Devam — ${purposes.length} seçildi`
+                  ? t("Devam — {count} seçildi", { count: purposes.length })
                   : "Devam"
               }
               onPress={() => setStep(2)}
@@ -278,8 +285,8 @@ export default function OnboardingFlowScreen({ navigation }: any) {
             style={[s.img, { height: imgH }]}
             resizeMode="contain"
           />
-          <Text style={s.title}>Varsayılan iletişim{"\n"}aralığın ne olsun?</Text>
-          <Text style={s.subtitle}>Yeni eklediğin kişiler için bu aralığı kullanacağız. Dilediğin zaman kişi bazında değiştirebilirsin.</Text>
+          <Text style={s.title}>{t("Varsayılan iletişim\naralığın ne olsun?")}</Text>
+          <Text style={s.subtitle}>{t("Yeni eklediğin kişiler için bu aralığı kullanacağız. Dilediğin zaman kişi bazında değiştirebilirsin.")}</Text>
 
           <View style={s.goalsList}>
             {INTERVAL_PRESETS.map(preset => {
@@ -290,8 +297,10 @@ export default function OnboardingFlowScreen({ navigation }: any) {
                   style={[s.goalRow, active && s.goalRowActive]}
                   onPress={() => setIntervalDays(preset.days)}
                   activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
                 >
-                  <Text style={[s.goalLabel, active && s.goalLabelActive]}>{preset.label}</Text>
+                  <Text style={[s.goalLabel, active && s.goalLabelActive]}>{t(preset.label)}</Text>
                   <View style={[s.goalCheck, active && s.goalCheckActive]}>
                     {active && <Text style={s.goalCheckMark}>✓</Text>}
                   </View>
@@ -302,8 +311,10 @@ export default function OnboardingFlowScreen({ navigation }: any) {
               style={[s.goalRow, intervalDays === null && s.goalRowActive]}
               onPress={() => setIntervalDays(null)}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: intervalDays === null }}
             >
-              <Text style={[s.goalLabel, intervalDays === null && s.goalLabelActive]}>{LATER}</Text>
+              <Text style={[s.goalLabel, intervalDays === null && s.goalLabelActive]}>{t(LATER)}</Text>
               <View style={[s.goalCheck, intervalDays === null && s.goalCheckActive]}>
                 {intervalDays === null && <Text style={s.goalCheckMark}>✓</Text>}
               </View>
@@ -312,7 +323,7 @@ export default function OnboardingFlowScreen({ navigation }: any) {
         </ScrollView>
 
         <View style={s.stickyFooter}>
-          <GradientBtn label="Uygulamaya geç" onPress={savePurposesAndFinish} />
+          <GradientBtn label={t("Uygulamaya geç")} onPress={savePurposesAndFinish} />
         </View>
       </View>
     </StepShell>

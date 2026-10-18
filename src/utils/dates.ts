@@ -1,3 +1,5 @@
+import { locale } from "../i18n";
+
 /** Local-calendar date as YYYY-MM-DD (toISOString would shift it to UTC). */
 export function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -58,8 +60,7 @@ export function addDays(d: Date, days: number): Date {
   return r;
 }
 
-const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-
+/** "17 Ekim 2026" / "October 17, 2026" in the app language. */
 export function formatLongTR(d: Date): string {
-  return `${d.getDate()} ${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return d.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
 }

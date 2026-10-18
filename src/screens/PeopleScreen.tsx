@@ -17,7 +17,7 @@ import DraggableFlatList, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import type { ContactForm } from "./AddContactScreen";
-import { loadContacts, deleteContacts, reorderContacts, addContacts, markContacted, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
+import { loadContacts, deleteContacts, reorderContacts, addContacts, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -27,12 +27,12 @@ import SnoozeModal from "../components/SnoozeModal";
 import { showUndoToast } from "../components/Toast";
 import { daysSinceIntervalStart, effectiveIntervalDays, isDue } from "../utils/reminderInterval";
 import { healthScore, healthScoreColor } from "../utils/healthScore";
-import { hapticSuccess } from "../utils/haptics";
+import { logMoment } from "../app/momentActions";
 import type { InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
-import { showToast } from "../components/Toast";
 import EmptyState from "../components/EmptyState";
+import { t, tv } from "../i18n";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ type StatusFilter = "all" | "reachOut" | "upcoming" | "recent";
 
 const STATUS_FILTERS: { key: StatusFilter; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "all",      label: "Tümü",      icon: "people-outline" },
-  { key: "reachOut", label: "Bekleyen",  icon: "alarm-outline" },
+  { key: "reachOut", label: "Yeniden bağlan", icon: "heart-outline" },
   { key: "upcoming", label: "Yaklaşan",  icon: "hourglass-outline" },
   { key: "recent",   label: "Son görüşülen", icon: "checkmark-done-outline" },
 ];
@@ -184,7 +184,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
     const removed = contacts.filter(c => c.id && selectedIds.has(c.id));
     const updated = await deleteContacts(ids);
     setContacts(updated);
-    showUndoToast(ids.length === 1 ? "Kişi silindi" : `${ids.length} kişi silindi`, async () => {
+    showUndoToast(t("{count} kişi silindi", { count: ids.length }), async () => {
       setContacts(await addContacts(removed));
     });
     exitSelectMode();
@@ -193,24 +193,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
   const handleLog = async (type: InteractionType, note: string, date: string) => {
     const target = logTarget;
     setLogTarget(null);
-    if (!target?.id) return;
-    const snapshot = {
-      interactions: target.interactions,
-      lastContactDate: target.lastContactDate,
-      reminderIntervalStart: target.reminderIntervalStart,
-      snoozedUntil: target.snoozedUntil,
-    };
-    try {
-      await markContacted(target.id, type, note, date);
-      hapticSuccess();
-      setContacts(await loadContacts());
-      showUndoToast("Görüşme kaydedildi", async () => {
-        await updateContact(target.id!, snapshot);
-        setContacts(await loadContacts());
-      });
-    } catch {
-      showToast("Kaydedilemedi. Lütfen tekrar dene.");
-    }
+    if (target) await logMoment(target, type, note, date, () => loadContacts().then(setContacts));
   };
 
   const handleSnooze = async (date: string) => {
@@ -220,7 +203,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
     const previous = target.snoozedUntil;
     await snoozeContact(target.id, date);
     setContacts(await loadContacts());
-    showUndoToast("Hatırlatma ertelendi", async () => {
+    showUndoToast(t("Hatırlatma ertelendi"), async () => {
       await updateContact(target.id!, { snoozedUntil: previous });
       setContacts(await loadContacts());
     });
@@ -247,15 +230,15 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
         {selectMode ? (
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.headerTitle}>{selectedIds.size} seçildi</Text>
-              <Text style={styles.headerSub}>Silmek için seç, ya da vazgeç.</Text>
+              <Text style={styles.headerTitle}>{t("{count} seçildi", { count: selectedIds.size })}</Text>
+              <Text style={styles.headerSub}>{t("Silmek için seç, ya da vazgeç.")}</Text>
             </View>
             <TouchableOpacity
               style={styles.cancelSelectBtn}
               onPress={exitSelectMode}
               activeOpacity={0.75}
             >
-              <Text style={styles.cancelSelectBtnText}>Vazgeç</Text>
+              <Text style={styles.cancelSelectBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -266,14 +249,14 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                   onPress={() => navigation.goBack()}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   accessibilityRole="button"
-                  accessibilityLabel="Geri"
+                  accessibilityLabel={t("Geri")}
                 >
                   <Ionicons name="chevron-back" size={26} color={colors.primary} />
                 </TouchableOpacity>
               ) : null}
               <View>
-                <Text style={styles.headerTitle} accessibilityRole="header">Kişiler</Text>
-                <Text style={styles.headerSub}>{contacts.length} kişi</Text>
+                <Text style={styles.headerTitle} accessibilityRole="header">{t("Kişiler")}</Text>
+                <Text style={styles.headerSub}>{t("{count} kişi", { count: contacts.length })}</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -281,7 +264,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               onPress={() => navigation.navigate("AddContact")}
               activeOpacity={0.82}
               accessibilityRole="button"
-              accessibilityLabel="Yeni kişi ekle"
+              accessibilityLabel={t("Yeni kişi ekle")}
             >
               <Ionicons name="add" size={24} color={colors.white} />
             </TouchableOpacity>
@@ -296,8 +279,8 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               <Ionicons name="search" size={18} color={GRAY} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="İsim, şirket, şehir, etiket"
-                accessibilityLabel="Kişi ara"
+                placeholder={t("İsim, şirket, şehir, etiket")}
+                accessibilityLabel={t("Kişi ara")}
                 placeholderTextColor={GRAY}
                 value={search}
                 onChangeText={setSearch}
@@ -308,7 +291,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                   onPress={() => setSearch("")}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   accessibilityRole="button"
-                  accessibilityLabel="Aramayı temizle"
+                  accessibilityLabel={t("Aramayı temizle")}
                 >
                   <Ionicons name="close-circle" size={20} color={GRAY} />
                 </TouchableOpacity>
@@ -320,7 +303,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               onPress={() => setFilterOpen(true)}
               activeOpacity={0.75}
               accessibilityRole="button"
-              accessibilityLabel={activeFilter !== "Tümü" ? `İlişki filtresi: ${activeFilter}` : "İlişki türüne göre filtrele"}
+              accessibilityLabel={activeFilter !== "Tümü" ? t("İlişki filtresi: {name}", { name: tv(activeFilter) }) : t("İlişki türüne göre filtrele")}
             >
               <Ionicons name="funnel-outline" size={20} color={activeFilter !== "Tümü" ? TEAL : TEXTSUB} />
             </TouchableOpacity>
@@ -330,7 +313,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               onPress={() => setSortOpen(true)}
               activeOpacity={0.75}
               accessibilityRole="button"
-              accessibilityLabel="Sırala"
+              accessibilityLabel={t("Sırala")}
             >
               <Ionicons name="swap-vertical" size={20} color={TEXTSUB} />
             </TouchableOpacity>
@@ -351,7 +334,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                   accessibilityState={{ selected: active }}
                 >
                   <Ionicons name={f.icon} size={15} color={active ? colors.white : colors.textSub} />
-                  <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>{f.label}</Text>
+                  <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>{t(f.label)}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -362,12 +345,12 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
         {!selectMode && activeFilter !== "Tümü" && (
           <View style={styles.filterPillRow}>
             <View style={styles.filterPill}>
-              <Text style={styles.filterPillText}>{activeFilter}</Text>
+              <Text style={styles.filterPillText}>{tv(activeFilter)}</Text>
               <TouchableOpacity
                 onPress={() => setFilter("Tümü")}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityRole="button"
-                accessibilityLabel={`${activeFilter} filtresini kaldır`}
+                accessibilityLabel={t("{name} filtresini kaldır", { name: tv(activeFilter) })}
               >
                 <Ionicons name="close" size={14} color={TEAL} />
               </TouchableOpacity>
@@ -380,8 +363,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
           <View style={styles.manualHintRow}>
             <Text style={styles.manualHintText}>
               {canDrag
-                ? "Bir kişiyi basılı tutup sürükleyerek sırasını değiştirebilirsin."
-                : "Sürükleme için aramayı ve filtreyi temizle."}
+                ? t("Bir kişiyi basılı tutup sürükleyerek sırasını değiştirebilirsin.") : t("Sürükleme için aramayı ve filtreyi temizle.")}
             </Text>
           </View>
         )}
@@ -389,28 +371,28 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
 
       {/* ── List / Empty ── */}
       {!loaded ? (
-        <View style={{ padding: 20, gap: 12 }} accessibilityLabel="Yükleniyor" accessibilityRole="progressbar">
+        <View style={{ padding: 20, gap: 12 }} accessibilityLabel={t("Yükleniyor")} accessibilityRole="progressbar">
           {[0, 1, 2, 3].map(i => <View key={i} style={styles.skeletonRow} />)}
         </View>
       ) : list.length === 0 ? (
         contacts.length === 0 ? (
           <EmptyState
             icon="people-outline"
-            title="Henüz kişi yok"
-            description="İlk bağlantını ekle."
-            buttonLabel="Kişi ekle"
+            title={t("Henüz kişi yok")}
+            description={t("İlk bağlantını ekle.")}
+            buttonLabel={t("Kişi ekle")}
             onPress={() => navigation.navigate("AddContact")}
-            secondaryLabel="Rehberden aktar"
+            secondaryLabel={t("Rehberden aktar")}
             onSecondaryPress={() => navigation.navigate("ImportContacts")}
           />
         ) : status === "reachOut" && !search && activeFilter === "Tümü" ? (
-          <EmptyState icon="checkmark-circle-outline" title="Bekleyen kimse yok" description="Harika gidiyorsun!" />
+          <EmptyState icon="checkmark-circle-outline" title={t("Herkesle bağın taze ✨")} description={t("Harika gidiyorsun!")} />
         ) : (
           <EmptyState
             icon="search-outline"
-            title="Sonuç yok"
-            description="Aramayı veya filtreyi değiştir."
-            buttonLabel="Filtreleri temizle"
+            title={t("Sonuç yok")}
+            description={t("Aramayı veya filtreyi değiştir.")}
+            buttonLabel={t("Filtreleri temizle")}
             onPress={() => { setSearch(""); setFilter("Tümü"); setStatus("all"); }}
           />
         )
@@ -464,19 +446,19 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                       style={[styles.swipeBtn, { backgroundColor: colors.primary }]}
                       onPress={() => { methods.close(); setLogTarget(item); }}
                       accessibilityRole="button"
-                      accessibilityLabel={`${item.fullName} ile görüştüm`}
+                      accessibilityLabel={t("{name} ile görüştüm", { name: item.fullName })}
                     >
                       <Ionicons name="checkmark-circle" size={22} color={colors.white} />
-                      <Text style={styles.swipeText}>Görüştüm</Text>
+                      <Text style={styles.swipeText}>{t("Görüştüm")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.swipeBtn, { backgroundColor: colors.warning }]}
                       onPress={() => { methods.close(); setSnoozeTarget(item); }}
                       accessibilityRole="button"
-                      accessibilityLabel={`${item.fullName} ertele`}
+                      accessibilityLabel={t("{name} hatırlatmasını ertele", { name: item.fullName })}
                     >
                       <Ionicons name="alarm" size={22} color={colors.white} />
-                      <Text style={styles.swipeText}>Ertele</Text>
+                      <Text style={styles.swipeText}>{t("Ertele")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -498,14 +480,14 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
             disabled={selectedIds.size === 0}
           >
             <Text style={styles.deleteBtnText}>
-              {selectedIds.size > 0 ? `Sil (${selectedIds.size})` : "Kişi seç"}
+              {selectedIds.size > 0 ? t("Sil ({count})", { count: selectedIds.size }) : t("Kişi seç")}
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* ── Filter bottom sheet ── */}
-      <BottomSheet visible={filterOpen} title="Filtrele" onClose={() => setFilterOpen(false)}>
+      <BottomSheet visible={filterOpen} title={t("Filtrele")} onClose={() => setFilterOpen(false)}>
         <View style={styles.sheetChipGrid}>
           {relationshipFilters.map(f => (
             <TouchableOpacity
@@ -515,7 +497,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               activeOpacity={0.75}
             >
               <Text style={[styles.sheetChipText, activeFilter === f && styles.sheetChipTextActive]}>
-                {f}
+                {tv(f)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -523,7 +505,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
       </BottomSheet>
 
       {/* ── Sort bottom sheet ── */}
-      <BottomSheet visible={sortOpen} title="Sırala" onClose={() => setSortOpen(false)}>
+      <BottomSheet visible={sortOpen} title={t("Sırala")} onClose={() => setSortOpen(false)}>
         {SORT_OPTIONS.map(opt => (
           <TouchableOpacity
             key={opt.key}
@@ -558,24 +540,24 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
         <Pressable style={styles.overlay} onPress={() => setDeleteConfirmOpen(false)}>
           <Pressable style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>
-              {selectedIds.size === 1 ? "Kişi silinsin mi?" : `${selectedIds.size} kişi silinsin mi?`}
+              {t("{count} kişi silinsin mi?", { count: selectedIds.size })}
             </Text>
             <Text style={styles.confirmDesc}>
-              Notlar ve görüşme geçmişi de silinir. Hemen ardından “Geri al” diyebilirsin.
+              {t("Notlar ve görüşme geçmişi de silinir. Hemen ardından “Geri al” diyebilirsin.")}
             </Text>
             <TouchableOpacity
               style={styles.confirmDeleteBtn}
               onPress={handleDeleteSelected}
               activeOpacity={0.85}
             >
-              <Text style={styles.confirmDeleteBtnText}>Sil</Text>
+              <Text style={styles.confirmDeleteBtnText}>{t("Sil")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.confirmCancelBtn}
               onPress={() => setDeleteConfirmOpen(false)}
               activeOpacity={0.75}
             >
-              <Text style={styles.confirmCancelBtnText}>Vazgeç</Text>
+              <Text style={styles.confirmCancelBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -600,8 +582,8 @@ function PersonCard({
   onLongPress: () => void;
 }) {
   const tags  = typeof item.tags === "string" ? item.tags : "";
-  const subtitle = [item.jobTitle, item.company].filter(Boolean).join(" · ") || item.relationship || "";
-  const daysText = days === undefined || days >= 9999 ? "" : days === 0 ? "Bugün" : `${days}g`;
+  const subtitle = [item.jobTitle, item.company].filter(Boolean).join(" · ") || tv(item.relationship) || "";
+  const daysText = days === undefined || days >= 9999 ? "" : days === 0 ? t("Bugün") : t("{days}g", { days });
 
   return (
     <TouchableOpacity
@@ -611,9 +593,9 @@ function PersonCard({
       onLongPress={onLongPress}
       delayLongPress={280}
       accessibilityRole="button"
-      accessibilityLabel={[item.fullName, subtitle, daysText && `son temas ${daysText}`, due && "bekliyor"].filter(Boolean).join(", ")}
+      accessibilityLabel={[item.fullName, subtitle, daysText && t("son görüşme {days}", { days: daysText }), due && t("seni özlemiş olabilir")].filter(Boolean).join(", ")}
       accessibilityState={selectMode ? { selected } : undefined}
-      accessibilityHint={selectMode ? undefined : "Seçmek için basılı tut, işlemler için sola kaydır"}
+      accessibilityHint={selectMode ? undefined : t("Seçmek için basılı tut, işlemler için sola kaydır")}
     >
       {/* Selection checkbox */}
       {selectMode && (
@@ -674,7 +656,7 @@ function BottomSheet({
           <Text style={styles.sheetTitle}>{title}</Text>
           {children}
           <TouchableOpacity style={styles.sheetCloseBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.sheetCloseTxt}>Kapat</Text>
+            <Text style={styles.sheetCloseTxt}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

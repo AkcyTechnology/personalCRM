@@ -5,7 +5,7 @@ import type { RootStackParamList } from "./RootNavigator";
 import HomeScreen from "../screens/HomeScreen";
 import PeopleScreen from "../screens/PeopleScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import InsightsScreen from "../screens/InsightsScreen";
+import UniverseScreen from "../screens/UniverseScreen";
 import BottomTabBar from "../components/BottomTabBar";
 import { colors } from "../theme/colors";
 
@@ -17,7 +17,7 @@ function ActiveScreen({ tab, navigation }: { tab: Tab; navigation: Props["naviga
   switch (tab) {
     case "Home":     return <HomeScreen navigation={navigation} />;
     case "People":   return <PeopleScreen navigation={navigation} />;
-    case "Insights": return <InsightsScreen navigation={navigation} />;
+    case "Insights": return <UniverseScreen navigation={navigation} />;
     case "Profile":  return <ProfileScreen navigation={navigation} />;
   }
 }

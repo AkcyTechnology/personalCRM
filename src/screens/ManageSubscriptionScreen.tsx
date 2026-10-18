@@ -7,6 +7,7 @@ import {
 import AppHeader from "../components/AppHeader";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 const PURPLE = colors.primary;
 const BG = colors.bg;
@@ -29,32 +30,32 @@ const BETA_FEATURES = [
 export default function ManageSubscriptionScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
-      <AppHeader type="settings" centerTitle="Abonelik" onBack={() => navigation.goBack()} />
+      <AppHeader type="settings" centerTitle={t("Abonelik")} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.currentLabel}>Mevcut planın</Text>
+        <Text style={styles.currentLabel}>{t("Mevcut planın")}</Text>
 
         <View style={[styles.planCard, styles.planCardActive]}>
           <View style={styles.planTop}>
             <View>
-              <Text style={[styles.planName, { color: PURPLE }]}>Beta · Ücretsiz</Text>
+              <Text style={[styles.planName, { color: PURPLE }]}>{t("Beta · Ücretsiz")}</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.planPrice}>₺0</Text>
               </View>
             </View>
             <View style={styles.currentBadge}>
-              <Text style={styles.currentBadgeText}>Aktif</Text>
+              <Text style={styles.currentBadgeText}>{t("Aktif")}</Text>
             </View>
           </View>
 
           <Text style={styles.featureText}>
-            Beta süresince tüm özellikler herkese açık ve ücretsiz. Kart bilgisi istemiyoruz, otomatik yenilenen bir ödeme yok.
+            {t("Beta süresince tüm özellikler herkese açık ve ücretsiz. Kart bilgisi istemiyoruz, otomatik yenilenen bir ödeme yok.")}
           </Text>
 
           <View style={styles.featureList}>
             {BETA_FEATURES.map((f) => (
               <View key={f} style={styles.featureRow}>
                 <Text style={styles.featureCheck}>✓</Text>
-                <Text style={styles.featureText}>{f}</Text>
+                <Text style={styles.featureText}>{t(f)}</Text>
               </View>
             ))}
           </View>

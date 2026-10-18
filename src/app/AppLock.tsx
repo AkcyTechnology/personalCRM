@@ -3,7 +3,9 @@ import { AppState, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator }
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { loadSettings, subscribeSettings } from "../data/userSettings";
 import { authenticateAsync } from "../utils/biometrics";
+import { resolveLanguage, setLanguage } from "../i18n";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 /** Lock again if the app stayed in the background longer than this. */
 const RELOCK_AFTER_MS = 30_000;
@@ -19,6 +21,7 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [covered, setCovered] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [, setLangTick] = useState(0);
   const backgroundAt = useRef<number | null>(null);
   const enabledRef = useRef(false);
 
@@ -32,11 +35,13 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadSettings().then((s) => {
+      setLanguage(resolveLanguage(s.language));
       enabledRef.current = s.appLockEnabled;
       setEnabled(s.appLockEnabled);
       setLocked(s.appLockEnabled);
     });
     return subscribeSettings((s) => {
+      setLangTick((n) => n + 1); // dil değişince kilit ekranı metinleri de güncellensin
       enabledRef.current = s.appLockEnabled;
       setEnabled(s.appLockEnabled);
       if (!s.appLockEnabled) setLocked(false);
@@ -80,17 +85,17 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
           <View style={styles.iconWrap}>
             <Ionicons name="lock-closed" size={34} color={colors.primary} />
           </View>
-          <Text style={styles.title}>Connectly kilitli</Text>
-          <Text style={styles.sub}>Kişilerin ve notların koruma altında.</Text>
+          <Text style={styles.title}>{t("Connectly kilitli")}</Text>
+          <Text style={styles.sub}>{t("Kişilerin ve notların koruma altında.")}</Text>
           {locked && !covered && (
             <TouchableOpacity
               style={styles.btn}
               onPress={unlock}
               disabled={busy}
               accessibilityRole="button"
-              accessibilityLabel="Kilidi aç"
+              accessibilityLabel={t("Kilidi aç")}
             >
-              <Text style={styles.btnText}>{busy ? "Doğrulanıyor…" : "Kilidi aç"}</Text>
+              <Text style={styles.btnText}>{busy ? t("Doğrulanıyor…") : t("Kilidi aç")}</Text>
             </TouchableOpacity>
           )}
         </View>

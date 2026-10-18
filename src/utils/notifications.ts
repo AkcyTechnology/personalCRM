@@ -4,6 +4,7 @@ import type * as ExpoNotifications from "expo-notifications";
 import type { ContactForm } from "../screens/AddContactScreen";
 import type { UserSettings } from "../data/userSettings";
 import { planReminders } from "./reminderPlan";
+import { getLanguage, t } from "../i18n";
 
 /**
  * True when running inside Expo Go on Android. `expo-notifications` throws on
@@ -34,13 +35,13 @@ export function getNotificationsModule(): typeof ExpoNotifications | null {
   return cachedModule;
 }
 
-let setupDone = false;
+let setupLang: string | null = null;
 
 /** Foreground presentation, Android channel and the "Görüştüm" action buttons. */
 export async function setupNotificationsAsync(): Promise<void> {
   const N = getNotificationsModule();
-  if (!N || setupDone) return;
-  setupDone = true;
+  if (!N || setupLang === getLanguage()) return;
+  setupLang = getLanguage();
   try {
     N.setNotificationHandler({
       handleNotification: async () => ({
@@ -52,13 +53,13 @@ export async function setupNotificationsAsync(): Promise<void> {
     });
     if (Platform.OS === "android") {
       await N.setNotificationChannelAsync(CHANNEL_ID, {
-        name: "Hatırlatıcılar",
+        name: t("Hatırlatıcılar"),
         importance: N.AndroidImportance.HIGH,
       });
     }
     await N.setNotificationCategoryAsync(CATEGORY_FOLLOW_UP, [
-      { identifier: ACTION_CONTACTED, buttonTitle: "Görüştüm ✓", options: { opensAppToForeground: false } },
-      { identifier: ACTION_SNOOZE, buttonTitle: "Yarın hatırlat", options: { opensAppToForeground: false } },
+      { identifier: ACTION_CONTACTED, buttonTitle: t("Görüştüm ✓"), options: { opensAppToForeground: false } },
+      { identifier: ACTION_SNOOZE, buttonTitle: t("Yarın hatırlat"), options: { opensAppToForeground: false } },
     ]);
   } catch (error) {
     console.warn("Bildirim kurulumu başarısız:", error);

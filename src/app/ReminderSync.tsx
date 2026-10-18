@@ -12,6 +12,7 @@ import {
 import { navigationRef } from "../navigation/navigationRef";
 import { addDays, toISODate } from "../utils/dates";
 import { showToast } from "../components/Toast";
+import { t } from "../i18n";
 
 async function resyncNow() {
   const [contacts, settings] = await Promise.all([loadContacts(), loadSettings()]);
@@ -57,7 +58,7 @@ export default function ReminderSync() {
       const contactId = data?.contactId;
       if (response.actionIdentifier === ACTION_CONTACTED && contactId) {
         await markContacted(contactId, "other");
-        showToast("Görüşme kaydedildi");
+        showToast(t("Görüşme kaydedildi"));
       } else if (response.actionIdentifier === ACTION_SNOOZE && contactId) {
         await snoozeContact(contactId, toISODate(addDays(new Date(), 1)));
       } else if (contactId) {

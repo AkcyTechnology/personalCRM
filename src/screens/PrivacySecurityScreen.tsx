@@ -10,6 +10,7 @@ import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { infoDialog } from "../utils/confirm";
+import { t } from "../i18n";
 
 const BG = colors.bg;
 const CARD = colors.card;
@@ -33,47 +34,43 @@ export default function PrivacySecurityScreen({ navigation }: any) {
 
   const toggleAppLock = async (value: boolean) => {
     if (value && !lockSupported) {
-      infoDialog(
-        "Cihaz kilidi gerekli",
-        "Uygulama kilidini kullanmak için önce cihazında Face ID, parmak izi veya bir ekran şifresi ayarlamalısın."
+      infoDialog(t("Cihaz kilidi gerekli"), t("Uygulama kilidini kullanmak için önce cihazında Face ID, parmak izi veya bir ekran şifresi ayarlamalısın.")
       );
       return;
     }
     // Açarken de kapatırken de kimliği doğrula
-    const ok = await authenticateAsync(value ? "Uygulama kilidini aç" : "Uygulama kilidini kapat");
+    const ok = await authenticateAsync(value ? t("Uygulama kilidini aç") : t("Uygulama kilidini kapat"));
     if (!ok) return;
     setAppLock(value);
     await updateSettings({ appLockEnabled: value });
-    showToast(value ? "Uygulama kilidi açıldı" : "Uygulama kilidi kapatıldı");
+    showToast(value ? t("Uygulama kilidi açıldı") : t("Uygulama kilidi kapatıldı"));
   };
 
   const encryptionText =
     Platform.OS === "web"
-      ? "Web sürümünde veriler tarayıcıda saklanır; şifreleme yalnızca iOS ve Android uygulamasında vardır."
-      : "Kişilerin, notların ve ayarların cihazında XChaCha20-Poly1305 ile şifrelenir. Anahtar, cihazın güvenli donanımında (Keychain / Keystore) tutulur ve yedeklere dahil edilmez.";
+      ? t("Web sürümünde veriler tarayıcıda saklanır; şifreleme yalnızca iOS ve Android uygulamasında vardır.") : t("Kişilerin, notların ve ayarların cihazında XChaCha20-Poly1305 ile şifrelenir. Anahtar, cihazın güvenli donanımında (Keychain / Keystore) tutulur ve yedeklere dahil edilmez.");
 
   return (
     <View style={styles.screen}>
-      <AppHeader type="settings" centerTitle="Gizlilik ve Güvenlik" onBack={() => navigation.goBack()} />
+      <AppHeader type="settings" centerTitle={t("Gizlilik ve Güvenlik")} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.banner}>
           <Ionicons name="shield-checkmark" size={22} color={colors.success} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Verilerin yalnızca bu cihazda</Text>
+            <Text style={styles.bannerTitle}>{t("Verilerin yalnızca bu cihazda")}</Text>
             <Text style={styles.bannerText}>{encryptionText}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>GÜVENLİK</Text>
+        <Text style={styles.sectionLabel}>{t("GÜVENLİK")}</Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <Ionicons name="finger-print" size={20} color={colors.primary} style={styles.rowIcon} />
             <View style={styles.rowInfo}>
-              <Text style={styles.rowLabel}>Uygulama kilidi</Text>
+              <Text style={styles.rowLabel}>{t("Uygulama kilidi")}</Text>
               <Text style={styles.rowDesc}>
                 {lockSupported
-                  ? "Açılışta ve 30 sn arka planda kaldıktan sonra Face ID / parmak izi / cihaz şifresi iste"
-                  : "Cihazında Face ID, parmak izi veya ekran şifresi ayarlı değil"}
+                  ? t("Açılışta ve 30 sn arka planda kaldıktan sonra Face ID / parmak izi / cihaz şifresi iste") : t("Cihazında Face ID, parmak izi veya ekran şifresi ayarlı değil")}
               </Text>
             </View>
             <Switch
@@ -81,51 +78,51 @@ export default function PrivacySecurityScreen({ navigation }: any) {
               onValueChange={toggleAppLock}
               trackColor={{ false: BORDER, true: colors.primary }}
               thumbColor={colors.white}
-              accessibilityLabel="Uygulama kilidi"
+              accessibilityLabel={t("Uygulama kilidi")}
             />
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>VERİLERİM</Text>
+        <Text style={styles.sectionLabel}>{t("VERİLERİM")}</Text>
         <View style={styles.card}>
           <Row
             icon="download-outline"
-            label="Yedek al"
-            desc="Tüm verilerini bir .json dosyasına aktar. Dosya şifresizdir; güvenli bir yerde sakla."
+            label={t("Yedek al")}
+            desc={t("Tüm verilerini bir .json dosyasına aktar. Dosya şifresizdir; güvenli bir yerde sakla.")}
             onPress={runExportBackup}
           />
           <Row
             icon="cloud-upload-outline"
-            label="Yedekten geri yükle"
-            desc="Daha önce aldığın bir yedeği içe aktar"
+            label={t("Yedekten geri yükle")}
+            desc={t("Daha önce aldığın bir yedeği içe aktar")}
             onPress={() => runRestoreBackup()}
             border
           />
         </View>
 
-        <Text style={styles.sectionLabel}>YASAL</Text>
+        <Text style={styles.sectionLabel}>{t("YASAL")}</Text>
         <View style={styles.card}>
           <Row
             icon="document-text-outline"
-            label="Gizlilik Politikası"
-            desc="Hangi verileri neden işlediğimiz (KVKK / GDPR)"
+            label={t("Gizlilik Politikası")}
+            desc={t("Hangi verileri neden işlediğimiz (KVKK / GDPR)")}
             onPress={() => navigation.navigate("Legal", { doc: "privacy" })}
           />
           <Row
             icon="reader-outline"
-            label="Kullanım Şartları"
-            desc="Uygulamayı kullanma koşulları"
+            label={t("Kullanım Şartları")}
+            desc={t("Uygulamayı kullanma koşulları")}
             onPress={() => navigation.navigate("Legal", { doc: "terms" })}
             border
           />
         </View>
 
-        <Text style={styles.sectionLabel}>TEHLİKELİ BÖLGE</Text>
+        <Text style={styles.sectionLabel}>{t("TEHLİKELİ BÖLGE")}</Text>
         <View style={styles.card}>
           <Row
             icon="trash-outline"
-            label="Tüm verileri sil"
-            desc="Kişiler, notlar, geçmiş, kartvizit ve ayarlar bu cihazdan kalıcı olarak silinir"
+            label={t("Tüm verileri sil")}
+            desc={t("Kişiler, notlar, geçmiş, kartvizit ve ayarlar bu cihazdan kalıcı olarak silinir")}
             onPress={() =>
               confirmWipeAllData(() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] }))
             }

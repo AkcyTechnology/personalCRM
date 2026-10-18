@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import type * as LegacyContacts from "expo-contacts/legacy";
+import { t } from "../i18n";
 
 /**
  * Single entry point to the device address book. The native module is loaded
@@ -20,15 +21,14 @@ export type DeviceContact = {
 export class ContactsUnavailableError extends Error {
   constructor() {
     super(
-      "Rehber modülü bu derlemede bulunamadı. Terminalde `npx expo install expo-contacts` çalıştırıp " +
-        "uygulamayı yeniden başlat; development build kullanıyorsan uygulamayı yeniden derle."
+      t("Rehber modülü bu derlemede bulunamadı. Terminalde `npx expo install expo-contacts` çalıştırıp uygulamayı yeniden başlat; development build kullanıyorsan uygulamayı yeniden derle.")
     );
   }
 }
 
 export class ContactsPermissionError extends Error {
   constructor() {
-    super("Rehber izni verilmedi.");
+    super(t("Rehber izni verilmedi."));
   }
 }
 

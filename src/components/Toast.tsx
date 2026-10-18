@@ -3,6 +3,7 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 type ToastOptions = {
   /** Label of an inline action, e.g. "Geri al". */
@@ -22,7 +23,7 @@ export function showToast(message: string, options: ToastOptions = {}) {
 
 /** Toast with a "Geri al" button for reversible actions. */
 export function showUndoToast(message: string, onUndo: () => void) {
-  showToast(message, { actionLabel: "Geri al", onAction: onUndo, durationMs: 5000 });
+  showToast(message, { actionLabel: t("Geri al"), onAction: onUndo, durationMs: 5000 });
 }
 
 export default function ToastHost() {

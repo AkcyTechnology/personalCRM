@@ -18,6 +18,7 @@ import QrCode from "../components/QrCode";
 import { showToast } from "../components/Toast";
 import { confirmDialog } from "../utils/confirm";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 type BusinessCardForm = {
   fullName: string;
@@ -101,7 +102,7 @@ export default function BusinessCardScreen({ navigation }: any) {
 
   const saveCard = async () => {
     if (!isValid) {
-      showToast("Kartvizit için ad soyad gerekli");
+      showToast(t("Kartvizit için ad soyad gerekli"));
       return;
     }
 
@@ -124,9 +125,9 @@ export default function BusinessCardScreen({ navigation }: any) {
       setHasCard(true);
       setMode("view");
 
-      showToast("Kartvizit kaydedildi");
+      showToast(t("Kartvizit kaydedildi"));
     } catch {
-      showToast("Kartvizit kaydedilemedi. Lütfen tekrar dene.");
+      showToast(t("Kartvizit kaydedilemedi. Lütfen tekrar dene."));
     }
   };
 
@@ -135,27 +136,27 @@ export default function BusinessCardScreen({ navigation }: any) {
   const shareCard = async () => {
     try {
       await Share.share({
-        title: "Dijital Kartvizit",
+        title: t("Dijital Kartvizit"),
         message: cardSummary(),
       });
     } catch {
-      showToast("Paylaşım başlatılamadı");
+      showToast(t("Paylaşım başlatılamadı"));
     }
   };
 
   const showQr = () => {
     setQrModalOpen(true);
-    showToast("QR kod hazır");
+    showToast(t("QR kod hazır"));
   };
 
   const resetCard = () => {
-    confirmDialog("Kartviziti sıfırla", "Kartvizit bilgilerini temizlemek istediğine emin misin?", [
+    confirmDialog(t("Kartviziti sıfırla"), t("Kartvizit bilgilerini temizlemek istediğine emin misin?"), [
       {
-        text: "Vazgeç",
+        text: t("Vazgeç"),
         style: "cancel",
       },
       {
-        text: "Sıfırla",
+        text: t("Sıfırla"),
         style: "destructive",
         onPress: async () => {
           await secureRemoveItem(STORAGE_KEY);
@@ -174,19 +175,21 @@ export default function BusinessCardScreen({ navigation }: any) {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.75}
+          accessibilityRole="button"
         >
-          <Text style={styles.backText}>Geri</Text>
+          <Text style={styles.backText}>{t("Geri")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.appTitle}>Dijital Kartvizit</Text>
+        <Text style={styles.appTitle}>{t("Dijital Kartvizit")}</Text>
 
         {hasCard ? (
           <TouchableOpacity
             style={styles.topAction}
             onPress={() => setMode(mode === "view" ? "edit" : "view")}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
-            <Text style={styles.topActionText}>{mode === "view" ? "Düzenle" : "Önizle"}</Text>
+            <Text style={styles.topActionText}>{mode === "view" ? t("Düzenle") : t("Önizle")}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.topActionGhost} />
@@ -203,27 +206,27 @@ export default function BusinessCardScreen({ navigation }: any) {
               <Text style={styles.successIconText}>✓</Text>
             </View>
 
-            <Text style={styles.successTitle}>Kartvizitin hazır</Text>
-            <Text style={styles.successSub}>Bilgilerini paylaşabilir veya dilediğin zaman düzenleyebilirsin.</Text>
+            <Text style={styles.successTitle}>{t("Kartvizitin hazır")}</Text>
+            <Text style={styles.successSub}>{t("Bilgilerini paylaşabilir veya dilediğin zaman düzenleyebilirsin.")}</Text>
           </View>
 
           <BusinessCardPreview form={form} />
 
           <View style={styles.quickActions}>
-            <ActionButton label="Paylaş" onPress={shareCard} />
-            <ActionButton label="Düzenle" onPress={() => setMode("edit")} variant="light" />
-            <ActionButton label="QR Göster" onPress={showQr} variant="light" />
+            <ActionButton label={t("Paylaş")} onPress={shareCard} />
+            <ActionButton label={t("Düzenle")} onPress={() => setMode("edit")} variant="light" />
+            <ActionButton label={t("QR Göster")} onPress={showQr} variant="light" />
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Kartvizit bilgilerin senkron kalır</Text>
+            <Text style={styles.infoTitle}>{t("Kartvizit bilgilerin senkron kalır")}</Text>
             <Text style={styles.infoText}>
-              Bilgilerini güncellediğinde dijital kartvizit görünümün de yenilenir.
+              {t("Bilgilerini güncellediğinde dijital kartvizit görünümün de yenilenir.")}
             </Text>
           </View>
 
           <TouchableOpacity style={styles.dangerButton} onPress={resetCard} activeOpacity={0.75}>
-            <Text style={styles.dangerButtonText}>Kartviziti sıfırla</Text>
+            <Text style={styles.dangerButtonText}>{t("Kartviziti sıfırla")}</Text>
           </TouchableOpacity>
         </ScrollView>
       ) : (
@@ -235,50 +238,49 @@ export default function BusinessCardScreen({ navigation }: any) {
           <View style={styles.editHero}>
             {!hasCard ? <Text style={styles.editHeroIcon}>📇</Text> : null}
             <Text style={styles.editHeroTitle}>
-              {hasCard ? "Kartvizitini düzenle" : "Kartvizitini tamamla"}
+              {hasCard ? t("Kartvizitini düzenle") : t("Kartvizitini tamamla")}
             </Text>
             <Text style={styles.editHeroText}>
               {hasCard
-                ? "İş bilgilerini ekle, dijital kartvizitini hızlıca paylaşılabilir hale getir."
-                : "Paylaşılabilir bir dijital kartvizit oluşturmak için temel bilgilerini ekle."}
+                ? t("İş bilgilerini ekle, dijital kartvizitini hızlıca paylaşılabilir hale getir.") : t("Paylaşılabilir bir dijital kartvizit oluşturmak için temel bilgilerini ekle.")}
             </Text>
           </View>
 
-          <Section title="Temel bilgiler">
+          <Section title={t("Temel bilgiler")}>
             <Input
-              label="Ad Soyad"
-              placeholder="Tuğçe Ulucan"
+              label={t("Ad Soyad")}
+              placeholder={t("Ayşe Yılmaz")}
               value={form.fullName}
               onChangeText={(v) => updateField("fullName", v)}
               required
             />
 
             <Input
-              label="Unvan / Pozisyon"
-              placeholder="Proje Mühendisi"
+              label={t("Unvan / Pozisyon")}
+              placeholder={t("Yazılım Mühendisi")}
               value={form.title}
               onChangeText={(v) => updateField("title", v)}
             />
 
             <Input
-              label="Şirket / Kurum"
-              placeholder="GEST Mühendislik"
+              label={t("Şirket / Kurum")}
+              placeholder={t("Acme A.Ş.")}
               value={form.company}
               onChangeText={(v) => updateField("company", v)}
             />
 
             <Input
-              label="Hakkımda"
-              placeholder="Kısa bir açıklama yaz..."
+              label={t("Hakkımda")}
+              placeholder={t("Kısa bir açıklama yaz...")}
               value={form.about}
               onChangeText={(v) => updateField("about", v)}
               multiline
             />
           </Section>
 
-          <Section title="İletişim bilgileri">
+          <Section title={t("İletişim bilgileri")}>
             <Input
-              label="Telefon"
+              label={t("Telefon")}
               placeholder="+90 555 123 45 67"
               value={form.phone}
               onChangeText={(v) => updateField("phone", v)}
@@ -286,8 +288,8 @@ export default function BusinessCardScreen({ navigation }: any) {
             />
 
             <Input
-              label="E-posta"
-              placeholder="ornek@mail.com"
+              label={t("E-posta")}
+              placeholder={t("ornek@mail.com")}
               value={form.email}
               onChangeText={(v) => updateField("email", v)}
               keyboardType="email-address"
@@ -295,63 +297,63 @@ export default function BusinessCardScreen({ navigation }: any) {
             />
 
             <Input
-              label="Web sitesi"
-              placeholder="www.site.com"
+              label={t("Web sitesi")}
+              placeholder={"www.site.com"}
               value={form.website}
               onChangeText={(v) => updateField("website", v)}
               autoCapitalize="none"
             />
 
             <Input
-              label="LinkedIn"
-              placeholder="linkedin.com/in/kullanici"
+              label={t("LinkedIn")}
+              placeholder={t("linkedin.com/in/kullanici")}
               value={form.linkedin}
               onChangeText={(v) => updateField("linkedin", v)}
               autoCapitalize="none"
             />
 
             <Input
-              label="Adres"
-              placeholder="İlçe, İl, Ülke"
+              label={t("Adres")}
+              placeholder={t("İlçe, İl, Ülke")}
               value={form.address}
               onChangeText={(v) => updateField("address", v)}
               multiline
             />
           </Section>
 
-          <Section title="Görünürlük">
+          <Section title={t("Görünürlük")}>
             <VisibilityRow
-              label="Telefonu göster"
+              label={t("Telefonu göster")}
               value={form.showPhone}
               onChange={(v) => setForm((prev) => ({ ...prev, showPhone: v }))}
             />
             <VisibilityRow
-              label="E-postayı göster"
+              label={t("E-postayı göster")}
               value={form.showEmail}
               onChange={(v) => setForm((prev) => ({ ...prev, showEmail: v }))}
             />
             <VisibilityRow
-              label="Web sitesini göster"
+              label={t("Web sitesini göster")}
               value={form.showWebsite}
               onChange={(v) => setForm((prev) => ({ ...prev, showWebsite: v }))}
             />
             <VisibilityRow
-              label="LinkedIn göster"
+              label={t("LinkedIn göster")}
               value={form.showLinkedin}
               onChange={(v) => setForm((prev) => ({ ...prev, showLinkedin: v }))}
             />
             <VisibilityRow
-              label="Adres göster"
+              label={t("Adres göster")}
               value={form.showAddress}
               onChange={(v) => setForm((prev) => ({ ...prev, showAddress: v }))}
             />
           </Section>
 
           <View style={styles.previewMiniCard}>
-            <Text style={styles.previewMiniLabel}>Canlı önizleme</Text>
-            <Text style={styles.previewMiniName}>{form.fullName || "Ad Soyad"}</Text>
+            <Text style={styles.previewMiniLabel}>{t("Canlı önizleme")}</Text>
+            <Text style={styles.previewMiniName}>{form.fullName || t("Ad Soyad")}</Text>
             <Text style={styles.previewMiniText}>
-              {[form.title, form.company].filter(Boolean).join(" · ") || "Unvan · Şirket"}
+              {[form.title, form.company].filter(Boolean).join(" · ") || t("Unvan · Şirket")}
             </Text>
           </View>
 
@@ -361,7 +363,7 @@ export default function BusinessCardScreen({ navigation }: any) {
             activeOpacity={0.8}
           >
             <Text style={styles.saveButtonText}>
-              {hasCard ? "Değişiklikleri kaydet" : "Kartviziti oluştur"}
+              {hasCard ? t("Değişiklikleri kaydet") : t("Kartviziti oluştur")}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -370,13 +372,13 @@ export default function BusinessCardScreen({ navigation }: any) {
       <Modal visible={qrModalOpen} transparent animationType="fade" onRequestClose={() => setQrModalOpen(false)}>
         <Pressable style={styles.qrModalOverlay} onPress={() => setQrModalOpen(false)}>
           <Pressable style={styles.qrModalBox}>
-            <Text style={styles.qrModalTitle}>{form.fullName || "Kartvizit"}</Text>
-            <Text style={styles.qrModalSub}>Bu QR kodu okutarak kartvizit bilgilerine ulaşabilirsin.</Text>
+            <Text style={styles.qrModalTitle}>{form.fullName || t("Kartvizit")}</Text>
+            <Text style={styles.qrModalSub}>{t("Bu QR kodu okutarak kartvizit bilgilerine ulaşabilirsin.")}</Text>
             <View style={styles.qrModalCodeWrap}>
-              <QrCode value={businessCardVCard(form)} size={220} />
+              <QrCode value={businessCardVCard(form)} size={220} accessibilityLabel={t("Kartvizit QR kodu. Okutulunca kişi rehbere eklenir.")} />
             </View>
-            <TouchableOpacity style={styles.qrModalClose} onPress={() => setQrModalOpen(false)} activeOpacity={0.75}>
-              <Text style={styles.qrModalCloseText}>Kapat</Text>
+            <TouchableOpacity style={styles.qrModalClose} onPress={() => setQrModalOpen(false)} activeOpacity={0.75} accessibilityRole="button">
+              <Text style={styles.qrModalCloseText}>{t("Kapat")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -419,11 +421,11 @@ function businessCardSummary(form: BusinessCardForm) {
     form.title || "",
     form.company || "",
     "",
-    form.showPhone && form.phone ? `Telefon: ${form.phone}` : "",
-    form.showEmail && form.email ? `E-posta: ${form.email}` : "",
-    form.showWebsite && form.website ? `Web sitesi: ${form.website}` : "",
-    form.showLinkedin && form.linkedin ? `LinkedIn: ${form.linkedin}` : "",
-    form.showAddress && form.address ? `Adres: ${form.address}` : "",
+    form.showPhone && form.phone ? t("Telefon: {value}", { value: form.phone }) : "",
+    form.showEmail && form.email ? t("E-posta: {value}", { value: form.email }) : "",
+    form.showWebsite && form.website ? t("Web sitesi: {value}", { value: form.website }) : "",
+    form.showLinkedin && form.linkedin ? t("LinkedIn: {value}", { value: form.linkedin }) : "",
+    form.showAddress && form.address ? t("Adres: {value}", { value: form.address }) : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -456,11 +458,11 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
 
           <View style={styles.cardDivider} />
 
-          <CardLine label="E-posta" value={form.showEmail ? form.email : ""} />
-          <CardLine label="Telefon" value={form.showPhone ? form.phone : ""} />
-          <CardLine label="Web sitesi" value={form.showWebsite ? form.website : ""} />
-          <CardLine label="LinkedIn" value={form.showLinkedin ? form.linkedin : ""} />
-          <CardLine label="Adres" value={form.showAddress ? form.address : ""} />
+          <CardLine label={t("E-posta")} value={form.showEmail ? form.email : ""} />
+          <CardLine label={t("Telefon")} value={form.showPhone ? form.phone : ""} />
+          <CardLine label={t("Web sitesi")} value={form.showWebsite ? form.website : ""} />
+          <CardLine label={t("LinkedIn")} value={form.showLinkedin ? form.linkedin : ""} />
+          <CardLine label={t("Adres")} value={form.showAddress ? form.address : ""} />
         </View>
 
         <View style={styles.cardRight}>
@@ -469,10 +471,10 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
           </View>
 
           <View style={styles.qrBox}>
-            <QrCode value={businessCardVCard(form)} size={66} />
+            <QrCode value={businessCardVCard(form)} size={66} accessibilityLabel={t("Kartvizit QR kodu")} />
           </View>
 
-          <Text style={styles.qrText}>QR Kart</Text>
+          <Text style={styles.qrText}>{t("QR Kart")}</Text>
         </View>
       </View>
     </View>
@@ -506,6 +508,7 @@ function ActionButton({
       style={[styles.actionButton, variant === "light" && styles.actionButtonLight]}
       onPress={onPress}
       activeOpacity={0.78}
+      accessibilityRole="button"
     >
       <Text
         style={[
@@ -529,7 +532,7 @@ function Section({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{title}</Text>
         <View style={styles.sectionLine} />
       </View>
 
@@ -563,12 +566,13 @@ function Input({
         <Text style={styles.inputLabel}>{label}</Text>
         {required ? (
           <View style={styles.requiredBadge}>
-            <Text style={styles.requiredText}>Zorunlu</Text>
+            <Text style={styles.requiredText}>{t("Zorunlu")}</Text>
           </View>
         ) : null}
       </View>
 
       <TextInput
+        accessibilityLabel={required ? t("{label}, zorunlu", { label }) : label}
         style={[styles.input, multiline && styles.inputMultiline]}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
@@ -597,6 +601,7 @@ function VisibilityRow({
       <Switch
         value={value}
         onValueChange={onChange}
+        accessibilityLabel={label}
         trackColor={{ false: colors.border, true: colors.primary + "88" }}
         thumbColor={value ? colors.primary : colors.white}
       />

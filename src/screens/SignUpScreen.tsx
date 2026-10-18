@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import { updateSettings } from "../data/userSettings";
+import { t } from "../i18n";
 
 const TEAL = colors.primary;
 
@@ -36,21 +37,20 @@ export default function SignUpScreen({ navigation }: any) {
               resizeMode="contain"
             />
             <View style={styles.betaBadge}>
-              <Text style={styles.betaText}>BETA</Text>
+              <Text style={styles.betaText}>{t("BETA")}</Text>
             </View>
           </View>
 
           {/* Headings */}
-          <Text style={styles.title}>Hoş Geldin</Text>
-          <Text style={styles.subtitle}>
-            Senin için önemli olan kişilerle{"\n"}bağını hiç kaybetme.
-          </Text>
+          <Text style={styles.title}>{t("Hoş Geldin")}</Text>
+          <Text style={styles.subtitle}>{t("Senin için önemli olan kişilerle\nbağını hiç kaybetme.")}</Text>
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
 
           {/* Privacy promises */}
           <View style={styles.promiseGroup}>
-            <PromiseRow icon="lock-closed-outline" text={Platform.OS === "web" ? "Verilerin yalnızca bu cihazda saklanır" : "Verilerin cihazında şifreli saklanır"} />
-            <PromiseRow icon="cloud-offline-outline" text="Hesap yok, sunucu yok, reklam yok" />
-            <PromiseRow icon="trash-outline" text="İstediğin an tek dokunuşla hepsini sil" />
+            <PromiseRow icon="lock-closed-outline" text={Platform.OS === "web" ? t("Verilerin yalnızca bu cihazda saklanır") : t("Verilerin cihazında şifreli saklanır")} />
+            <PromiseRow icon="cloud-offline-outline" text={t("Hesap yok, sunucu yok, reklam yok")} />
+            <PromiseRow icon="trash-outline" text={t("İstediğin an tek dokunuşla hepsini sil")} />
           </View>
 
           {/* Primary CTA */}
@@ -70,31 +70,31 @@ export default function SignUpScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.guestBtn}
               >
-                <Text style={styles.guestBtnText}>Başlayalım</Text>
+                <Text style={styles.guestBtnText}>{t("Başlayalım")}</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.guestNote}>Hesap oluşturman gerekmez.</Text>
+            <Text style={styles.guestNote}>{t("Hesap oluşturman gerekmez.")}</Text>
           </View>
 
           {/* Footer */}
           <Text style={styles.footer}>
-            Devam ederek{" "}
+            {t("Devam ederek ")}
             <Text
               style={styles.link}
               onPress={() => navigation.navigate("Legal", { doc: "terms" })}
               accessibilityRole="link"
             >
-              Kullanım Şartları
+              {t("Kullanım Şartları")}
             </Text>
-            {"'"}nı ve{" "}
+            {t("'nı ve ")}
             <Text
               style={styles.link}
               onPress={() => navigation.navigate("Legal", { doc: "privacy" })}
               accessibilityRole="link"
             >
-              Gizlilik Politikası
+              {t("Gizlilik Politikası")}
             </Text>
-            {"'"}nı kabul etmiş olursun.{"\n"}Verilerin asla satılmaz.
+            {t("'nı kabul etmiş olursun.")}{"\n"}{t("Verilerin asla satılmaz.")}
           </Text>
         </ScrollView>
       </View>
@@ -114,6 +114,7 @@ function PromiseRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text
 }
 
 const styles = StyleSheet.create({
+  tagline: { marginTop: 10, fontSize: 14, fontWeight: "700", color: colors.primary, textAlign: "center", letterSpacing: 0.3 },
   promiseLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   outer: {
     flex: 1,

@@ -7,6 +7,7 @@ import { wipeSecureStorage } from "../storage/secureStorage";
 import { cancelAllRemindersAsync } from "../utils/notifications";
 import { isDuplicateContact } from "../utils/duplicateContact";
 import { todayISO } from "../utils/dates";
+import { t } from "../i18n";
 
 const FORMAT = "connectly-backup";
 const VERSION = 1;
@@ -44,14 +45,14 @@ export function parseBackup(text: string): BackupFile {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Dosya okunamadı. Geçerli bir Connectly yedeği seç.");
+    throw new Error(t("Dosya okunamadı. Geçerli bir Connectly yedeği seç."));
   }
   const obj = data as Partial<BackupFile>;
   if (!obj || obj.format !== FORMAT || !Array.isArray(obj.contacts)) {
-    throw new Error("Bu dosya bir Connectly yedeği değil.");
+    throw new Error(t("Bu dosya bir Connectly yedeği değil."));
   }
   if (typeof obj.version !== "number" || obj.version > VERSION) {
-    throw new Error("Bu yedek daha yeni bir uygulama sürümüyle oluşturulmuş.");
+    throw new Error(t("Bu yedek daha yeni bir uygulama sürümüyle oluşturulmuş."));
   }
   const str = (v: unknown, max = 2000) => (typeof v === "string" ? v.slice(0, max) : "");
   const contacts: ContactForm[] = obj.contacts
@@ -111,7 +112,7 @@ export async function exportBackupAsync(): Promise<number> {
       await Sharing.shareAsync(file.uri, {
         mimeType: "application/json",
         UTI: "public.json",
-        dialogTitle: "Yedeği kaydet veya paylaş",
+        dialogTitle: t("Yedeği kaydet veya paylaş"),
       });
     } else {
       await Share.share({ title: fileName, message: json });
@@ -133,7 +134,7 @@ export async function pickBackupAsync(): Promise<BackupFile | null> {
   });
   if (result.canceled || !result.assets?.[0]) return null;
   const asset = result.assets[0];
-  if (asset.size && asset.size > 20 * 1024 * 1024) throw new Error("Dosya çok büyük.");
+  if (asset.size && asset.size > 20 * 1024 * 1024) throw new Error(t("Dosya çok büyük."));
 
   let text: string;
   if (Platform.OS === "web") {

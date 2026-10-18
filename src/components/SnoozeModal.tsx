@@ -5,6 +5,7 @@ import { addDays, toISODate } from "../utils/dates";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import { t } from "../i18n";
 
 type PresetOption = { label: string; days: number };
 
@@ -56,9 +57,11 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
     <Modal visible={visible} transparent animationType="fade" onRequestClose={resetAndCancel}>
       <Pressable style={styles.overlay} onPress={resetAndCancel}>
         <Pressable style={styles.modalBox}>
-          <Text style={styles.title}>Ne kadar erteleyelim?</Text>
+          <Text style={styles.title}>{t("Ne kadar erteleyelim?")}</Text>
           <Text style={styles.desc}>
-            {contactName ? `${contactName} kişisini ` : ""}seçtiğin tarihte tekrar öncelikli olarak göstereceğiz.
+            {contactName
+              ? t("{name} için seçtiğin tarihte tekrar hatırlatacağım.", { name: contactName })
+              : t("Seçtiğin tarihte tekrar hatırlatacağım.")}
           </Text>
 
           <View style={styles.optionsGrid}>
@@ -73,7 +76,7 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{p.label}</Text>
+                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{t(p.label)}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -81,8 +84,10 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
               style={[styles.option, styles.optionWide, selected === "custom" && styles.optionActive]}
               onPress={() => setSelected("custom")}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: selected === "custom" }}
             >
-              <Text style={[styles.optionText, selected === "custom" && styles.optionTextActive]}>{CUSTOM}</Text>
+              <Text style={[styles.optionText, selected === "custom" && styles.optionTextActive]}>{t(CUSTOM)}</Text>
             </TouchableOpacity>
           </View>
 
@@ -93,14 +98,14 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
                 value={customDate}
                 onChange={setCustomDate}
                 minimumDate={addDays(new Date(), 1)}
-                placeholder="Tarih seç"
+                placeholder={t("Tarih seç")}
               />
             </View>
           )}
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={resetAndCancel} activeOpacity={0.75}>
-              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              <Text style={styles.cancelBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.confirmBtn, !canConfirm && styles.confirmBtnOff]}
@@ -108,7 +113,7 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
               activeOpacity={0.85}
               disabled={!canConfirm}
             >
-              <Text style={styles.confirmBtnText}>Ertele</Text>
+              <Text style={styles.confirmBtnText}>{t("Ertele")}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

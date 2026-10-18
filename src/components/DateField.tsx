@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, Pressable, T
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import { birthdayToDate, formatBirthday, formatLongTR, parseISODate, toISODate } from "../utils/dates";
+import { t } from "../i18n";
 
 type Props = {
   label?: string;
@@ -19,7 +20,7 @@ type Props = {
 
 /** A tappable date field backed by the native date picker (no typing formats). */
 export default function DateField({
-  label, format, value, onChange, placeholder = "Tarih seç", maximumDate, minimumDate, error, clearable = true,
+  label, format, value, onChange, placeholder, maximumDate, minimumDate, error, clearable = true,
 }: Props) {
   const [iosOpen, setIosOpen] = useState(false);
   const current = format === "iso" ? parseISODate(value) : birthdayToDate(value);
@@ -54,7 +55,7 @@ export default function DateField({
           style={[styles.field, styles.webInput, !!error && styles.fieldError]}
           value={value}
           onChangeText={onChange}
-          placeholder={format === "iso" ? "YYYY-AA-GG" : "GG/AA/YYYY"}
+          placeholder={format === "iso" ? t("YYYY-AA-GG") : t("GG/AA/YYYY")}
           placeholderTextColor={colors.textMuted}
           accessibilityLabel={label}
         />
@@ -73,17 +74,17 @@ export default function DateField({
         onPress={open}
         activeOpacity={0.75}
         accessibilityRole="button"
-        accessibilityLabel={`${label ?? "Tarih"}: ${display || "seçilmedi"}`}
-        accessibilityHint="Tarih seçiciyi açar"
+        accessibilityLabel={`${label ?? t("Tarih")}: ${display || t("seçilmedi")}`}
+        accessibilityHint={t("Tarih seçiciyi açar")}
       >
         <Ionicons name="calendar-outline" size={18} color={current ? colors.primary : colors.textMuted} />
-        <Text style={[styles.value, !current && styles.placeholder]}>{display || placeholder}</Text>
+        <Text style={[styles.value, !current && styles.placeholder]}>{display || placeholder || t("Tarih seç")}</Text>
         {clearable && current ? (
           <TouchableOpacity
             onPress={() => onChange("")}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
-            accessibilityLabel="Tarihi temizle"
+            accessibilityLabel={t("Tarihi temizle")}
           >
             <Ionicons name="close-circle" size={18} color={colors.textMuted} />
           </TouchableOpacity>
@@ -95,7 +96,7 @@ export default function DateField({
         <Modal visible={iosOpen} transparent animationType="fade" onRequestClose={() => setIosOpen(false)}>
           <Pressable style={styles.backdrop} onPress={() => setIosOpen(false)}>
             <Pressable style={styles.sheet} onPress={() => {}}>
-              <Text style={styles.sheetTitle}>{label ?? "Tarih seç"}</Text>
+              <Text style={styles.sheetTitle}>{label ?? t("Tarih seç")}</Text>
               <DateTimePicker
                 value={draft}
                 mode="date"
@@ -108,7 +109,7 @@ export default function DateField({
               />
               <View style={styles.sheetActions}>
                 <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIosOpen(false)}>
-                  <Text style={styles.secondaryText}>Vazgeç</Text>
+                  <Text style={styles.secondaryText}>{t("Vazgeç")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryBtn}
@@ -117,7 +118,7 @@ export default function DateField({
                     setIosOpen(false);
                   }}
                 >
-                  <Text style={styles.primaryText}>Tamam</Text>
+                  <Text style={styles.primaryText}>{t("Tamam")}</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>

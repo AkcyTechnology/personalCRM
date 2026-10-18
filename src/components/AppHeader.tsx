@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 const HEADER_HEIGHT = 64;
 
@@ -93,10 +94,10 @@ function BackButton({ onPress }: { onPress?: () => void }) {
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
-      accessibilityLabel="Geri"
+      accessibilityLabel={t("Geri")}
     >
       <Text style={styles.backIcon}>‹</Text>
-      <Text style={styles.backLabel}>Geri</Text>
+      <Text style={styles.backLabel}>{t("Geri")}</Text>
     </TouchableOpacity>
   );
 }
@@ -108,7 +109,7 @@ function IconButton({ label, onPress }: { label: string; color?: string; onPress
       onPress={onPress}
       activeOpacity={0.82}
       accessibilityRole="button"
-      accessibilityLabel={label === "+" || label === "＋" ? "Ekle" : label}
+      accessibilityLabel={label === "+" || label === "＋" ? t("Ekle") : label}
     >
       <Text style={{ fontSize: 22, color: colors.white, fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
         {label}
@@ -124,7 +125,7 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
-      accessibilityLabel={label === "+" || label === "＋" ? "Ekle" : label}
+      accessibilityLabel={label === "+" || label === "＋" ? t("Ekle") : label}
     >
       <Text style={[styles.textBtn, { color: color ?? colors.primary }]}>{label}</Text>
     </TouchableOpacity>

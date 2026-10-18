@@ -9,7 +9,8 @@ export type UserSettings = {
   phone?: string;
   city?: string;
   defaultContactIntervalDays?: number;
-  language: "tr" | "en" | "es" | "de";
+  /** "system" follows the phone language. */
+  language: "system" | "tr" | "en";
   onboardingComplete: boolean;
   goals: string[];
   notif_birthday: boolean;
@@ -19,13 +20,15 @@ export type UserSettings = {
   /** Require Face ID / fingerprint / device passcode to open the app. */
   appLockEnabled: boolean;
   acceptedTermsAt?: string;
+  /** Distinct people to connect with per week (weekly ring). */
+  weeklyGoal: number;
 };
 
 const DEFAULTS: UserSettings = {
   reachOutThresholdDays: 14,
   userName: "",
   email: "",
-  language: "tr",
+  language: "system",
   onboardingComplete: false,
   goals: [],
   notif_birthday: true,
@@ -33,6 +36,7 @@ const DEFAULTS: UserSettings = {
   notif_weeklySummary: false,
   notif_smartNudge: true,
   appLockEnabled: false,
+  weeklyGoal: 3,
 };
 
 type Listener = (settings: UserSettings) => void;
@@ -47,7 +51,10 @@ export async function loadSettings(): Promise<UserSettings> {
   try {
     const raw = await secureGetItem(KEY);
     if (!raw) return DEFAULTS;
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULTS, ...JSON.parse(raw) } as UserSettings;
+    // Eski sürümlerde dil seçimi işlevsizdi (es/de); sistem diline dön.
+    if (!["system", "tr", "en"].includes(parsed.language)) parsed.language = "system";
+    return parsed;
   } catch {
     return DEFAULTS;
   }

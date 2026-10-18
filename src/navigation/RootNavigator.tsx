@@ -17,6 +17,8 @@ import PrivacySecurityScreen from "../screens/PrivacySecurityScreen";
 import ManageSubscriptionScreen from "../screens/ManageSubscriptionScreen";
 import BusinessCardScreen from "../screens/BusinessCardScreen";
 import LegalScreen from "../screens/LegalScreen";
+import ShuffleScreen from "../screens/ShuffleScreen";
+import StoryScreen from "../screens/StoryScreen";
 import { loadSettings } from "../data/userSettings";
 import { colors } from "../theme/colors";
 
@@ -37,6 +39,8 @@ export type RootStackParamList = {
   ManageSubscription:      undefined;
   BusinessCard:            undefined;
   Legal:                   { doc: "privacy" | "terms" };
+  Shuffle:                 undefined;
+  Story:                   undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -78,6 +82,8 @@ export default function RootNavigator() {
       <Stack.Screen name="ManageSubscription"   component={ManageSubscriptionScreen} />
       <Stack.Screen name="BusinessCard"          component={BusinessCardScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Legal"                 component={LegalScreen} />
+      <Stack.Screen name="Shuffle"               component={ShuffleScreen} options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="Story"                 component={StoryScreen} options={{ presentation: "fullScreenModal", animation: "fade" }} />
     </Stack.Navigator>
   );
 }

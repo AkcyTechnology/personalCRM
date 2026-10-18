@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 const TEAL = colors.primary;
 
@@ -19,9 +20,9 @@ export default function WelcomeScreen({ navigation }: any) {
             <Text style={styles.icon}>👋</Text>
           </View>
 
-          <Text style={styles.title}>Merhaba, seni tanıyalım</Text>
+          <Text style={styles.title}>{t("Merhaba, seni tanıyalım")}</Text>
           <Text style={styles.desc}>
-            Kişisel CRM deneyimini sana göre ayarlamak için birkaç bilgiye ihtiyacımız var.
+            {t("Kişisel CRM deneyimini sana göre ayarlamak için birkaç bilgiye ihtiyacımız var.")}
           </Text>
 
           <View style={styles.btnShadow}>
@@ -36,7 +37,7 @@ export default function WelcomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.btn}
               >
-                <Text style={styles.btnText}>Devam et</Text>
+                <Text style={styles.btnText}>{t("Devam et")}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

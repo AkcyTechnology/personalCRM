@@ -1,83 +1,49 @@
 import { useState, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { copyWithAutoClear } from "../utils/clipboard";
-import { loadContacts, markContacted, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
-import LogInteractionModal from "../components/LogInteractionModal";
+import { loadContacts, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
-import messageSuggestions from "./messageSuggestions.json";
-import type { ContactForm, InteractionType } from "./AddContactScreen";
+import { dailyMessage } from "../data/messages";
+import type { ContactForm } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
-import {
-  isDue,
-  isSnoozed,
-  effectiveIntervalDays,
-  daysSinceIntervalStart,
-} from "../utils/reminderInterval";
+import { isDue, daysSinceIntervalStart } from "../utils/reminderInterval";
 import { averageHealthScore, healthScore, healthScoreColor, healthScoreLabel } from "../utils/healthScore";
 import { nextBirthday } from "../utils/dates";
+import {
+  onThisDay,
+  peopleThisWeek,
+  personOfTheDay,
+  reasonFor,
+  todaysSparks,
+  weeklyStreak,
+  type Spark,
+} from "../utils/engagement";
+import { logMoment } from "../app/momentActions";
 import SnoozeModal from "../components/SnoozeModal";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
+import LogInteractionModal from "../components/LogInteractionModal";
+import ProgressRing from "../components/ProgressRing";
 import Avatar from "../components/Avatar";
 import { showToast, showUndoToast } from "../components/Toast";
-import { hapticSuccess } from "../utils/haptics";
-
-type DashboardFilter = "all" | "reachOut" | "upcoming" | "recent";
-
-type DailySuggestion = {
-  id: number;
-  title: string;
-  message: string;
-  category?: string;
-  tone?: string;
-};
+import { reasonText } from "./ShuffleScreen";
+import { t } from "../i18n";
 
 type IconName = keyof typeof Ionicons.glyphMap;
-
-function daysSince(iso?: string): number {
-  if (!iso) return 9999;
-  const time = new Date(iso).getTime();
-  if (Number.isNaN(time)) return 9999;
-  return Math.max(0, Math.floor((Date.now() - time) / 86_400_000));
-}
-
-/** Compact "3g" / "Bugün" style label. */
-function shortDays(days: number) {
-  if (days <= 0) return "Bugün";
-  if (days >= 9999) return "—";
-  return `${days}g`;
-}
 
 function firstName(name: string) {
   return name.trim().split(/\s+/)[0] || name;
 }
 
-function getDayOfYear() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-}
-
-function getDailySuggestion(): DailySuggestion {
-  const list = messageSuggestions as DailySuggestion[];
-  if (!Array.isArray(list) || list.length === 0) {
-    return {
-      id: 0,
-      title: "Bugünün mesaj fikri",
-      message: "Uzun zamandır konuşmadığın birine kısa ve samimi bir selam gönder.",
-    };
-  }
-  return list[(getDayOfYear() - 1) % list.length];
+function shortDays(days: number) {
+  if (days <= 0) return t("Bugün");
+  if (days >= 9999) return "—";
+  return t("{days}g", { days });
 }
 
 export default function HomeScreen({ navigation }: any) {
@@ -85,70 +51,52 @@ export default function HomeScreen({ navigation }: any) {
   const [contacts, setContacts] = useState<ContactForm[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [threshold, setThreshold] = useState(14);
+  const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [userName, setUserName] = useState("");
   const [snoozeTarget, setSnoozeTarget] = useState<ContactForm | null>(null);
   const [composerTarget, setComposerTarget] = useState<ContactForm | null>(null);
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
 
+  const reload = useCallback(() => loadContacts().then(setContacts), []);
+
   useFocusEffect(
     useCallback(() => {
       Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
         setContacts(c);
         setThreshold(s.reachOutThresholdDays || 14);
+        setWeeklyGoal(s.weeklyGoal || 3);
         setUserName(s.userName || "");
         setLoaded(true);
       });
-      // Bildirimden "Görüştüm" gibi arka planda yapılan değişiklikler
       return subscribeContacts(setContacts);
     }, [])
   );
 
   const goToContact = (contact: ContactForm) => navigation.navigate("PersonDetail", { contact });
-  const goToPeople = (filter: DashboardFilter = "all") => navigation.navigate("People", { filter, threshold });
-  const goToReminders = (filter: DashboardFilter = "all") => navigation.navigate("Reminders", { filter, threshold });
 
-  const dailySuggestion = useMemo(() => getDailySuggestion(), []);
-
-  const dashboard = useMemo(() => {
-    const active = contacts.filter((c) => !isSnoozed(c) && c.reminderEnabled !== false);
-    const byOldest = [...active].sort((a, b) => daysSinceIntervalStart(b) - daysSinceIntervalStart(a));
-
-    const today = byOldest.filter((c) => isDue(c, threshold));
-
-    const upcoming = byOldest
-      .filter((c) => {
-        const d = daysSinceIntervalStart(c);
-        const interval = effectiveIntervalDays(c, threshold);
-        return d >= Math.floor(interval * 0.6) && d < interval;
-      })
-      .slice(0, 3);
-
+  const data = useMemo(() => {
     const now = new Date();
+    const due = contacts
+      .filter((c) => isDue(c, threshold))
+      .sort((a, b) => daysSinceIntervalStart(b) - daysSinceIntervalStart(a));
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const birthdays = contacts
       .map((c) => ({ contact: c, date: nextBirthday(c.birthday, now) }))
       .filter((b): b is { contact: ContactForm; date: Date } => !!b.date)
-      .map((b) => ({
-        ...b,
-        daysLeft: Math.round(
-          (b.date.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000
-        ),
-      }))
+      .map((b) => ({ ...b, daysLeft: Math.round((b.date.getTime() - startOfToday) / 86_400_000) }))
       .filter((b) => b.daysLeft <= 30)
       .sort((a, b) => a.daysLeft - b.daysLeft)
       .slice(0, 8);
-
-    const recent = [...contacts]
-      .filter((c) => daysSince(c.lastContactDate) < 9999)
-      .sort((a, b) => daysSince(a.lastContactDate) - daysSince(b.lastContactDate))
-      .slice(0, 3);
-
+    const pod = personOfTheDay(contacts, threshold, now);
     return {
-      today,
-      upcoming,
+      due,
       birthdays,
-      recent,
-      contactedThisWeek: contacts.filter((c) => daysSince(c.lastContactDate) <= 7).length,
+      pod,
+      sparks: todaysSparks(contacts, threshold, now),
+      memories: onThisDay(contacts, now),
+      streak: weeklyStreak(contacts, now),
+      thisWeek: peopleThisWeek(contacts, now),
       health: averageHealthScore(contacts, threshold),
     };
   }, [contacts, threshold]);
@@ -161,52 +109,36 @@ export default function HomeScreen({ navigation }: any) {
       try {
         const previous = target.snoozedUntil;
         await snoozeContact(target.id, date);
-        setContacts(await loadContacts());
-        showUndoToast(`${firstName(target.fullName)} ertelendi`, async () => {
+        await reload();
+        showUndoToast(t("{name} ertelendi", { name: firstName(target.fullName) }), async () => {
           await updateContact(target.id!, { snoozedUntil: previous });
-          setContacts(await loadContacts());
+          await reload();
         });
       } catch {
-        showToast("Ertelenemedi. Lütfen tekrar dene.");
+        showToast(t("Ertelenemedi. Lütfen tekrar dene."));
       }
     },
-    [snoozeTarget]
+    [snoozeTarget, reload]
   );
 
-  const handleLogInteraction = useCallback(
-    async (type: InteractionType, note: string, date: string) => {
-      const target = logTarget;
-      setLogTarget(null);
-      if (!target?.id) return;
-      const snapshot = {
-        interactions: target.interactions,
-        lastContactDate: target.lastContactDate,
-        reminderIntervalStart: target.reminderIntervalStart,
-        snoozedUntil: target.snoozedUntil,
-      };
-      try {
-        await markContacted(target.id, type, note, date);
-        hapticSuccess();
-        setContacts(await loadContacts());
-        showUndoToast(`${firstName(target.fullName)} ile görüşme kaydedildi`, async () => {
-          await updateContact(target.id!, snapshot);
-          setContacts(await loadContacts());
-        });
-      } catch {
-        showToast("Kaydedilemedi. Lütfen tekrar dene.");
-      }
-    },
-    [logTarget]
-  );
-
-  const dueCount = dashboard.today.length;
+  const dueCount = data.due.length;
   const subtitle = !loaded
     ? " "
     : contacts.length === 0
-      ? "Hadi ilk kişini ekleyelim"
-      : dueCount > 0
-        ? `Bugün ${dueCount} kişi seni bekliyor`
-        : "Bugün her şey yolunda ✓";
+      ? t("Hadi ilk kişini ekleyelim")
+      : dueCount === 1
+        ? t("Görüşmek isteyebileceğin biri var")
+        : dueCount > 1
+          ? t("Görüşmek isteyebileceğin birkaç kişi var")
+          : t("Bugün her şey yolunda ✓");
+
+  const sparksDone = data.sparks.filter((s) => s.done).length;
+
+  const onSpark = (s: Spark) => {
+    if (s.kind === "meetUp") navigation.navigate("Shuffle");
+    else if (s.kind === "birthday" || s.kind === "reconnect") setComposerTarget(s.contact);
+    else goToContact(s.contact);
+  };
 
   return (
     <View style={styles.screen}>
@@ -214,23 +146,18 @@ export default function HomeScreen({ navigation }: any) {
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.greeting} numberOfLines={1} accessibilityRole="header">
-            {userName ? `Merhaba, ${firstName(userName)}` : "Merhaba 👋"}
+            {userName ? t("Merhaba, {name}", { name: firstName(userName) }) : t("Merhaba 👋")}
           </Text>
-          <Text style={[styles.greetingSub, dueCount > 0 && styles.greetingSubAccent]} numberOfLines={1}>
+          <Text style={[styles.greetingSub, dueCount > 0 && styles.greetingSubAccent]} numberOfLines={2}>
             {subtitle}
           </Text>
         </View>
-
-        <IconButton
-          icon="id-card-outline"
-          label="Dijital kartvizit"
-          onPress={() => navigation.navigate("BusinessCard")}
-        />
+        <IconButton icon="id-card-outline" label={t("Dijital kartvizit")} onPress={() => navigation.navigate("BusinessCard")} />
         <IconButton
           icon="notifications-outline"
-          label={dueCount > 0 ? `Hatırlatıcılar, ${dueCount} bekleyen` : "Hatırlatıcılar"}
+          label={dueCount > 0 ? t("Hatırlatıcılar, {count} kişi", { count: dueCount }) : t("Hatırlatıcılar")}
           badge={dueCount}
-          onPress={() => goToReminders("all")}
+          onPress={() => navigation.navigate("Reminders", { filter: "all", threshold })}
         />
       </View>
 
@@ -238,134 +165,217 @@ export default function HomeScreen({ navigation }: any) {
         <HomeSkeleton />
       ) : contacts.length === 0 ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.emptyCard}>
+          <LinearGradient colors={[colors.primarySoft, colors.accentSoft]} style={styles.emptyCard}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="people" size={30} color={colors.primary} />
+              <Ionicons name="heart" size={30} color={colors.secondary} />
             </View>
-            <Text style={styles.emptyTitle}>İlk kişini ekle</Text>
-            <Text style={styles.emptyDesc}>Kimi unutmak istemiyorsun?</Text>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => navigation.navigate("AddContact")}
-              accessibilityRole="button"
-            >
+            <Text style={styles.emptyTitle}>{t("İlk kişini ekle")}</Text>
+            <Text style={styles.emptyDesc}>{t("Kimi unutmak istemiyorsun?")}</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate("AddContact")} accessibilityRole="button">
               <Ionicons name="add" size={20} color={colors.white} />
-              <Text style={styles.primaryButtonText}>Kişi ekle</Text>
+              <Text style={styles.primaryButtonText}>{t("Kişi ekle")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => navigation.navigate("ImportContacts")}
-              accessibilityRole="button"
-            >
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate("ImportContacts")} accessibilityRole="button">
               <Ionicons name="download-outline" size={18} color={colors.primary} />
-              <Text style={styles.secondaryButtonText}>Rehberden aktar</Text>
+              <Text style={styles.secondaryButtonText}>{t("Rehberden aktar")}</Text>
             </TouchableOpacity>
-          </View>
-          <DailyMessageCard suggestion={dailySuggestion} />
+          </LinearGradient>
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* ── Health ── */}
-          <View style={styles.healthCard}>
-            <View style={styles.healthTop}>
-              <View>
-                <View style={styles.rowCenter}>
-                  <Text style={styles.kicker}>İlişki sağlığı</Text>
-                  <TouchableOpacity
-                    onPress={() => setHealthInfoOpen(true)}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="İlişki sağlığı nasıl hesaplanır?"
-                  >
-                    <Ionicons name="information-circle-outline" size={18} color={colors.textSub} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.rowBaseline}>
-                  <Text style={[styles.healthNumber, { color: healthScoreColor(dashboard.health) }]}>
-                    {dashboard.health}
+          {/* ── This week: goal ring · streak · connection ── */}
+          <View style={styles.weekCard}>
+            <ProgressRing
+              size={104}
+              stroke={11}
+              progress={data.thisWeek / weeklyGoal}
+              color={colors.primary}
+              accessibilityLabel={t("Bu hafta {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
+            >
+              <Text style={styles.ringValue}>{data.thisWeek}/{weeklyGoal}</Text>
+              <Text style={styles.ringLabel}>{t("bu hafta")}</Text>
+            </ProgressRing>
+
+            <View style={styles.weekRight}>
+              <View style={styles.streakRow} accessible accessibilityLabel={t("{count} haftalık seri", { count: data.streak.current })}>
+                <Text style={styles.flame}>{data.streak.current > 0 ? "🔥" : "🌱"}</Text>
+                <View style={styles.streakTextCol}>
+                  <Text style={styles.streakValue}>
+                    {data.streak.current > 0 ? t("{count} hafta", { count: data.streak.current }) : t("Seriyi başlat")}
                   </Text>
-                  <Text style={styles.healthTotal}>/100</Text>
-                  <View style={[styles.healthPill, { backgroundColor: healthScoreColor(dashboard.health) + "1A" }]}>
-                    <Text style={[styles.healthPillText, { color: healthScoreColor(dashboard.health) }]}>
-                      {healthScoreLabel(dashboard.health)}
-                    </Text>
-                  </View>
+                  <Text style={styles.streakSub}>
+                    {data.streak.thisWeekDone ? t("Bu haftayı kurtardın") : data.streak.current > 0 ? t("Seriyi sürdürmek için bir an kaydet") : t("Haftada bir an yeter")}
+                  </Text>
                 </View>
               </View>
-            </View>
-            <View style={styles.bar} accessibilityLabel={`İlişki sağlığı ${dashboard.health} / 100`}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${dashboard.health}%`, backgroundColor: healthScoreColor(dashboard.health) },
-                ]}
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <Stat icon="people-outline" value={contacts.length} label="Kişi" onPress={() => goToPeople("all")} />
-              <Stat icon="chatbubbles-outline" value={dashboard.contactedThisWeek} label="Bu hafta" onPress={() => goToPeople("recent")} />
-              <Stat
-                icon="alarm-outline"
-                value={dueCount}
-                label="Bekleyen"
-                danger={dueCount > 0}
-                onPress={() => goToPeople("reachOut")}
-              />
+              <View style={styles.weekMetaRow}>
+                {data.streak.freezes > 0 ? (
+                  <View style={styles.metaPill} accessible accessibilityLabel={t("{count} dondurma hakkı", { count: data.streak.freezes })}>
+                    <Text style={styles.metaPillText}>{"❄️".repeat(data.streak.freezes)}</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.metaPill, { backgroundColor: healthScoreColor(data.health) + "1A" }]}
+                  onPress={() => setHealthInfoOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Bağlantı durumu: {label}. Nasıl hesaplanır?", { label: t(healthScoreLabel(data.health)) })}
+                >
+                  <View style={[styles.healthDot, { backgroundColor: healthScoreColor(data.health) }]} />
+                  <Text style={[styles.metaPillText, { color: healthScoreColor(data.health) }]}>{t(healthScoreLabel(data.health))}</Text>
+                  <Ionicons name="information-circle-outline" size={15} color={healthScoreColor(data.health)} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* ── Today ── */}
-          <SectionHeader title="Bugün" count={dueCount} onPress={dueCount > 0 ? () => goToPeople("reachOut") : undefined} />
+          {/* ── Person of the day ── */}
+          {data.pod ? (
+            <LinearGradient colors={[colors.primarySoft, colors.accentSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.podCard}>
+              <Text style={styles.podKicker}>{t("Günün kişisi")}</Text>
+              <TouchableOpacity
+                style={styles.podTop}
+                onPress={() => goToContact(data.pod!)}
+                accessibilityRole="button"
+                accessibilityLabel={`${data.pod.fullName}. ${reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}`}
+              >
+                <Avatar name={data.pod.fullName} size={68} ringColor={healthScoreColor(healthScore(data.pod, threshold))} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.podName} numberOfLines={1}>{data.pod.fullName}</Text>
+                  <Text style={styles.podReason} numberOfLines={2}>{reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={styles.podActions}>
+                <TouchableOpacity style={styles.podPrimary} onPress={() => setComposerTarget(data.pod)} accessibilityRole="button">
+                  <Ionicons name="chatbubble-ellipses" size={18} color={colors.white} />
+                  <Text style={styles.podPrimaryText}>{t("Merhaba de")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.podIcon}
+                  onPress={() => setLogTarget(data.pod)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("{name} ile görüştüm", { name: data.pod.fullName })}
+                >
+                  <Ionicons name="checkmark" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.podIcon}
+                  onPress={() => navigation.navigate("Shuffle")}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Başka birini göster")}
+                >
+                  <Ionicons name="shuffle" size={22} color={colors.accent} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          ) : null}
+
+          {/* ── Today's sparks ── */}
+          {data.sparks.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <View style={styles.rowCenter}>
+                  <Text style={styles.sectionTitle} accessibilityRole="header">{t("Bugünün kıvılcımları")}</Text>
+                </View>
+                <ProgressRing
+                  size={36}
+                  stroke={5}
+                  progress={sparksDone / data.sparks.length}
+                  color={colors.accent}
+                  accessibilityLabel={t("{done} / {total} tamamlandı", { done: sparksDone, total: data.sparks.length })}
+                >
+                  <Text style={styles.miniRingText}>{sparksDone}</Text>
+                </ProgressRing>
+              </View>
+              <View style={styles.list}>
+                {data.sparks.map((s) => (
+                  <SparkRow key={s.id} spark={s} onPress={() => onSpark(s)} />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {/* ── People to reconnect with ── */}
           {dueCount > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carousel}
-              style={styles.carouselWrap}
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle} accessibilityRole="header">{t("Yeniden bağlan")}</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("People", { filter: "reachOut", threshold })}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Yeniden bağlan: tümünü gör")}
+                >
+                  <Text style={styles.seeAll}>{t("Tümü")}</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel} style={styles.carouselWrap}>
+                {data.due.slice(0, 10).map((c) => (
+                  <TodayCard
+                    key={c.id}
+                    contact={c}
+                    days={daysSinceIntervalStart(c)}
+                    ring={healthScoreColor(healthScore(c, threshold))}
+                    onOpen={() => goToContact(c)}
+                    onDone={() => setLogTarget(c)}
+                    onMessage={() => setComposerTarget(c)}
+                    onSnooze={() => setSnoozeTarget(c)}
+                  />
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {/* ── On this day ── */}
+          {data.memories.map((m, i) => (
+            <TouchableOpacity
+              key={`${m.contact.id}-${i}`}
+              style={styles.memoryCard}
+              onPress={() => goToContact(m.contact)}
+              accessibilityRole="button"
             >
-              {dashboard.today.map((c) => (
-                <TodayCard
-                  key={c.id}
-                  contact={c}
-                  days={daysSinceIntervalStart(c)}
-                  ring={healthScoreColor(healthScore(c, threshold))}
-                  onOpen={() => goToContact(c)}
-                  onDone={() => setLogTarget(c)}
-                  onMessage={() => setComposerTarget(c)}
-                  onSnooze={() => setSnoozeTarget(c)}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.allGood}>
-              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-              <Text style={styles.allGoodText}>Bekleyen kimse yok</Text>
-            </View>
-          )}
+              <Text style={styles.memoryEmoji}>{m.kind === "added" ? "🤝" : "📸"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memoryKicker}>{t("Bugün {count} yıl önce", { count: m.yearsAgo })}</Text>
+                <Text style={styles.memoryText} numberOfLines={2}>
+                  {m.kind === "added"
+                    ? t("{name} hayatına girdi", { name: m.contact.fullName })
+                    : m.interaction?.note
+                      ? `${m.contact.fullName}: “${m.interaction.note}”`
+                      : t("{name} ile görüşmüştün", { name: m.contact.fullName })}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))}
 
           {/* ── Birthdays ── */}
-          {dashboard.birthdays.length > 0 ? (
+          {data.birthdays.length > 0 ? (
             <>
-              <SectionHeader title="Doğum günleri" icon="gift-outline" />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.carousel}
-                style={styles.carouselWrap}
-              >
-                {dashboard.birthdays.map(({ contact, daysLeft }) => (
+              <View style={styles.sectionHeader}>
+                <View style={styles.rowCenter}>
+                  <Ionicons name="gift-outline" size={18} color={colors.text} />
+                  <Text style={styles.sectionTitle} accessibilityRole="header">{t("Doğum günleri")}</Text>
+                </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel} style={styles.carouselWrap}>
+                {data.birthdays.map(({ contact, daysLeft }) => (
                   <TouchableOpacity
                     key={contact.id}
                     style={styles.bdayChip}
-                    onPress={() => goToContact(contact)}
+                    onPress={() => setComposerTarget(contact)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${contact.fullName}, doğum günü ${daysLeft === 0 ? "bugün" : `${daysLeft} gün sonra`}`}
+                    accessibilityLabel={
+                      daysLeft === 0
+                        ? t("{name}, doğum günü bugün", { name: contact.fullName })
+                        : t("{name}, doğum günü {days} gün sonra", { name: contact.fullName, days: daysLeft })
+                    }
                   >
                     <Avatar name={contact.fullName} size={36} />
                     <View>
                       <Text style={styles.bdayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
                       <Text style={[styles.bdayDays, daysLeft <= 1 && { color: colors.secondary }]}>
-                        {daysLeft === 0 ? "Bugün 🎉" : daysLeft === 1 ? "Yarın" : `${daysLeft}g`}
+                        {daysLeft === 0 ? t("Bugün 🎉") : daysLeft === 1 ? t("Yarın") : t("{days}g", { days: daysLeft })}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -374,65 +384,16 @@ export default function HomeScreen({ navigation }: any) {
             </>
           ) : null}
 
-          {/* ── Upcoming ── */}
-          {dashboard.upcoming.length > 0 ? (
-            <>
-              <SectionHeader title="Yaklaşanlar" onPress={() => goToReminders("upcoming")} />
-              <View style={styles.list}>
-                {dashboard.upcoming.map((c) => {
-                  const left = Math.max(0, effectiveIntervalDays(c, threshold) - daysSinceIntervalStart(c));
-                  return (
-                    <ContactRow
-                      key={c.id}
-                      contact={c}
-                      chip={`${left}g`}
-                      chipIcon="hourglass-outline"
-                      chipColor={colors.warning}
-                      a11y={`${c.fullName}, ${left} gün kaldı`}
-                      onPress={() => goToContact(c)}
-                    />
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-
-          {/* ── Recent ── */}
-          {dashboard.recent.length > 0 ? (
-            <>
-              <SectionHeader title="Son görüşülenler" onPress={() => goToPeople("recent")} />
-              <View style={styles.list}>
-                {dashboard.recent.map((c) => {
-                  const d = daysSince(c.lastContactDate);
-                  return (
-                    <ContactRow
-                      key={c.id}
-                      contact={c}
-                      chip={shortDays(d)}
-                      chipIcon="checkmark-done-outline"
-                      chipColor={colors.success}
-                      a11y={`${c.fullName}, son görüşme ${d === 0 ? "bugün" : `${d} gün önce`}`}
-                      onPress={() => goToContact(c)}
-                    />
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-
           {contacts.length < 3 ? (
-            <TouchableOpacity
-              style={styles.importRow}
-              onPress={() => navigation.navigate("ImportContacts")}
-              accessibilityRole="button"
-            >
+            <TouchableOpacity style={styles.importRow} onPress={() => navigation.navigate("ImportContacts")} accessibilityRole="button">
               <Ionicons name="download-outline" size={20} color={colors.primary} />
-              <Text style={styles.importText}>Rehberden kişi aktar</Text>
+              <Text style={styles.importText}>{t("Rehberden kişi aktar")}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
 
-          <DailyMessageCard suggestion={dailySuggestion} />
+          <DailyMessageCard />
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
         </ScrollView>
       )}
 
@@ -442,38 +403,27 @@ export default function HomeScreen({ navigation }: any) {
         onCancel={() => setSnoozeTarget(null)}
         onConfirm={handleSnoozeConfirm}
       />
-
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
-
       <LogInteractionModal
         visible={!!logTarget}
         contactName={logTarget?.fullName ?? ""}
         onClose={() => setLogTarget(null)}
-        onSave={handleLogInteraction}
+        onSave={(type, note, date) => {
+          const target = logTarget;
+          setLogTarget(null);
+          if (target) logMoment(target, type, note, date, () => reload());
+        }}
       />
-
-      <MessageComposer
-        visible={!!composerTarget}
-        contact={composerTarget}
-        onClose={() => setComposerTarget(null)}
-      />
+      <MessageComposer visible={!!composerTarget} contact={composerTarget} onClose={() => setComposerTarget(null)} />
     </View>
   );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function IconButton({
-  icon, label, badge, onPress,
-}: { icon: IconName; label: string; badge?: number; onPress: () => void }) {
+function IconButton({ icon, label, badge, onPress }: { icon: IconName; label: string; badge?: number; onPress: () => void }) {
   return (
-    <TouchableOpacity
-      style={styles.iconBtn}
-      onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
+    <TouchableOpacity style={styles.iconBtn} onPress={onPress} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={label}>
       <Ionicons name={icon} size={22} color={colors.text} />
       {badge ? (
         <View style={styles.badge}>
@@ -484,49 +434,52 @@ function IconButton({
   );
 }
 
-function Stat({
-  icon, value, label, danger, onPress,
-}: { icon: IconName; value: number; label: string; danger?: boolean; onPress: () => void }) {
+function sparkContent(s: Spark): { icon: IconName; color: string; text: string } {
+  switch (s.kind) {
+    case "reconnect":
+      return {
+        icon: "paper-plane-outline",
+        color: colors.primary,
+        text: s.days > 0
+          ? t("{days} gündür konuşmadığın {name}'e yaz", { days: s.days, name: firstName(s.contact.fullName) })
+          : t("{name}'e bir merhaba gönder", { name: firstName(s.contact.fullName) }),
+      };
+    case "birthday":
+      return {
+        icon: "gift-outline",
+        color: colors.secondary,
+        text: s.days === 0
+          ? t("{name}'in doğum gününü kutla 🎂", { name: firstName(s.contact.fullName) })
+          : t("{name}'in doğum günü {days} gün sonra — bir sürpriz düşün", { name: firstName(s.contact.fullName), days: s.days }),
+      };
+    case "followUp":
+      return {
+        icon: "chatbubbles-outline",
+        color: colors.accent,
+        text: t("{name}'e şunu sor: “{note}”", { name: firstName(s.contact.fullName), note: s.note.length > 40 ? `${s.note.slice(0, 40)}…` : s.note }),
+      };
+    default:
+      return { icon: "cafe-outline", color: colors.warning, text: t("Bir arkadaşınla kahve planla") };
+  }
+}
+
+function SparkRow({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  const c = sparkContent(spark);
   return (
     <TouchableOpacity
-      style={styles.stat}
+      style={styles.sparkRow}
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={c.text}
+      accessibilityState={{ checked: spark.done }}
     >
-      <Ionicons name={icon} size={16} color={danger ? colors.danger : colors.textSub} />
-      <Text style={[styles.statValue, danger && { color: colors.danger }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function SectionHeader({
-  title, count, icon, onPress,
-}: { title: string; count?: number; icon?: IconName; onPress?: () => void }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.rowCenter}>
-        {icon ? <Ionicons name={icon} size={18} color={colors.text} /> : null}
-        <Text style={styles.sectionTitle} accessibilityRole="header">{title}</Text>
-        {count ? (
-          <View style={styles.countPill}>
-            <Text style={styles.countPillText}>{count}</Text>
-          </View>
-        ) : null}
+      <View style={[styles.sparkCheck, spark.done && { backgroundColor: colors.success, borderColor: colors.success }]}>
+        {spark.done ? <Ionicons name="checkmark" size={16} color={colors.white} /> : <Ionicons name={c.icon} size={16} color={c.color} />}
       </View>
-      {onPress ? (
-        <TouchableOpacity
-          onPress={onPress}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}: tümünü gör`}
-        >
-          <Text style={styles.seeAll}>Tümü</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
+      <Text style={[styles.sparkText, spark.done && styles.sparkTextDone]} numberOfLines={2}>{c.text}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
@@ -548,12 +501,12 @@ function TodayCard({
         onPress={onOpen}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel={`${contact.fullName}, ${days >= 9999 ? "henüz görüşme yok" : `${days} gündür görüşülmedi`}`}
+        accessibilityLabel={days >= 9999 ? contact.fullName : t("{name}, {days} gündür görüşülmedi", { name: contact.fullName, days })}
       >
         <Avatar name={contact.fullName} size={56} ringColor={ring} />
         <Text style={styles.todayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
         <View style={styles.rowCenter}>
-          <Ionicons name="time-outline" size={13} color={colors.danger} />
+          <Ionicons name="time-outline" size={13} color={colors.textSub} />
           <Text style={styles.todayDays}>{shortDays(days)}</Text>
         </View>
       </TouchableOpacity>
@@ -562,17 +515,17 @@ function TodayCard({
         onPress={onDone}
         activeOpacity={0.85}
         accessibilityRole="button"
-        accessibilityLabel={`${contact.fullName} ile görüştüm`}
+        accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
       >
         <Ionicons name="checkmark" size={16} color={colors.white} />
-        <Text style={styles.doneText}>Görüştüm</Text>
+        <Text style={styles.doneText}>{t("Görüştüm")}</Text>
       </TouchableOpacity>
       <View style={styles.todayActions}>
         <TouchableOpacity
           style={styles.smallIconBtn}
           onPress={onMessage}
           accessibilityRole="button"
-          accessibilityLabel={`${contact.fullName} için mesaj hazırla`}
+          accessibilityLabel={t("{name} için mesaj hazırla", { name: contact.fullName })}
         >
           <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
@@ -580,7 +533,7 @@ function TodayCard({
           style={styles.smallIconBtn}
           onPress={onSnooze}
           accessibilityRole="button"
-          accessibilityLabel={`${contact.fullName} hatırlatmasını ertele`}
+          accessibilityLabel={t("{name} hatırlatmasını ertele", { name: contact.fullName })}
         >
           <Ionicons name="alarm-outline" size={18} color={colors.textSub} />
         </TouchableOpacity>
@@ -589,51 +542,23 @@ function TodayCard({
   );
 }
 
-function ContactRow({
-  contact, chip, chipIcon, chipColor, a11y, onPress,
-}: {
-  contact: ContactForm;
-  chip: string;
-  chipIcon: IconName;
-  chipColor: string;
-  a11y: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.contactRow}
-      onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-    >
-      <Avatar name={contact.fullName} size={40} />
-      <Text style={styles.contactName} numberOfLines={1}>{contact.fullName}</Text>
-      <View style={[styles.chip, { backgroundColor: chipColor + "1A" }]}>
-        <Ionicons name={chipIcon} size={13} color={chipColor} />
-        <Text style={[styles.chipText, { color: chipColor }]}>{chip}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function DailyMessageCard({ suggestion }: { suggestion: DailySuggestion }) {
+function DailyMessageCard() {
+  const message = useMemo(() => dailyMessage(), []);
   const copyMessage = async () => {
-    await copyWithAutoClear(suggestion.message);
-    showToast("Kopyalandı · 90 sn sonra panodan silinir");
+    await copyWithAutoClear(message);
+    showToast(t("Kopyalandı · 90 sn sonra panodan silinir"));
   };
-
   return (
     <TouchableOpacity
       style={styles.dailyCard}
       activeOpacity={0.86}
       onPress={copyMessage}
       accessibilityRole="button"
-      accessibilityLabel={`Günün mesajı: ${suggestion.message}`}
-      accessibilityHint="Mesajı kopyalar"
+      accessibilityLabel={t("Günün mesajı: {message}", { message })}
+      accessibilityHint={t("Mesajı kopyalar")}
     >
       <Ionicons name="sparkles-outline" size={20} color={colors.accent} />
-      <Text style={styles.dailyMessage} numberOfLines={2}>“{suggestion.message}”</Text>
+      <Text style={styles.dailyMessage} numberOfLines={2}>“{message}”</Text>
       <Ionicons name="copy-outline" size={18} color={colors.textSub} />
     </TouchableOpacity>
   );
@@ -641,13 +566,10 @@ function DailyMessageCard({ suggestion }: { suggestion: DailySuggestion }) {
 
 function HomeSkeleton() {
   return (
-    <View style={styles.content} accessibilityLabel="Yükleniyor" accessibilityRole="progressbar">
-      <View style={[styles.skeleton, { height: 150 }]} />
-      <View style={[styles.skeleton, { height: 22, width: 120, marginTop: 24 }]} />
-      <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
-        <View style={[styles.skeleton, { height: 170, width: 140 }]} />
-        <View style={[styles.skeleton, { height: 170, width: 140 }]} />
-      </View>
+    <View style={styles.content} accessibilityLabel={t("Yükleniyor")} accessibilityRole="progressbar">
+      <View style={[styles.skeleton, { height: 140 }]} />
+      <View style={[styles.skeleton, { height: 170, marginTop: 16 }]} />
+      <View style={[styles.skeleton, { height: 140, marginTop: 16 }]} />
     </View>
   );
 }
@@ -657,7 +579,6 @@ function HomeSkeleton() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   rowCenter: { flexDirection: "row", alignItems: "center", gap: 6 },
-  rowBaseline: { flexDirection: "row", alignItems: "baseline", gap: 4, marginTop: 4 },
 
   topBar: {
     flexDirection: "row",
@@ -690,7 +611,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     paddingHorizontal: 4,
-    backgroundColor: colors.danger,
+    backgroundColor: colors.secondary,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -700,54 +621,90 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 140 },
 
-  healthCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 18,
-  },
-  healthTop: { flexDirection: "row", justifyContent: "space-between" },
-  kicker: { fontSize: 14, fontWeight: "700", color: colors.textSub },
-  healthNumber: { fontSize: 40, fontWeight: "800", letterSpacing: -1 },
-  healthTotal: { fontSize: 16, color: colors.textSub, fontWeight: "600" },
-  healthPill: { marginLeft: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
-  healthPillText: { fontSize: 13, fontWeight: "800" },
-  bar: { height: 8, borderRadius: 4, backgroundColor: colors.border, marginTop: 12, overflow: "hidden" },
-  barFill: { height: 8, borderRadius: 4 },
-  statsRow: { flexDirection: "row", gap: 10, marginTop: 16 },
-  stat: {
-    flex: 1,
-    minHeight: 64,
-    backgroundColor: colors.bg,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 10,
-    gap: 2,
-  },
-  statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
-  statLabel: { fontSize: 13, color: colors.textSub, fontWeight: "600" },
-
-  sectionHeader: {
-    marginTop: 24,
-    marginBottom: 10,
+  weekCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 18,
+    padding: 18,
+    borderRadius: radius.card,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
-  countPill: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    paddingHorizontal: 7,
-    backgroundColor: colors.dangerSoft,
+  ringValue: { fontSize: 24, fontWeight: "900", color: colors.text },
+  ringLabel: { fontSize: 12, fontWeight: "700", color: colors.textSub },
+  weekRight: { flex: 1, gap: 12 },
+  streakRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  flame: { fontSize: 30 },
+  streakTextCol: { flex: 1, minWidth: 0 },
+  streakValue: { fontSize: 20, fontWeight: "900", color: colors.text },
+  streakSub: { fontSize: 13, color: colors.textSub, fontWeight: "600", marginTop: 1 },
+  weekMetaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    minHeight: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  metaPillText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  healthDot: { width: 8, height: 8, borderRadius: 4 },
+
+  podCard: { marginTop: 16, borderRadius: radius.card, padding: 18 },
+  podKicker: { fontSize: 13, fontWeight: "800", color: colors.accent, textTransform: "uppercase", letterSpacing: 0.8 },
+  podTop: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 },
+  podName: { fontSize: 22, fontWeight: "900", color: colors.text },
+  podReason: { fontSize: 15, color: colors.text, marginTop: 4, lineHeight: 20 },
+  podActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  podPrimary: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  podPrimaryText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  podIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
   },
-  countPillText: { fontSize: 13, fontWeight: "800", color: colors.danger },
+
+  sectionHeader: { marginTop: 24, marginBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
   seeAll: { fontSize: 15, fontWeight: "700", color: colors.primary },
+  miniRingText: { fontSize: 13, fontWeight: "900", color: colors.accent },
+
+  list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" },
+  sparkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    minHeight: 62,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  sparkCheck: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sparkText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text, lineHeight: 20 },
+  sparkTextDone: { color: colors.textSub, textDecorationLine: "line-through" },
 
   carouselWrap: { marginHorizontal: -20 },
   carousel: { paddingHorizontal: 20, gap: 12 },
@@ -762,7 +719,7 @@ const styles = StyleSheet.create({
   },
   todayTop: { alignItems: "center", gap: 6, width: "100%" },
   todayName: { fontSize: 16, fontWeight: "800", color: colors.text, maxWidth: "100%" },
-  todayDays: { fontSize: 13, fontWeight: "700", color: colors.danger },
+  todayDays: { fontSize: 13, fontWeight: "700", color: colors.textSub },
   doneBtn: {
     marginTop: 10,
     alignSelf: "stretch",
@@ -787,15 +744,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  allGood: {
+  memoryCard: {
+    marginTop: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 16,
+    gap: 12,
+    padding: 14,
     borderRadius: radius.card,
-    backgroundColor: colors.successSoft,
+    backgroundColor: colors.warningSoft,
   },
-  allGoodText: { fontSize: 15, fontWeight: "700", color: colors.success },
+  memoryEmoji: { fontSize: 28 },
+  memoryKicker: { fontSize: 13, fontWeight: "800", color: colors.warning },
+  memoryText: { fontSize: 15, fontWeight: "600", color: colors.text, marginTop: 2 },
 
   bdayChip: {
     flexDirection: "row",
@@ -810,33 +770,6 @@ const styles = StyleSheet.create({
   },
   bdayName: { fontSize: 15, fontWeight: "700", color: colors.text, maxWidth: 110 },
   bdayDays: { fontSize: 13, fontWeight: "600", color: colors.textSub },
-
-  list: {
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    overflow: "hidden",
-  },
-  contactRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    minHeight: 60,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  contactName: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.text },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  chipText: { fontSize: 13, fontWeight: "800" },
 
   importRow: {
     marginTop: 20,
@@ -863,24 +796,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
   },
   dailyMessage: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.text },
+  tagline: { marginTop: 24, textAlign: "center", fontSize: 13, fontWeight: "700", color: colors.textSub, letterSpacing: 0.3 },
 
-  emptyCard: {
-    alignItems: "center",
-    padding: 24,
-    borderRadius: radius.card,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 8,
-  },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  emptyCard: { alignItems: "center", padding: 24, borderRadius: radius.card, gap: 8 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text, marginTop: 4 },
   emptyDesc: { fontSize: 15, color: colors.textSub },
   primaryButton: {
@@ -895,14 +814,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   primaryButtonText: { color: colors.white, fontSize: 16, fontWeight: "800" },
-  secondaryButton: {
-    alignSelf: "stretch",
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
+  secondaryButton: { alignSelf: "stretch", minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   secondaryButtonText: { color: colors.primary, fontSize: 15, fontWeight: "700" },
 
   skeleton: { backgroundColor: colors.borderLight, borderRadius: radius.card },

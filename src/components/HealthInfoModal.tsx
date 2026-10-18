@@ -1,6 +1,7 @@
 import { Modal, Pressable, Text, StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 type Props = {
   visible: boolean;
@@ -12,12 +13,12 @@ export default function HealthInfoModal({ visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.box}>
-          <Text style={styles.title}>İlişki Sağlığı nedir?</Text>
+          <Text style={styles.title}>{t("Bağlantın nasıl hesaplanır?")}</Text>
           <Text style={styles.desc}>
-            İlişki sağlığı; son iletişim tarihi, kişi bazlı iletişim aralığı, ertelenen hatırlatıcılar ve yaklaşan özel günlere göre hesaplanır.
+            {t("Her kişi için seçtiğin görüşme sıklığına göre hesaplanır. Aralık içinde kaldıkça bağ güçlü kalır; süre aşıldıkça yavaşça zayıflar. Ertelediğin kişiler yolunda sayılır, tarihi olmayanlar hesaba katılmaz.")}
           </Text>
           <Pressable style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>Anladım</Text>
+            <Text style={styles.closeBtnText}>{t("Anladım")}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

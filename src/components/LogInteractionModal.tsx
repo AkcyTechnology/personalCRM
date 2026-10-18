@@ -7,6 +7,7 @@ import type { InteractionType } from "../screens/AddContactScreen";
 import { colors } from "../theme/colors";
 import { todayISO } from "../utils/dates";
 import DateField from "./DateField";
+import { t } from "../i18n";
 
 export const INTERACTION_TYPES: { type: InteractionType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { type: "call",     label: "Arama",    icon: "call-outline" },
@@ -18,7 +19,8 @@ export const INTERACTION_TYPES: { type: InteractionType; label: string; icon: ke
 ];
 
 export function interactionMeta(type: InteractionType) {
-  return INTERACTION_TYPES.find((t) => t.type === type) ?? INTERACTION_TYPES[INTERACTION_TYPES.length - 1];
+  const meta = INTERACTION_TYPES.find((it) => it.type === type) ?? INTERACTION_TYPES[INTERACTION_TYPES.length - 1];
+  return { ...meta, label: t(meta.label) };
 }
 
 type Props = {
@@ -49,50 +51,50 @@ export default function LogInteractionModal({ visible, contactName, initialType 
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.handle} />
-            <Text style={styles.title}>{contactName} ile görüştün 🎉</Text>
-            <Text style={styles.sub}>Nasıl iletişime geçtin?</Text>
+            <Text style={styles.title}>{t("{name} ile görüştün 🎉", { name: contactName })}</Text>
+            <Text style={styles.sub}>{t("Nasıl iletişime geçtin?")}</Text>
 
             <View style={styles.types}>
-              {INTERACTION_TYPES.map((t) => {
-                const active = t.type === type;
+              {INTERACTION_TYPES.map((it) => {
+                const active = it.type === type;
                 return (
                   <TouchableOpacity
-                    key={t.type}
+                    key={it.type}
                     style={[styles.type, active && styles.typeActive]}
-                    onPress={() => setType(t.type)}
+                    onPress={() => setType(it.type)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active }}
-                    accessibilityLabel={t.label}
+                    accessibilityLabel={t(it.label)}
                   >
-                    <Ionicons name={t.icon} size={18} color={active ? colors.primary : colors.textSub} />
-                    <Text style={[styles.typeText, active && styles.typeTextActive]}>{t.label}</Text>
+                    <Ionicons name={it.icon} size={18} color={active ? colors.primary : colors.textSub} />
+                    <Text style={[styles.typeText, active && styles.typeTextActive]}>{t(it.label)}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <DateField label="Tarih" format="iso" value={date} onChange={(v) => setDate(v || todayISO())} maximumDate={new Date()} clearable={false} />
+            <DateField label={t("Tarih")} format="iso" value={date} onChange={(v) => setDate(v || todayISO())} maximumDate={new Date()} clearable={false} />
 
-            <Text style={styles.label}>Not (isteğe bağlı)</Text>
+            <Text style={styles.label}>{t("Not (isteğe bağlı)")}</Text>
             <TextInput
               style={styles.input}
               value={note}
               onChangeText={setNote}
-              placeholder="Ne konuştunuz? Bir dahaki sefere hatırlamak istediğin bir şey var mı?"
+              placeholder={t("Ne konuştunuz? Bir dahaki sefere hatırlamak istediğin bir şey var mı?")}
               placeholderTextColor={colors.textMuted}
               multiline
               maxLength={2000}
-              accessibilityLabel="Görüşme notu"
+              accessibilityLabel={t("Görüşme notu")}
             />
 
             <TouchableOpacity
               style={styles.save}
               onPress={() => onSave(type, note, date)}
               accessibilityRole="button"
-              accessibilityLabel="Görüşmeyi kaydet"
+              accessibilityLabel={t("Görüşmeyi kaydet")}
             >
               <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-              <Text style={styles.saveText}>Kaydet</Text>
+              <Text style={styles.saveText}>{t("Kaydet")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

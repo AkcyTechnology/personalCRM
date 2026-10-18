@@ -1,6 +1,7 @@
 import { Modal, Pressable, Text, TouchableOpacity, Linking, StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 type Props = {
   visible: boolean;
@@ -21,10 +22,10 @@ export default function PermissionDeniedModal({ visible, title, description, onC
             onPress={() => { onClose(); Linking.openSettings(); }}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>Ayarları aç</Text>
+            <Text style={styles.primaryBtnText}>{t("Ayarları aç")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.secondaryBtnText}>Vazgeç</Text>
+            <Text style={styles.secondaryBtnText}>{t("Vazgeç")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

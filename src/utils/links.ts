@@ -1,5 +1,6 @@
 import { Linking } from "react-native";
 import { showToast } from "../components/Toast";
+import { t } from "../i18n";
 
 /**
  * Normalises a phone number to international digits for wa.me links.
@@ -35,31 +36,31 @@ async function open(url: string) {
   try {
     await Linking.openURL(url);
   } catch {
-    showToast("Bağlantı açılamadı");
+    showToast(t("Bağlantı açılamadı"));
   }
 }
 
 export function openPhoneCall(phone: string) {
   const cleaned = phone.replace(/[^\d+]/g, "");
-  if (cleaned.replace(/\D/g, "").length < 3) return showToast("Geçersiz telefon numarası");
+  if (cleaned.replace(/\D/g, "").length < 3) return showToast(t("Geçersiz telefon numarası"));
   return open(`tel:${cleaned}`);
 }
 
 export function openWhatsApp(phone: string, text?: string) {
   const number = toWhatsAppNumber(phone);
-  if (!number) return showToast("WhatsApp için geçerli bir numara yok");
+  if (!number) return showToast(t("WhatsApp için geçerli bir numara yok"));
   return open(`https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ""}`);
 }
 
 export function openEmail(email: string) {
   const value = email.trim();
-  if (!EMAIL_RE.test(value)) return showToast("Geçersiz e-posta adresi");
+  if (!EMAIL_RE.test(value)) return showToast(t("Geçersiz e-posta adresi"));
   return open(`mailto:${encodeURIComponent(value).replace(/%40/g, "@")}`);
 }
 
 export function openWebUrl(input: string) {
   const url = toSafeWebUrl(input);
-  if (!url) return showToast("Güvenli olmayan veya geçersiz bağlantı");
+  if (!url) return showToast(t("Güvenli olmayan veya geçersiz bağlantı"));
   return open(url);
 }
 

@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import AppHeader from "../components/AppHeader";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Legal">;
 
@@ -101,17 +102,17 @@ const TERMS: Section[] = [
 export default function LegalScreen({ navigation, route }: Props) {
   const isPrivacy = route.params.doc === "privacy";
   const sections = isPrivacy ? PRIVACY : TERMS;
-  const title = isPrivacy ? "Gizlilik Politikası" : "Kullanım Şartları";
+  const title = isPrivacy ? t("Gizlilik Politikası") : t("Kullanım Şartları");
 
   return (
     <View style={styles.screen}>
       <AppHeader type="settings" centerTitle={title} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>Son güncelleme: {UPDATED}</Text>
+        <Text style={styles.updated}>{t("Son güncelleme: {date}", { date: UPDATED })}</Text>
         {sections.map((s) => (
           <View key={s.title} style={styles.section}>
-            <Text style={styles.heading} accessibilityRole="header">{s.title}</Text>
-            <Text style={styles.body}>{s.body}</Text>
+            <Text style={styles.heading} accessibilityRole="header">{t(s.title)}</Text>
+            <Text style={styles.body}>{t(s.body)}</Text>
           </View>
         ))}
       </ScrollView>

@@ -1,6 +1,7 @@
 import type { ContactForm } from "../screens/AddContactScreen";
 import type { UserSettings } from "../data/userSettings";
 import { addDays, nextBirthday, parseISODate } from "./dates";
+import { t } from "../i18n";
 import { effectiveIntervalDays, intervalStartDate, isDue, neglectScore } from "./reminderInterval";
 
 /** Pure planning step for local notifications — no native calls, easy to test. */
@@ -57,8 +58,8 @@ export function planReminders(
         kind: "followUp",
         contactId: c.id,
         date,
-        title: `${firstName(c)} ile görüşme zamanı`,
-        body: `${c.fullName} ile en son iletişiminin üzerinden epey zaman geçti. Kısa bir mesaj atmaya ne dersin?`,
+        title: t("Küçük bir merhaba çok şey değiştirebilir"),
+        body: t("{name} ile görüşmeyeli epey oldu. Bir selam vermek ister misin?", { name: firstName(c) }),
       });
     }
   }
@@ -75,8 +76,8 @@ export function planReminders(
           kind: "birthday",
           contactId: c.id,
           date,
-          title: `Yarın ${firstName(c)}'in doğum günü 🎂`,
-          body: `${c.fullName} için bir kutlama mesajı hazırlamayı unutma.`,
+          title: t("Yarın {name}'in doğum günü 🎂", { name: firstName(c) }),
+          body: t("Küçük bir kutlama mesajı onu çok mutlu edebilir."),
         });
       }
       const sameDay = new Date(bday.getFullYear(), bday.getMonth(), bday.getDate(), 9, 0, 0, 0);
@@ -85,8 +86,8 @@ export function planReminders(
           kind: "birthday",
           contactId: c.id,
           date: sameDay,
-          title: `Bugün ${firstName(c)}'in doğum günü 🎉`,
-          body: `${c.fullName}'i kutlamak için harika bir gün.`,
+          title: t("Bugün {name}'in doğum günü 🎉", { name: firstName(c) }),
+          body: t("Onu kutlamak için harika bir gün."),
         });
       }
     }
@@ -106,8 +107,8 @@ export function planReminders(
         kind: "smartNudge",
         contactId: candidate.id,
         date,
-        title: "Bu akşam için küçük bir öneri",
-        body: `${candidate.fullName} ile bir süredir konuşmadın. Bir "nasılsın?" mesajı ilişkini canlı tutar.`,
+        title: t("Bu akşam için küçük bir öneri"),
+        body: t("{name} aklına geldi mi? Bir “nasılsın?” bazen her şeye yeter.", { name: firstName(candidate) }),
       });
     }
   }
@@ -122,11 +123,11 @@ export function planReminders(
       weekday: 2, // Pazartesi (1 = Pazar)
       hour: 9,
       minute: 0,
-      title: "Haftalık ilişki özetin hazır",
+      title: t("Yeni bir hafta, yeni anlar"),
       body:
         dueCount > 0
-          ? `Bu hafta ${dueCount} kişi seni bekliyor. Connectly'yi açıp kimlere ulaşacağına bak.`
-          : "Harika gidiyorsun! Şu an seni bekleyen kimse yok.",
+          ? t("Bu hafta görüşmek isteyebileceğin birkaç kişi var.")
+          : t("Harika gidiyorsun! Bu haftaya güzel bir merhaba ile başla."),
     });
   }
 
