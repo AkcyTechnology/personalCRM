@@ -22,7 +22,8 @@ fs.mkdirSync(OUT, { recursive: true });
   const errors = [];
 
   async function run(viewport, label) {
-    const page = await browser.newPage({ viewport });
+    const context = await browser.newContext({ viewport, locale: "tr-TR" });
+    const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(`[${label}] pageerror: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") errors.push(`[${label}] console: ${m.text().slice(0, 200)}`); });
     // Web confirm dialogs: decline "Önce yedek al", accept everything else.
@@ -61,8 +62,8 @@ fs.mkdirSync(OUT, { recursive: true });
       await click(text("1 ay önce"));
     });
     await step("add: save", () => click(text("Kişiyi Kaydet")));
-    await step("home: dynamic due count", () => text("Bugün 1 kişi seni bekliyor").waitFor({ timeout: 4000 }));
-    await step("home: bell badge label", () => label_("Hatırlatıcılar, 1 bekleyen").waitFor({ timeout: 3000 }));
+    await step("home: dynamic due count", () => text("Görüşmek isteyebileceğin biri var").waitFor({ timeout: 4000 }));
+    await step("home: bell badge label", () => label_("Hatırlatıcılar, 1 kişi").waitFor({ timeout: 3000 }));
     await shot("03-home-due");
 
     await step("log: Görüştüm from Today card", async () => {
@@ -71,9 +72,9 @@ fs.mkdirSync(OUT, { recursive: true });
       await label_("Görüşme notu").fill("Kahve içtik");
       await click(label_("Görüşmeyi kaydet"));
     });
-    await step("log: undo toast shown", () => text("Geri al").waitFor({ timeout: 3000 }));
+    await step("log: undo toast shown", () => text("Geri al").waitFor({ timeout: 5000 }));
     await shot("04-undo-toast");
-    await step("log: undo restores due state", async () => { await click(text("Geri al")); await text("Bugün 1 kişi seni bekliyor").waitFor({ timeout: 4000 }); });
+    await step("log: undo restores due state", async () => { await click(text("Geri al")); await text("Görüşmek isteyebileceğin biri var").waitFor({ timeout: 4000 }); });
     await step("log: log again", async () => {
       await click(label_("Ahmet Yılmaz ile görüştüm"));
       await label_("Görüşme notu").fill("Kahve içtik");
@@ -90,7 +91,7 @@ fs.mkdirSync(OUT, { recursive: true });
       await page.waitForTimeout(800);
     });
     await step("people: two contacts listed", async () => { await click(label_("Kişiler")); await text("2 kişi").waitFor({ timeout: 4000 }); });
-    await step("people: status filter Bekleyen", async () => { await click(text("Bekleyen")); await text("Bekleyen kimse yok").waitFor({ timeout: 3000 }); await click(text("Tümü")); });
+    await step("people: status filter Yeniden bağlan", async () => { await click(text("Yeniden bağlan")); await text("Herkesle bağın taze ✨").waitFor({ timeout: 3000 }); await click(text("Tümü")); });
     await step("people: search", async () => { await label_("Kişi ara").fill("zzz"); await text("Sonuç yok").waitFor({ timeout: 3000 }); await click(label_("Aramayı temizle")); });
     await shot("06-people");
 
@@ -111,6 +112,24 @@ fs.mkdirSync(OUT, { recursive: true });
       await text("2 kişi").waitFor({ timeout: 4000 });
     });
 
+    await step("universe: map renders", async () => { await click(label_("Evren")); await label_("Sen, evrenin merkezi").waitFor({ timeout: 4000 }); });
+    await shot("09-universe");
+    await step("universe: insights segment", async () => { await click(text("İçgörüler")); await page.waitForTimeout(500); await click(text("Bağ haritası")); });
+    await step("story: names hidden by default", async () => {
+      await click(label_("Bu ayın hikâyesi"));
+      await text("Bağlantı hikâyen").waitFor({ timeout: 4000 });
+      if (await page.getByText(/En çok konuştuğun kişi/).locator("visible=true").count()) throw new Error("name shown without opt-in");
+    });
+    await shot("10-story");
+    await step("story: close", () => click(label_("Kapat")));
+    await step("shuffle: opens from Home", async () => {
+      await click(label_("Ana Sayfa"));
+      await click(label_("Başka birini göster"));
+      await text("Bugün kimi hatırlayalım?").waitFor({ timeout: 4000 });
+    });
+    await shot("11-shuffle");
+    await step("shuffle: close", () => click(label_("Kapat")));
+
     await step("privacy: open", async () => { await click(label_("Profil")); await click(text("Gizlilik ve Güvenlik")); await text("Tüm verileri sil").waitFor({ timeout: 3000 }); });
     await shot("08-privacy");
     await step("privacy: policy page", async () => { await click(text("Gizlilik Politikası")); await text("Rehber erişimi").waitFor({ timeout: 3000 }); await click(text("Geri")); });
@@ -121,10 +140,45 @@ fs.mkdirSync(OUT, { recursive: true });
       if (keys.includes("crm_contacts")) throw new Error("contacts still stored: " + keys.join(","));
       await text("Atla").waitFor({ timeout: 4000 });
     });
-    await page.close();
+    await context.close();
   }
 
   await run({ width: 390, height: 844 }, "iphone14");
+
+  // English UI: a browser in any non-Turkish locale gets English copy.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US" });
+    const page = await context.newPage();
+    page.on("pageerror", (e) => errors.push(`[en] pageerror: ${e.message}`));
+    const vis = (loc) => loc.locator("visible=true").first();
+    const text = (s) => vis(page.getByText(s, { exact: true }));
+    const click = async (loc) => { await loc.click({ timeout: 6000 }); await page.waitForTimeout(700); };
+    const step = async (name, fn) => {
+      try { await fn(); results.push({ name: `[en] ${name}`, ok: true }); }
+      catch (e) { results.push({ name: `[en] ${name}`, ok: false, err: e.message.split("\n")[0] }); await page.screenshot({ path: path.join(OUT, `en-FAIL-${name.replace(/\W+/g, "_")}.png`) }); }
+    };
+    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.waitForTimeout(1500);
+    await step("onboarding in English", async () => { await vis(page.getByText(/Never lose/)).waitFor({ timeout: 4000 }); await click(text("Skip")); });
+    await step("sign-up in English", async () => { await click(text("Let's begin")); await click(text("Continue")); });
+    await step("profile step", async () => { await vis(page.getByPlaceholder("Full name")).fill("Test User"); await click(text("Continue")); });
+    await step("goals step", async () => { await click(text("Grow my network")); await click(vis(page.getByText(/^Continue/))); });
+    await step("finish", () => click(text("Go to the app")));
+    await step("home empty state", () => text("Add your first person").waitFor({ timeout: 4000 }));
+    await page.screenshot({ path: path.join(OUT, "en-01-home.png") });
+    await step("add a person", async () => {
+      await click(vis(page.getByLabel("Add a person", { exact: true })));
+      await vis(page.getByPlaceholder("Alex Morgan", { exact: true })).fill("Alex Morgan");
+      await click(text("Friend"));
+      await click(text("1 month ago"));
+      await click(text("Save person"));
+    });
+    await step("warm home copy", () => text("There's someone you might love catching up with").waitFor({ timeout: 4000 }));
+    await page.screenshot({ path: path.join(OUT, "en-02-home-due.png") });
+    await step("universe tab label", async () => { await click(vis(page.getByLabel("Universe", { exact: true }))); await text("Connection map").waitFor({ timeout: 4000 }); });
+    await page.screenshot({ path: path.join(OUT, "en-03-universe.png") });
+    await context.close();
+  }
 
   // Small-screen layout check (iPhone SE 1st gen size): home must render without errors.
   const small = await browser.newPage({ viewport: { width: 320, height: 568 } });

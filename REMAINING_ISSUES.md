@@ -17,9 +17,9 @@
 | R-04 | Karanlık mod yok (`userInterfaceStyle: light`) | `useColorScheme` ile açık ve koyu token setleri. Renkler artık tek yerde olduğu için geçiş kolaylaştı |
 | R-05 | Her yazmada tüm veri yeniden şifreleniyor (Node'da 1 MB için 94 ms; Hermes'te daha yavaş olabilir) | Kişi başına anahtar/değer ya da SQLite + SQLCipher (`expo-sqlite`) |
 | R-06 | Gizlilik politikası ve kullanım şartları birer taslak | Hukukçu incelemesi; metni hem uygulamada hem herkese açık bir URL'de yayınla (mağazalar URL istiyor) |
-| R-07 | Çok dil desteği yok; dil seçimi kaldırıldı | `expo-localization` + i18n; önce İngilizce |
+| R-07 | ~~Çok dil desteği yok~~ **Kapatıldı:** Türkçe + İngilizce, telefon diline göre otomatik; Profil'den değiştirilebilir. İngilizce metinler anadil konuşanı tarafından gözden geçirilmeli | — |
 | R-08 | Ekran dosyaları hâlâ büyük (BusinessCard ~1100, Insights ~1280, AddContact ~1275 satır) | Ortak `Button`, `Card`, `Input` bileşenleri çıkararak bölmek |
-| R-09 | Erişilebilirlik eksikleri: İçgörüler grafikleri, Kartvizit ve Onboarding etiketleri; sistem yazı boyutu testi yapılmadı | Ekran okuyucuyla gezinme testi; `accessibilityLabel` / `accessibilityValue` ekleme |
+| R-09 | Kod tarafındaki erişilebilirlik eksikleri kapatıldı (Onboarding noktaları, bildirim anahtarları, kartvizit ve QR, içe aktarma kutuları, ⓘ butonları, grafikler, çipler, ton seçimi, form etiketleri, modal butonları). **Açık kalan:** VoiceOver/TalkBack ile cihazda gezinme ve en büyük yazı boyutu testi | Cihazda ekran okuyucu testi |
 | R-10 | Backend yok. Cihaz değişince veri yalnızca manuel yedekle taşınabiliyor | İhtiyaç olursa Supabase (Auth + RLS) ile isteğe bağlı eşitleme. **O zaman güvenlik denetimi yeniden yapılmalı** |
 
 ## Düşük
@@ -34,3 +34,4 @@
 | R-16 | "Geri al" balonu 5 sn sonra kayboluyor | Ekran okuyucu açıkken süreyi uzat |
 | R-17 | Abonelik ekranı yalnızca bilgi veriyor; ödeme altyapısı yok | Ücretli plan gerekirse RevenueCat + sunucuda doğrulama |
 | R-18 | Semgrep ve MobSF taramaları çalıştırılamadı | CI'a `semgrep ci` ekle; release APK için MobSF |
+| R-19 | Sesli an kaydı, yapay zekâ koçu, ana ekran widget'ı ve dünya haritası eklenmedi | Ses/AI bir sunucu ve LLM gerektiriyor (gizlilik açısından ayrıca tasarlanmalı); widget native WidgetKit/AppWidget kodu istiyor; harita konum ve geocoding istiyor |

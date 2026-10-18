@@ -21,8 +21,8 @@ Aşağıdaki sonuçların hepsi gerçekten çalıştırılan komutların çıkt�
 Komut: `npx jest --ci`
 
 ```
-Test Suites: 8 passed, 8 total
-Tests:       41 passed, 41 total
+Test Suites: 10 passed, 10 total
+Tests:       57 passed, 57 total
 ```
 
 | Dosya | Kapsam |
@@ -35,6 +35,8 @@ Tests:       41 passed, 41 total
 | `__tests__/links.test.ts` | WhatsApp numarası normalleştirme; tehlikeli şemaların (`javascript:`, `file:`, `intent:`) engellenmesi; sosyal profil adresleri |
 | `__tests__/dates.test.ts` | Yerel tarih (UTC kayması olmadan), doğum günü ayrıştırma, bir sonraki doğum günü |
 | `__tests__/duplicateContact.test.ts` | Telefon, e-posta ve isim normalleştirmesiyle mükerrer tespiti |
+| `__tests__/engagement.test.ts` | Haftalık seri ve dondurma hakkı, bu haftaki kişiler, Günün kişisi (gün içinde sabit), Bugünün kıvılcımları, "Bugün X yıl önce", aylık hikâye, ilişki yolculuğu |
+| `__tests__/i18n.test.ts` | Kaynaktaki her `t("…")` metninin ve kayıtlı sabit değerlerin (ilişki türü, tanışma yeri vb.) İngilizce karşılığı var; `{yer tutucu}` adları korunuyor; çoğul ve parametre işleme |
 
 **Performans ölçümü:** 1000 kişi, ~1 MB veri. Şifreleme 93.6 ms, çözme 41.6 ms (Node V8 JIT, 5 ölçüm ortalaması). Cihazdaki Hermes motorunda **ÖLÇÜLMEDİ**.
 
@@ -47,7 +49,7 @@ python3 -m http.server 8765 -d <dir>
 CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/web-smoke.js
 ```
 
-**Sonuç:** ✅ **29/29 adım geçti**, çalışma anında hata yok, çıkış kodu 0.
+**Sonuç:** ✅ **44/44 adım geçti** (Türkçe `tr-TR` ve İngilizce `en-US` tarayıcı dilleriyle), çalışma anında hata yok, çıkış kodu 0.
 
 | # | Adım | Sonuç |
 |---|---|---|
@@ -57,11 +59,13 @@ CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/web-smoke.js
 | 13–14 | Ana sayfadaki bekleyen sayısının gerçek veriden gelmesi; zil rozetinin erişilebilirlik etiketi | PASS |
 | 15–18 | "Bugün" kartından "Görüştüm" → "Geri al" balonu → geri alma bekleyen durumu geri getiriyor → tekrar kaydetme | PASS |
 | 19 | Mükerrer kişi uyarısı (web onayı) ve kaydetme | PASS |
-| 20–22 | Kişiler: 2 kişi listeleniyor; "Bekleyen" filtresi; arama ve temizleme | PASS |
+| 20–22 | Kişiler: 2 kişi listeleniyor; "Yeniden bağlan" filtresi; arama ve temizleme | PASS |
 | 23–24 | Detay: geçmişte not görünüyor; geri dönüş | PASS |
 | 25 | Detaydan silme → "Geri al" → kişi geri geliyor | PASS |
-| 26–28 | Gizlilik ekranı; gizlilik politikası; tüm verileri silme (localStorage'da `crm_contacts` kalmıyor, Onboarding açılıyor) | PASS |
-| 29 | iPhone SE (320 px) genişliğinde yatay taşma yok | PASS |
+| 26–31 | Evren: bağ haritası ve İçgörüler sekmesi; Aylık hikâye isimler kapalıyken kişi adı göstermiyor; Ana sayfadan Karıştır ekranı açılıp kapanıyor | PASS |
+| 32–34 | Gizlilik ekranı; gizlilik politikası; tüm verileri silme (localStorage'da `crm_contacts` kalmıyor, Onboarding açılıyor) | PASS |
+| 35–43 | İngilizce: onboarding, kayıt, profil, hedefler, boş ana sayfa, kişi ekleme, sıcak ana sayfa metni, "Universe" sekmesi | PASS |
+| 44 | iPhone SE (320 px) genişliğinde yatay taşma yok | PASS |
 
 **Bu testin yakaladığı ve düzeltilen hatalar:**
 - **FUN-07:** Bildirim balonundaki yarış durumu.

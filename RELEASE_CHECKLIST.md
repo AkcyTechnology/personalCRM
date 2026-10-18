@@ -5,8 +5,8 @@
 ## Kod ve otomasyon
 - [x] `npx tsc --noEmit` → 0 hata
 - [x] `npx eslint .` → 0 sorun
-- [x] `npx jest --ci` → 41/41 geçti
-- [x] `node e2e/web-smoke.js` → 29/29 geçti
+- [x] `npx jest --ci` → 57/57 geçti
+- [x] `node e2e/web-smoke.js` → 44/44 geçti (TR + EN)
 - [x] `expo export` Android, iOS ve web paketleri derleniyor
 - [x] Sır taraması temiz (çalışma dizini + git geçmişi)
 - [x] `npm audit` kritik açık yok
@@ -27,6 +27,10 @@
 - [ ] Android geri tuşu tüm ekranlarda beklendiği gibi çalışıyor
 - [ ] Sistem yazı boyutu en büyükte: taşma yok
 - [ ] VoiceOver / TalkBack ile ana akış tamamlanabiliyor
+- [ ] Yeni native modüller (`react-native-svg`, `react-native-view-shot`, `expo-localization`) için yeni development/production build alındı
+- [ ] Telefon dili İngilizce ve Türkçe iken metinler doğru; Profil → Dil seçimi anında değişiyor
+- [ ] Aylık hikâye görsel olarak paylaşılıyor (iOS paylaşım menüsü / Android)
+- [ ] Karıştır ekranında sağa/sola/yukarı kaydırma; mesaj uygulamasından dönünce "Görüştün mü?" soruluyor, otomatik kayıt yok
 - [ ] Küçük ekran (iPhone SE / 5 inç Android) ve tablet görünümü
 
 ## Güvenlik doğrulaması (cihazda)
