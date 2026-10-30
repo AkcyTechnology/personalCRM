@@ -27,7 +27,7 @@ const encryptionAvailable = Platform.OS === "ios" || Platform.OS === "android";
 
 let keyPromise: Promise<Uint8Array> | null = null;
 
-function randomBytes(n: number): Uint8Array {
+export function randomBytes(n: number): Uint8Array {
   const Crypto = require("expo-crypto") as typeof import("expo-crypto");
   return Crypto.getRandomBytes(n);
 }

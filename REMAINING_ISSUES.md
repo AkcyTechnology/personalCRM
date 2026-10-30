@@ -29,7 +29,6 @@
 
 | ID | Sorun | Öneri |
 |---|---|---|
-| R-14 | Yedek `.json` dosyası şifresiz (kullanıcı uyarılıyor) | İsteğe bağlı parolalı yedek (scrypt + XChaCha) |
 | R-15 | Web sürümünde veri şifresiz | Web yalnızca görmek için derleniyor, yayınlanmayacak; sorun değil |
 | R-16 | Bazı eski çipler 40 px yüksekliğinde (önerilen 44 px) | `minTouch = 44` token'ı |
 | R-17 | Abonelik ekranı yalnızca bilgi veriyor | Ücretli plan gerekirse RevenueCat + sunucuda doğrulama |
@@ -54,4 +53,5 @@
 | Semgrep çalıştırılamadı | 432 kural, 94 dosya: gerçek güvenlik bulgusu yok (SECURITY_REPORT) |
 | Gizlilik metni için herkese açık URL yok | `docs/privacy.html`, `docs/terms.html` (`npm run legal`) |
 | Mağaza formları ve görselleri | `STORE_LISTING.md`, `store/screenshots/` |
+| Yedek dosyası şifresiz | Parolalı yedek: scrypt (N=2^15) + XChaCha20-Poly1305, başlık doğrulamalı; yanlış parolada tekrar deneme |
 | Çok kişiyle hız ölçülmedi | `__tests__/performance.test.ts`: 2.000 kişi; Ana sayfa hesapları 900 → 320 ms |

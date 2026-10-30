@@ -120,7 +120,7 @@ export default function PrivacySecurityScreen({ navigation }: any) {
           <Row
             icon="download-outline"
             label={t("Yedek al")}
-            desc={t("Tüm verilerini bir .json dosyasına aktar. Dosya şifresizdir; güvenli bir yerde sakla.")}
+            desc={t("Tüm verilerini bir dosyaya aktar. İstersen parolayla şifrele.")}
             onPress={runExportBackup}
           />
           <Row

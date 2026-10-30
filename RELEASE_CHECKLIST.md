@@ -5,7 +5,7 @@
 ## Kod ve otomasyon
 - [x] `npx tsc --noEmit` → 0 hata
 - [x] `npx eslint .` → 0 sorun
-- [x] `npx jest --ci` → 67/67 geçti (performans testi dahil)
+- [x] `npx jest --ci` → 76/76 geçti (performans ve parolalı yedek testleri dahil)
 - [x] `node e2e/web-smoke.js` → 48/48 geçti (TR + EN + koyu tema)
 - [x] Semgrep (432 kural): gerçek güvenlik bulgusu yok
 - [x] `expo export` Android, iOS ve web paketleri derleniyor
@@ -23,7 +23,7 @@
 - [ ] Uygulama kilidi: açma, kapatma, 30 sn arka plan sonrası kilitlenme, uygulama değiştiricide içeriğin gizlenmesi
 - [ ] Rehber: iOS'ta izin istemeden sistem seçicisi; Android'de izin akışı; toplu aktarma
 - [ ] Kaydırma: Kişiler listesinde sola kaydırınca Görüştüm/Ertele
-- [ ] Yedek al → uygulamayı sil → yeniden kur → geri yükle
+- [ ] Yedek al → uygulamayı sil → yeniden kur → geri yükle (hem parolalı hem parolasız; yanlış parolada "Parola yanlış" çıkıyor)
 - [ ] "Tüm verileri sil" sonrası uygulama sıfırdan açılıyor
 - [ ] Android geri tuşu tüm ekranlarda beklendiği gibi çalışıyor
 - [ ] Sistem yazı boyutu en büyükte: taşma yok

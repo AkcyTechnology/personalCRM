@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ToastHost from './src/components/Toast';
 import CelebrationHost from './src/components/Celebration';
+import PasswordPromptHost from './src/components/PasswordPrompt';
 import AppLock from './src/app/AppLock';
 import LanguageGate from './src/app/LanguageGate';
 import ReminderSync from './src/app/ReminderSync';
@@ -30,6 +31,7 @@ export default function App() {
               <ReminderSync />
               <WidgetSync />
               <CelebrationHost />
+              <PasswordPromptHost />
               <ToastHost />
             </NavigationContainer>
           </LanguageGate>

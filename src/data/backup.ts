@@ -9,6 +9,7 @@ import { isDuplicateContact } from "../utils/duplicateContact";
 import { todayISO } from "../utils/dates";
 import { resetAnalytics } from "../utils/analytics";
 import { t } from "../i18n";
+import { decryptBackupText, encryptBackupText, isEncryptedBackup, WrongPasswordError } from "./backupCrypto";
 
 const FORMAT = "connectly-backup";
 const VERSION = 1;
@@ -91,15 +92,23 @@ export function parseBackup(text: string): BackupFile {
   return { ...(obj as BackupFile), contacts };
 }
 
-/** Writes a JSON backup to a temp file, opens the share sheet, then deletes the file. */
-export async function exportBackupAsync(): Promise<number> {
+export type BackupText = { text: string; count: number; encrypted: boolean };
+
+/** Serialises the backup; with a password it is sealed with scrypt + XChaCha20-Poly1305. */
+export async function buildBackupText(password?: string, onProgress?: (p: number) => void): Promise<BackupText> {
   const backup = await buildBackup();
   const json = JSON.stringify(backup, null, 2);
-  const fileName = `connectly-yedek-${todayISO()}.json`;
+  if (!password) return { text: json, count: backup.contacts.length, encrypted: false };
+  return { text: await encryptBackupText(json, password, { onProgress }), count: backup.contacts.length, encrypted: true };
+}
+
+/** Writes the backup to a temp file, opens the share sheet, then deletes the file. */
+export async function shareBackupText({ text, encrypted }: BackupText): Promise<void> {
+  const fileName = `connectly-yedek-${todayISO()}${encrypted ? "-sifreli" : ""}.json`;
 
   if (Platform.OS === "web") {
-    await Share.share({ title: fileName, message: json });
-    return backup.contacts.length;
+    await Share.share({ title: fileName, message: text });
+    return;
   }
 
   const { File, Paths } = require("expo-file-system") as typeof import("expo-file-system");
@@ -108,7 +117,7 @@ export async function exportBackupAsync(): Promise<number> {
   try {
     if (file.exists) file.delete();
     file.create();
-    file.write(json);
+    file.write(text);
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(file.uri, {
         mimeType: "application/json",
@@ -116,17 +125,16 @@ export async function exportBackupAsync(): Promise<number> {
         dialogTitle: t("Yedeği kaydet veya paylaş"),
       });
     } else {
-      await Share.share({ title: fileName, message: json });
+      await Share.share({ title: fileName, message: text });
     }
   } finally {
-    // Şifresiz kopya cihazda kalmasın
+    // Geçici kopya cihazda kalmasın
     try { if (file.exists) file.delete(); } catch {}
   }
-  return backup.contacts.length;
 }
 
-/** Lets the user pick a backup file. Returns null when cancelled. */
-export async function pickBackupAsync(): Promise<BackupFile | null> {
+/** Lets the user pick a backup file and returns its raw text. Returns null when cancelled. */
+export async function pickBackupTextAsync(): Promise<string | null> {
   const DocumentPicker = require("expo-document-picker") as typeof import("expo-document-picker");
   const result = await DocumentPicker.getDocumentAsync({
     type: ["application/json", "text/plain", "*/*"],
@@ -135,19 +143,32 @@ export async function pickBackupAsync(): Promise<BackupFile | null> {
   });
   if (result.canceled || !result.assets?.[0]) return null;
   const asset = result.assets[0];
-  if (asset.size && asset.size > 20 * 1024 * 1024) throw new Error(t("Dosya çok büyük."));
+  if (asset.size && asset.size > 40 * 1024 * 1024) throw new Error(t("Dosya çok büyük."));
 
-  let text: string;
-  if (Platform.OS === "web") {
-    text = await (await fetch(asset.uri)).text();
-  } else {
-    const { File } = require("expo-file-system") as typeof import("expo-file-system");
-    const file = new File(asset.uri);
+  if (Platform.OS === "web") return (await fetch(asset.uri)).text();
+  const { File } = require("expo-file-system") as typeof import("expo-file-system");
+  const file = new File(asset.uri);
+  try {
+    return await file.text();
+  } finally {
+    try { file.delete(); } catch {}
+  }
+}
+
+export { isEncryptedBackup, WrongPasswordError };
+
+/** Parses a picked backup; password-protected files need the password. */
+export async function openBackupText(text: string, password?: string, onProgress?: (p: number) => void): Promise<BackupFile> {
+  if (isEncryptedBackup(text)) {
+    if (!password) throw new WrongPasswordError("password required");
+    let plain: string;
     try {
-      text = await file.text();
-    } finally {
-      try { file.delete(); } catch {}
+      plain = await decryptBackupText(text, password, onProgress);
+    } catch (e) {
+      if (e instanceof WrongPasswordError) throw e;
+      throw new Error(t("Bu dosya bozuk ya da bir Connectly yedeği değil."));
     }
+    return parseBackup(plain);
   }
   return parseBackup(text);
 }

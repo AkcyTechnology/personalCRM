@@ -17,7 +17,7 @@
 </head>
 <body><main>
   <nav><a href="#tr">Türkçe</a><a href="#en">English</a></nav>
-  <p class="updated">Connectly · Son güncelleme / Last updated: 30.10.2026</p>
+  <p class="updated">Connectly · Son güncelleme / Last updated: 31.10.2026</p>
   
   <section lang="tr" id="tr">
     <h1>Gizlilik Politikası</h1>
@@ -36,7 +36,7 @@
     <h2>Güvenlik</h2>
 <p>iOS ve Android’de veriler cihazda XChaCha20-Poly1305 ile şifrelenir. Şifreleme anahtarı cihazın güvenli donanımında (iOS Keychain / Android Keystore) “yalnızca bu cihaz” ayarıyla tutulur ve bulut yedeklerine dahil edilmez. Android otomatik yedeklemesi kapalıdır. İstersen Face ID, parmak izi veya cihaz şifresiyle uygulama kilidi açabilirsin. Panoya kopyalanan mesajlar 90 saniye sonra panodan temizlenir.</p>
     <h2>Yedekler</h2>
-<p>“Yedek al” ile oluşturulan .json dosyası şifresizdir ve senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.</p>
+<p>“Yedek al” ile oluşturulan dosya senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Parola belirlersen dosya scrypt ile türetilen bir anahtarla XChaCha20-Poly1305 kullanılarak şifrelenir; parola olmadan açılamaz ve unutulursa kurtarılamaz. Parolasız yedek şifresizdir; bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.</p>
     <h2>Paylaştığın içerikler</h2>
 <p>Arama, WhatsApp, e-posta veya kartvizit paylaşımı gibi işlemler cihazındaki ilgili uygulamaya devredilir; bu uygulamaların kendi gizlilik politikaları geçerlidir.</p>
     <h2>Hakların (KVKK md. 11 / GDPR)</h2>
@@ -65,7 +65,7 @@
     <h2>Security</h2>
 <p>On iOS and Android your data is encrypted on the device with XChaCha20-Poly1305. The encryption key is kept in secure hardware (iOS Keychain / Android Keystore) as “this device only” and is never included in cloud backups. Android auto-backup is disabled. You can turn on an app lock with Face ID, fingerprint or passcode. Messages you copy are cleared from the clipboard after 90 seconds.</p>
     <h2>Backups</h2>
-<p>The .json file created by “Back up” is not encrypted and is saved wherever you choose (e.g. Files, email). Keeping it safe is your responsibility. The temporary copy is deleted from the device once sharing finishes.</p>
+<p>The file created with “Back up” is saved where you choose (e.g. Files, email). If you set a password, the file is encrypted with XChaCha20-Poly1305 using a key derived with scrypt; it cannot be opened without the password, and a forgotten password cannot be recovered. A backup without a password is not encrypted, and keeping it safe is your responsibility. The temporary copy is deleted from the device once sharing is done.</p>
     <h2>Things you share</h2>
 <p>Calls, WhatsApp, email and card sharing are handed over to the relevant app on your device; their own privacy policies apply.</p>
     <h2>Your rights (GDPR / KVKK art. 11)</h2>

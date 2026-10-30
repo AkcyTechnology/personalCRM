@@ -21,8 +21,8 @@ Aşağıdaki sonuçların hepsi gerçekten çalıştırılan komutların çıkt�
 Komut: `npx jest --ci`
 
 ```
-Test Suites: 12 passed, 12 total
-Tests:       67 passed, 67 total
+Test Suites: 13 passed, 13 total
+Tests:       76 passed, 76 total
 ```
 
 | Dosya | Kapsam |
@@ -36,6 +36,7 @@ Tests:       67 passed, 67 total
 | `__tests__/dates.test.ts` | Yerel tarih (UTC kayması olmadan), doğum günü ayrıştırma, bir sonraki doğum günü |
 | `__tests__/duplicateContact.test.ts` | Telefon, e-posta ve isim normalleştirmesiyle mükerrer tespiti |
 | `__tests__/engagement.test.ts` | Haftalık seri ve dondurma hakkı, bu haftaki kişiler, Günün kişisi (gün içinde sabit), Bugünün kıvılcımları, "Bugün X yıl önce", aylık hikâye, ilişki yolculuğu |
+| `__tests__/backupCrypto.test.ts` | Parolalı yedek: gidiş-dönüş ve içeriğin gizli olması; her seferinde yeni tuz ve nonce; yanlış parola; Unicode normalleştirme; veri ya da başlık değişikliğinin yakalanması; aşırı KDF parametrelerinin işe başlamadan reddi; en az 8 karakter; normal geri yükleme yolundan açılma |
 | `__tests__/analytics.test.ts` | Sayıların yuvarlanması; gönderilen paketin kişisiz ve GeoIP'siz olması, olay özelliklerinin bu bayrakları ezememesi; anahtar ya da izin yokken hiçbir istek atılmaması |
 | `__tests__/performance.test.ts` | 2.000 kişi × 20 an (~4 MB): Ana sayfa hesapları ~320 ms (önce ~900 ms; önbellek eklendi), aylık hikâye ~10 ms, hatırlatma planı ~85 ms, şifreleme ~0.6 sn, çözme ~1 sn (Node, jest). Hermes'te ölçülmedi |
 | `__tests__/i18n.test.ts` | Kaynaktaki her `t("…")` metninin ve kayıtlı sabit değerlerin (ilişki türü, tanışma yeri vb.) İngilizce karşılığı var; `{yer tutucu}` adları korunuyor; çoğul ve parametre işleme |

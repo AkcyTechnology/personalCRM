@@ -617,7 +617,8 @@ export const en: Record<string, string | [string, string]> = {
   "Uygulama kilidi açıldı": "App lock on",
   "Uygulama kilidi kapatıldı": "App lock off",
   "VERİLERİM": "MY DATA",
-  "Tüm verilerini bir .json dosyasına aktar. Dosya şifresizdir; güvenli bir yerde sakla.": "Export all your data to a .json file. It isn't encrypted — keep it somewhere safe.",
+  "Tüm verilerini bir dosyaya aktar. İstersen parolayla şifrele.":
+    "Export all your data to a file. You can protect it with a password.",
   "YASAL": "LEGAL",
   "Gizlilik Politikası": "Privacy Policy",
   "Hangi verileri neden işlediğimiz (KVKK / GDPR)": "What data we process and why (GDPR / KVKK)",
@@ -751,8 +752,8 @@ export const en: Record<string, string | [string, string]> = {
   "iOS ve Android’de veriler cihazda XChaCha20-Poly1305 ile şifrelenir. Şifreleme anahtarı cihazın güvenli donanımında (iOS Keychain / Android Keystore) “yalnızca bu cihaz” ayarıyla tutulur ve bulut yedeklerine dahil edilmez. Android otomatik yedeklemesi kapalıdır. İstersen Face ID, parmak izi veya cihaz şifresiyle uygulama kilidi açabilirsin. Panoya kopyalanan mesajlar 90 saniye sonra panodan temizlenir.":
     "On iOS and Android your data is encrypted on the device with XChaCha20-Poly1305. The encryption key is kept in secure hardware (iOS Keychain / Android Keystore) as “this device only” and is never included in cloud backups. Android auto-backup is disabled. You can turn on an app lock with Face ID, fingerprint or passcode. Messages you copy are cleared from the clipboard after 90 seconds.",
   "Yedekler": "Backups",
-  "“Yedek al” ile oluşturulan .json dosyası şifresizdir ve senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.":
-    "The .json file created by “Back up” is not encrypted and is saved wherever you choose (e.g. Files, email). Keeping it safe is your responsibility. The temporary copy is deleted from the device once sharing finishes.",
+  "“Yedek al” ile oluşturulan dosya senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Parola belirlersen dosya scrypt ile türetilen bir anahtarla XChaCha20-Poly1305 kullanılarak şifrelenir; parola olmadan açılamaz ve unutulursa kurtarılamaz. Parolasız yedek şifresizdir; bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.":
+    "The file created with “Back up” is saved where you choose (e.g. Files, email). If you set a password, the file is encrypted with XChaCha20-Poly1305 using a key derived with scrypt; it cannot be opened without the password, and a forgotten password cannot be recovered. A backup without a password is not encrypted, and keeping it safe is your responsibility. The temporary copy is deleted from the device once sharing is done.",
   "Paylaştığın içerikler": "Things you share",
   "Arama, WhatsApp, e-posta veya kartvizit paylaşımı gibi işlemler cihazındaki ilgili uygulamaya devredilir; bu uygulamaların kendi gizlilik politikaları geçerlidir.":
     "Calls, WhatsApp, email and card sharing are handed over to the relevant app on your device; their own privacy policies apply.",
@@ -835,4 +836,25 @@ export const en: Record<string, string | [string, string]> = {
   "Titreşim": "Haptics",
   "Önemli anlarda hafif titreşim": "Gentle vibration at key moments",
   "Bugün kime merhaba diyeceksin?": "Who will you say hi to today?",
+
+  // ── Password-protected backups ──
+  "Yedeği parolayla korumak ister misin?": "Protect the backup with a password?",
+  "Parolalı yedek, dosyayı ele geçiren birinin kişilerini ve notlarını okumasını engeller.": "A password stops anyone who gets hold of the file from reading your contacts and notes.",
+  "Parola belirle (önerilen)": "Set a password (recommended)",
+  "Parolasız devam et": "Continue without a password",
+  "Yedek için parola belirle": "Set a backup password",
+  "Bu parolayı bir yere not et. Parolayı unutursan yedek açılamaz; kimse kurtaramaz.": "Write this password down. If you forget it, the backup can't be opened, and nobody can recover it.",
+  "Şifrele ve paylaş": "Encrypt and share",
+  "Bu yedek parolalı": "This backup is password-protected",
+  "Yedeği alırken belirlediğin parolayı yaz.": "Enter the password you set when you made the backup.",
+  "Aç": "Open",
+  "Parola yanlış. Tekrar dene.": "Wrong password. Try again.",
+  "Bu dosya bozuk ya da bir Connectly yedeği değil.": "This file is damaged or isn't a Connectly backup.",
+  "Parola": "Password",
+  "Parolayı tekrar yaz": "Repeat password",
+  "Parolayı gizle": "Hide password",
+  "Parolayı göster": "Show password",
+  "En az {count} karakter": "At least {count} characters",
+  "Parolalar aynı değil": "Passwords don't match",
+  "Hazırlanıyor… %{percent}": "Working… {percent}%",
 };

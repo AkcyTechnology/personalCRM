@@ -9,7 +9,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Legal">;
 
 type Section = { title: string; body: string };
 
-const UPDATED = new Date(2026, 9, 30);
+const UPDATED = new Date(2026, 9, 31);
 
 const PRIVACY: Section[] = [
   {
@@ -50,7 +50,7 @@ const PRIVACY: Section[] = [
   {
     title: "Yedekler",
     body:
-      "“Yedek al” ile oluşturulan .json dosyası şifresizdir ve senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.",
+      "“Yedek al” ile oluşturulan dosya senin seçtiğin yere (ör. Dosyalar, e-posta) kaydedilir. Parola belirlersen dosya scrypt ile türetilen bir anahtarla XChaCha20-Poly1305 kullanılarak şifrelenir; parola olmadan açılamaz ve unutulursa kurtarılamaz. Parolasız yedek şifresizdir; bu dosyanın güvenliği senin sorumluluğundadır. Geçici kopya paylaşım tamamlanınca cihazdan silinir.",
   },
   {
     title: "Paylaştığın içerikler",
