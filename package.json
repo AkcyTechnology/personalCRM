@@ -62,7 +62,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --omit=dev",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "legal": "node scripts/build-legal-pages.js"
   },
   "private": true,
   "jest": {
