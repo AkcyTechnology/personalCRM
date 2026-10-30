@@ -16,10 +16,28 @@ export function weekKey(d: Date): string {
   return toISODate(addDays(day, -offset));
 }
 
+const weekCache = new Map<string, string>();
+
+/** weekKey for a YYYY-MM-DD string, cached: thousands of moments share a few hundred dates. */
+function weekOf(date: string): string {
+  let key = weekCache.get(date);
+  if (key === undefined) {
+    if (weekCache.size > 20_000) weekCache.clear();
+    key = weekKey(parseISODate(date)!);
+    weekCache.set(date, key);
+  }
+  return key;
+}
+
 type Moment = { contactId: string; date: string; interaction?: Interaction };
+
+// Contact lists are replaced, never mutated, so the array identity is a safe cache key.
+const momentsCache = new WeakMap<ContactForm[], Moment[]>();
 
 /** Every recorded moment (interaction history + manually set last-contact dates). */
 export function allMoments(contacts: ContactForm[]): Moment[] {
+  const cached = momentsCache.get(contacts);
+  if (cached) return cached;
   const out: Moment[] = [];
   for (const c of contacts) {
     if (!c.id) continue;
@@ -30,7 +48,9 @@ export function allMoments(contacts: ContactForm[]): Moment[] {
     }
     if (c.lastContactDate && !dates.has(c.lastContactDate)) out.push({ contactId: c.id, date: c.lastContactDate });
   }
-  return out.filter((m) => !!parseISODate(m.date));
+  const valid = out.filter((m) => /^\d{4}-\d{2}-\d{2}/.test(m.date) && !!parseISODate(m.date));
+  momentsCache.set(contacts, valid);
+  return valid;
 }
 
 export type Streak = {
@@ -43,7 +63,7 @@ export type Streak = {
 };
 
 export function weeklyStreak(contacts: ContactForm[], now: Date = new Date()): Streak {
-  const active = new Set(allMoments(contacts).map((m) => weekKey(parseISODate(m.date)!)));
+  const active = new Set(allMoments(contacts).map((m) => weekOf(m.date)));
   const thisWeek = weekKey(now);
   if (active.size === 0) return { current: 0, best: 0, freezes: 0, thisWeekDone: false };
 
@@ -69,7 +89,7 @@ export function weeklyStreak(contacts: ContactForm[], now: Date = new Date()): S
 /** Distinct people with a moment in the current week. */
 export function peopleThisWeek(contacts: ContactForm[], now: Date = new Date()): number {
   const wk = weekKey(now);
-  return new Set(allMoments(contacts).filter((m) => weekKey(parseISODate(m.date)!) === wk).map((m) => m.contactId)).size;
+  return new Set(allMoments(contacts).filter((m) => weekOf(m.date) === wk).map((m) => m.contactId)).size;
 }
 
 // ── Person of the day ─────────────────────────────────────────────────────────

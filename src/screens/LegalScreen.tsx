@@ -3,19 +3,19 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import AppHeader from "../components/AppHeader";
 import { colors } from "../theme/colors";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Legal">;
 
 type Section = { title: string; body: string };
 
-const UPDATED = "17 Ekim 2026";
+const UPDATED = new Date(2026, 9, 30);
 
 const PRIVACY: Section[] = [
   {
     title: "Özet",
     body:
-      "Connectly, ilişkilerini takip etmen için tasarlanmış bir kişisel CRM uygulamasıdır. Girdiğin tüm bilgiler yalnızca senin cihazında saklanır. Bu sürümde bir sunucumuz yoktur; verilerin bize gönderilmez, satılmaz, reklam veya profil oluşturma amacıyla kullanılmaz.",
+      "Connectly, ilişkilerini sıcak tutman için tasarlanmış bir kişisel ilişki uygulamasıdır. Girdiğin tüm bilgiler yalnızca senin cihazında saklanır. Kişilerin, notların ve görüşme geçmişin hiçbir sunucuya gönderilmez, satılmaz, reklam veya profil oluşturma amacıyla kullanılmaz. Tek istisna, yalnızca sen izin verirsen gönderilen anonim kullanım istatistikleridir (aşağıya bak).",
   },
   {
     title: "Hangi verileri işliyoruz?",
@@ -26,6 +26,16 @@ const PRIVACY: Section[] = [
     title: "Rehber erişimi",
     body:
       "Rehber izni yalnızca sen “Rehberden kişi seç” veya “Rehberden aktar” dediğinde istenir. iOS’ta tek kişi seçerken sistem seçicisi kullanılır ve uygulamaya sadece seçtiğin kişi gelir. Toplu aktarımda yalnızca ad, telefon, e-posta ve doğum günü okunur; sadece işaretlediğin kişiler kaydedilir. Rehberin hiçbir zaman cihaz dışına gönderilmez.",
+  },
+  {
+    title: "Anonim kullanım istatistikleri",
+    body:
+      "Yalnızca sen “Evet, yardım edeyim” dersen, hangi özelliklerin kullanıldığını anlamak için anonim olaylar gönderilir (ör. “bir an kaydedildi”, “hikâye paylaşıldı”). Her olayla birlikte rastgele bir kurulum kimliği, platform, uygulama dili ve sürümü ile “2-5” gibi yuvarlanmış sayılar gider. Kişi adları, telefon numaraları, notlar, tarihler ve rehber bilgileri asla gönderilmez; kişi profili ve konum tahmini kapalıdır. Veriler PostHog’un AB sunucularında işlenir. İzni istediğin an “Gizlilik ve Güvenlik” ekranından geri alabilirsin; “Tüm verileri sil” kurulum kimliğini de siler.",
+  },
+  {
+    title: "Ana ekran widget’ı",
+    body:
+      "iOS ana ekran widget’ı ağacının durumunu, haftalık ilerlemeni ve günün kişisinin yalnızca ilk adını gösterir. Uygulama kilidi açıksa widget’ta isim gösterilmez. Widget verisi yalnızca cihazındaki paylaşılan uygulama alanında tutulur.",
   },
   {
     title: "Bildirimler",
@@ -108,7 +118,7 @@ export default function LegalScreen({ navigation, route }: Props) {
     <View style={styles.screen}>
       <AppHeader type="settings" centerTitle={title} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>{t("Son güncelleme: {date}", { date: UPDATED })}</Text>
+        <Text style={styles.updated}>{t("Son güncelleme: {date}", { date: UPDATED.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" }) })}</Text>
         {sections.map((s) => (
           <View key={s.title} style={styles.section}>
             <Text style={styles.heading} accessibilityRole="header">{t(s.title)}</Text>

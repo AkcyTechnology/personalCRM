@@ -63,8 +63,9 @@ const light = {
   danger:         "#DC2626",
   dangerSoft:     "#FEE2E2",
 
-  gradientFrom:   "#00A39B",
-  gradientTo:     "#00857E",
+  // White text stays ≥ 4.5:1 across the whole gradient.
+  gradientFrom:   "#00857E",
+  gradientTo:     "#00706A",
 };
 
 export type Palette = typeof light;

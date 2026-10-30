@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+
+let screenReaderOn = false;
+AccessibilityInfo.isScreenReaderEnabled().then((v) => { screenReaderOn = v; }).catch(() => {});
+AccessibilityInfo.addEventListener("screenReaderChanged", (v) => { screenReaderOn = v; });
 import { t } from "../i18n";
 
 type ToastOptions = {
@@ -49,7 +53,9 @@ export default function ToastHost() {
       opacity.stopAnimation();
       setToast(next);
       Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-      hideTimer.current = setTimeout(hide, next.durationMs ?? (next.actionLabel ? 5000 : 2200));
+      // Screen-reader users need longer to reach the "Undo" action.
+      const base = next.durationMs ?? (next.actionLabel ? 5000 : 2200);
+      hideTimer.current = setTimeout(hide, screenReaderOn ? base * 3 : base);
     };
     return () => {
       listener = null;
