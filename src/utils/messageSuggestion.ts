@@ -1,4 +1,5 @@
 import type { ContactForm } from "../screens/AddContactScreen";
+import { getLanguage } from "../i18n";
 
 export type MessageTone = "samimi" | "profesyonel" | "kisa" | "daha-sicak" | "daha-resmi";
 
@@ -83,8 +84,29 @@ function applyTone(message: string, tone: MessageTone, contact: ContactForm, fam
   }
 }
 
+function englishMessage(contact: ContactForm, tone: MessageTone, family: Family): string {
+  const name = firstName(contact.fullName);
+  const days = daysSince(contact.lastContactDate);
+  const time =
+    days >= 9999 || days >= 60 ? "it's been a while since we talked"
+    : days <= 1 ? "you crossed my mind today"
+    : days < 14 ? `it's been ${days} days since we talked`
+    : `it's been ${Math.round(days / 7)} weeks since we talked`;
+  const notes = contact.notes?.trim();
+  const noteLine = notes ? ` How's ${notes.length > 60 ? notes.slice(0, 60).trim() + "…" : notes} going?` : "";
+
+  if (tone === "profesyonel" || tone === "daha-resmi" || (family === "profesyonel" && tone === "samimi")) {
+    return `Hi ${name}, I hope you're well. Our last conversation came to mind and I wanted to check in on how things are going.${noteLine}`;
+  }
+  if (tone === "kisa") return `Hey ${name}, ${time} — how are you?`;
+  if (tone === "daha-sicak") return `${name}, I really miss you! ${time.charAt(0).toUpperCase() + time.slice(1)}. How are you? Let's grab a coffee soon ❤️${noteLine}`;
+  if (family === "aile") return `Hi, ${time}. How are you? I was thinking about you today.${noteLine}`;
+  return `${name}, ${time}. How are you doing? Fancy a quick coffee when you're free?${noteLine}`;
+}
+
 export function generateMessage(contact: ContactForm, tone: MessageTone = "samimi"): string {
   const family = familyFor(contact);
+  if (getLanguage() === "en") return englishMessage(contact, tone, family);
   const base = baseMessage(contact, family);
   return applyTone(base, tone, contact, family);
 }

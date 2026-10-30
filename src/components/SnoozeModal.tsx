@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, TextInput, Modal, Pressable, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from "react-native";
+import DateField from "./DateField";
+import { addDays, toISODate } from "../utils/dates";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import { t } from "../i18n";
 
 type PresetOption = { label: string; days: number };
 
@@ -16,19 +19,7 @@ const PRESETS: PresetOption[] = [
 const CUSTOM = "Özel tarih seç";
 
 function daysAhead(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
-}
-
-function parseCustomDate(text: string): string | null {
-  const match = text.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!match) return null;
-  const [, dd, mm, yyyy] = match;
-  const iso = `${yyyy}-${mm}-${dd}`;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return iso;
+  return toISODate(addDays(new Date(), n));
 }
 
 type Props = {
@@ -40,16 +31,16 @@ type Props = {
 
 export default function SnoozeModal({ visible, contactName, onCancel, onConfirm }: Props) {
   const [selected, setSelected] = useState<number | "custom" | null>(null);
-  const [customText, setCustomText] = useState("");
+  const [customDate, setCustomDate] = useState("");
 
   const resetAndCancel = () => {
     setSelected(null);
-    setCustomText("");
+    setCustomDate("");
     onCancel();
   };
 
   const resolvedDate =
-    selected === "custom" ? parseCustomDate(customText)
+    selected === "custom" ? (customDate > daysAhead(0) ? customDate : null)
     : typeof selected === "number" ? daysAhead(selected)
     : null;
 
@@ -59,16 +50,18 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
     if (!resolvedDate) return;
     onConfirm(resolvedDate);
     setSelected(null);
-    setCustomText("");
+    setCustomDate("");
   };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={resetAndCancel}>
       <Pressable style={styles.overlay} onPress={resetAndCancel}>
         <Pressable style={styles.modalBox}>
-          <Text style={styles.title}>Ne kadar erteleyelim?</Text>
+          <Text style={styles.title}>{t("Ne kadar erteleyelim?")}</Text>
           <Text style={styles.desc}>
-            {contactName ? `${contactName} kişisini ` : ""}seçtiğin tarihte tekrar öncelikli olarak göstereceğiz.
+            {contactName
+              ? t("{name} için seçtiğin tarihte tekrar hatırlatacağım.", { name: contactName })
+              : t("Seçtiğin tarihte tekrar hatırlatacağım.")}
           </Text>
 
           <View style={styles.optionsGrid}>
@@ -80,8 +73,10 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
                   style={[styles.option, active && styles.optionActive]}
                   onPress={() => setSelected(p.days)}
                   activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{p.label}</Text>
+                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{t(p.label)}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -89,25 +84,28 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
               style={[styles.option, styles.optionWide, selected === "custom" && styles.optionActive]}
               onPress={() => setSelected("custom")}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: selected === "custom" }}
             >
-              <Text style={[styles.optionText, selected === "custom" && styles.optionTextActive]}>{CUSTOM}</Text>
+              <Text style={[styles.optionText, selected === "custom" && styles.optionTextActive]}>{t(CUSTOM)}</Text>
             </TouchableOpacity>
           </View>
 
           {selected === "custom" && (
-            <TextInput
-              style={styles.customInput}
-              value={customText}
-              onChangeText={setCustomText}
-              placeholder="GG/AA/YYYY"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numbers-and-punctuation"
-            />
+            <View style={{ marginTop: spacing.sm }}>
+              <DateField
+                format="iso"
+                value={customDate}
+                onChange={setCustomDate}
+                minimumDate={addDays(new Date(), 1)}
+                placeholder={t("Tarih seç")}
+              />
+            </View>
           )}
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={resetAndCancel} activeOpacity={0.75}>
-              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              <Text style={styles.cancelBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.confirmBtn, !canConfirm && styles.confirmBtnOff]}
@@ -115,7 +113,7 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
               activeOpacity={0.85}
               disabled={!canConfirm}
             >
-              <Text style={styles.confirmBtnText}>Ertele</Text>
+              <Text style={styles.confirmBtnText}>{t("Ertele")}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -126,7 +124,7 @@ export default function SnoozeModal({ visible, contactName, onCancel, onConfirm 
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
@@ -134,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg, borderRadius: radius.modal, padding: 22,
   },
   title: { fontSize: 18, fontWeight: "800", color: colors.text, marginBottom: 8, textAlign: "center" },
-  desc: { fontSize: 13, color: colors.textSub, textAlign: "center", lineHeight: 19, marginBottom: 18 },
+  desc: { fontSize: 14, color: colors.textSub, textAlign: "center", lineHeight: 19, marginBottom: 18 },
 
   optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   option: {
@@ -146,15 +144,9 @@ const styles = StyleSheet.create({
   },
   optionWide: { minWidth: "100%" },
   optionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  optionText: { fontSize: 14, fontWeight: "600", color: colors.textSub },
+  optionText: { fontSize: 15, fontWeight: "600", color: colors.textSub },
   optionTextActive: { color: colors.primary, fontWeight: "700" },
 
-  customInput: {
-    marginTop: spacing.sm,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.input,
-    backgroundColor: colors.card, color: colors.text,
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14,
-  },
 
   buttonRow: { flexDirection: "row", gap: 10, marginTop: 20 },
   cancelBtn: {
@@ -169,5 +161,5 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   confirmBtnOff: { backgroundColor: colors.primary + "55" },
-  confirmBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  confirmBtnText: { fontSize: 14, fontWeight: "700", color: colors.onFill },
 });

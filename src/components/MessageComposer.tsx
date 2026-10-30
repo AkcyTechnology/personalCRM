@@ -1,23 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet, Linking } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from "react-native";
+import { copyWithAutoClear } from "../utils/clipboard";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
 import type { ContactForm } from "../screens/AddContactScreen";
 import { generateMessage, TONE_LABELS, type MessageTone } from "../utils/messageSuggestion";
 import { showToast } from "./Toast";
+import { t } from "../i18n";
+import { openWhatsApp as openWhatsAppLink } from "../utils/links";
 
 type Props = {
   visible: boolean;
   contact: ContactForm | null;
   onClose: () => void;
+  /** Called right before leaving the app to send the message. */
+  onExternalSend?: () => void;
+  /** Extra buttons shown under the main actions (e.g. "Ara"). */
+  extraActions?: { label: string; onPress: () => void }[];
 };
 
-export default function MessageComposer({ visible, contact, onClose }: Props) {
+export default function MessageComposer({ visible, contact, onClose, onExternalSend, extraActions = [] }: Props) {
   const [tone, setTone] = useState<MessageTone>("samimi");
   const [message, setMessage] = useState("");
-  const [variant, setVariant] = useState(0);
+  const [, setVariant] = useState(0);
 
   useEffect(() => {
     if (visible && contact) {
@@ -25,6 +31,8 @@ export default function MessageComposer({ visible, contact, onClose }: Props) {
       setVariant(0);
       setMessage(generateMessage(contact, "samimi"));
     }
+    // Yalnızca açılışta / kişi değişince yeniden üret
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, contact?.id, contact?.fullName]);
 
   const regenerate = (nextTone: MessageTone = tone) => {
@@ -35,14 +43,15 @@ export default function MessageComposer({ visible, contact, onClose }: Props) {
   };
 
   const copyMessage = async () => {
-    await Clipboard.setStringAsync(message);
-    showToast("Mesaj kopyalandı");
+    await copyWithAutoClear(message);
+    showToast(t("Mesaj kopyalandı · 90 sn sonra panodan silinir"));
   };
 
   const openWhatsApp = () => {
     if (!contact?.phone) return;
-    const cleaned = contact.phone.replace(/[^0-9]/g, "");
-    Linking.openURL(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`);
+    onExternalSend?.();
+    onClose();
+    openWhatsAppLink(contact.phone, message);
   };
 
   const canWhatsApp = !!contact?.phone;
@@ -53,42 +62,62 @@ export default function MessageComposer({ visible, contact, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.box}>
-          <Text style={styles.title}>Mesaj hazırla</Text>
-          <Text style={styles.subtitle}>{contact.fullName} için · {TONE_LABELS[tone]}</Text>
+          <Text style={styles.title} accessibilityRole="header">{t("Mesaj hazırla")}</Text>
+          <Text style={styles.subtitle}>{t("{name} için · {tone}", { name: contact.fullName, tone: t(TONE_LABELS[tone]) })}</Text>
 
           <View style={styles.messageBox}>
             <Text style={styles.messageText}>{message}</Text>
           </View>
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.primaryBtn} onPress={copyMessage} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Kopyala</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={copyMessage} activeOpacity={0.85} accessibilityRole="button">
+              <Text style={styles.primaryBtnText}>{t("Kopyala")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryBtn, !canWhatsApp && styles.btnDisabled]}
               onPress={canWhatsApp ? openWhatsApp : undefined}
               activeOpacity={0.85}
               disabled={!canWhatsApp}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canWhatsApp }}
             >
-              <Text style={styles.primaryBtnText}>WhatsApp'ta Aç</Text>
+              <Text style={styles.primaryBtnText}>{t("WhatsApp'ta Aç")}</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => regenerate()} activeOpacity={0.75}>
-            <Text style={styles.secondaryBtnText}>Yeniden Oluştur</Text>
+          {extraActions.map((a) => (
+            <TouchableOpacity key={a.label} style={styles.secondaryBtn} onPress={a.onPress} activeOpacity={0.75} accessibilityRole="button">
+              <Text style={styles.secondaryBtnText}>{a.label}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => regenerate()} activeOpacity={0.75} accessibilityRole="button">
+            <Text style={styles.secondaryBtnText}>{t("Yeniden Oluştur")}</Text>
           </TouchableOpacity>
 
-          <View style={styles.toneRow}>
-            <TouchableOpacity style={styles.toneBtn} onPress={() => regenerate("daha-sicak")} activeOpacity={0.75}>
-              <Text style={styles.toneBtnText}>Daha Samimi Yap</Text>
+          <View style={styles.toneRow} accessibilityRole="radiogroup">
+            <TouchableOpacity
+              style={[styles.toneBtn, tone === "daha-sicak" && styles.toneBtnActive]}
+              onPress={() => regenerate("daha-sicak")}
+              activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: tone === "daha-sicak" }}
+            >
+              <Text style={styles.toneBtnText}>{t("Daha Samimi Yap")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.toneBtn} onPress={() => regenerate("profesyonel")} activeOpacity={0.75}>
-              <Text style={styles.toneBtnText}>Daha Profesyonel Yap</Text>
+            <TouchableOpacity
+              style={[styles.toneBtn, tone === "profesyonel" && styles.toneBtnActive]}
+              onPress={() => regenerate("profesyonel")}
+              activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: tone === "profesyonel" }}
+            >
+              <Text style={styles.toneBtnText}>{t("Daha Profesyonel Yap")}</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.closeBtnText}>Kapat</Text>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75} accessibilityRole="button">
+            <Text style={styles.closeBtnText}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -97,8 +126,9 @@ export default function MessageComposer({ visible, contact, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+  toneBtnActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   box: {
@@ -124,7 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
   },
   btnDisabled: { backgroundColor: colors.primary + "45" },
-  primaryBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
+  primaryBtnText: { fontSize: 13, fontWeight: "700", color: colors.onFill },
 
   secondaryBtn: {
     marginTop: 10, height: 46, borderRadius: radius.button,

@@ -9,16 +9,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert,
   StatusBar,
   FlatList,
 } from "react-native";
 import { useState, useCallback, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Contacts from "expo-contacts/legacy";
+import {
+  ContactsPermissionError,
+  ContactsUnavailableError,
+  listDeviceContactsAsync,
+  pickDeviceContactAsync,
+  type DeviceContact,
+} from "../utils/deviceContacts";
+import DateField from "../components/DateField";
+import { toISODate } from "../utils/dates";
+import { toSafeWebUrl } from "../utils/links";
+import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { addContact } from "../data/contacts";
+import { addContact, loadContacts } from "../data/contacts";
+import { isDuplicateContact } from "../utils/duplicateContact";
 import { loadSettings } from "../data/userSettings";
 import {
   DEFAULT_RELATIONSHIPS,
@@ -26,16 +36,29 @@ import {
   addCustomRelationship,
   removeCustomRelationship,
 } from "../data/relationshipTypes";
-import { colors } from "../theme/colors";
+import { colors, colorScheme } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { radius } from "../theme/radius";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { showToast } from "../components/Toast";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
+import { confirmDialog, infoDialog } from "../utils/confirm";
+import { track } from "../utils/analytics";
+import { t, tv } from "../i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SocialEntry = { platform: string; handle: string };
+
+export type InteractionType = "call" | "whatsapp" | "email" | "meeting" | "message" | "other";
+
+export type Interaction = {
+  id:    string;
+  /** YYYY-MM-DD */
+  date:  string;
+  type:  InteractionType;
+  note?: string;
+};
 
 export type ContactForm = {
   id?:                    string;
@@ -65,6 +88,7 @@ export type ContactForm = {
   createdAt?:             string;
   updatedAt?:             string;
   order?:                 number;
+  interactions?:          Interaction[];
 };
 
 const EMPTY: ContactForm = {
@@ -119,12 +143,14 @@ export default function AddContactScreen({ navigation }: Props) {
   const [errors, setErrors]         = useState<Partial<Record<keyof ContactForm, string>>>({});
   const [discardModal, setDiscard]  = useState(false);
   const [importedName, setImported] = useState("");
-  const [notesOpen, setNotesOpen]   = useState(false);
+  const [customLastContact, setCustomLastContact] = useState(false);
+  const [moreOpen, setMoreOpen]     = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customInterval, setCustomInterval] = useState(false);
   const [customIntervalText, setCustomIntervalText] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [deviceContacts, setDeviceContacts] = useState<Contacts.ExistingContact[]>([]);
+  const [deviceContacts, setDeviceContacts] = useState<DeviceContact[]>([]);
   const [permissionModal, setPermissionModal] = useState(false);
   const [customRelationships, setCustomRelationships] = useState<string[]>([]);
   const [relationshipManagerOpen, setRelationshipManagerOpen] = useState(false);
@@ -163,49 +189,53 @@ export default function AddContactScreen({ navigation }: Props) {
   };
 
   // ── Import from contacts ───────────────────────────────────────────────────
-  const handleImport = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== "granted") {
-        showToast("Rehber izni verilmedi");
-        setPermissionModal(true);
-        return;
-      }
-      const { data } = await Contacts.getContactsAsync({
-        fields: [
-          Contacts.Fields.Name,
-          Contacts.Fields.PhoneNumbers,
-          Contacts.Fields.Emails,
-          Contacts.Fields.Company,
-          Contacts.Fields.JobTitle,
-        ],
-        sort: Contacts.SortTypes.FirstName,
-      });
-      if (!data?.length) {
-        Alert.alert("Rehber boş", "Cihazında kayıtlı kişi bulunamadı.");
-        return;
-      }
-      setDeviceContacts(data.filter((c) => !!c.name));
-      setPickerVisible(true);
-    } catch {
-      showToast("Bir sorun oluştu. Lütfen tekrar dene.");
+  const handleContactsError = (error: unknown) => {
+    if (error instanceof ContactsPermissionError) {
+      showToast(t("Rehber izni verilmedi"));
+      setPermissionModal(true);
+    } else if (error instanceof ContactsUnavailableError) {
+      infoDialog(t("Rehber kullanılamıyor"), error.message);
+    } else {
+      showToast(t("Bir sorun oluştu. Lütfen tekrar dene."));
     }
   };
 
-  const handlePickDeviceContact = (picked: Contacts.ExistingContact) => {
-    const name    = picked.name ?? "";
-    const phone   = picked.phoneNumbers?.[0]?.number ?? "";
-    const email   = picked.emails?.[0]?.email ?? "";
-    const company = picked.company ?? "";
-    const title   = picked.jobTitle ?? "";
+  const handleImport = async () => {
+    try {
+      // Önce sistemin kişi seçicisi: yalnızca seçilen kişi uygulamaya gelir.
+      const picked = await pickDeviceContactAsync();
+      if (picked) handlePickDeviceContact(picked);
+      return;
+    } catch (error) {
+      if (error instanceof ContactsPermissionError || error instanceof ContactsUnavailableError) {
+        return handleContactsError(error);
+      }
+    }
+    // Sistem seçicisi yoksa uygulama içi listeye düş
+    try {
+      const data = await listDeviceContactsAsync();
+      if (!data.length) {
+        infoDialog(t("Rehber boş"), t("Cihazında kayıtlı kişi bulunamadı."));
+        return;
+      }
+      setDeviceContacts(data);
+      setPickerVisible(true);
+    } catch (error) {
+      handleContactsError(error);
+    }
+  };
+
+  const handlePickDeviceContact = (picked: DeviceContact) => {
+    const { name, phone, email, company, jobTitle: title, birthday } = picked;
     if (name) {
       setForm(prev => ({
         ...prev,
         fullName: name,
-        phone: phone.trim(),
-        email: email.trim(),
-        company: company.trim() || prev.company,
-        jobTitle: title.trim() || prev.jobTitle,
+        phone,
+        email,
+        company: company || prev.company,
+        jobTitle: title || prev.jobTitle,
+        birthday: /^\d{2}\/\d{2}\/\d{4}$/.test(birthday) ? birthday : prev.birthday,
       }));
       setImported(name);
       setErrors({});
@@ -221,28 +251,69 @@ export default function AddContactScreen({ navigation }: Props) {
   const birthdayValid = !form.birthday.trim() || BIRTHDAY_RE.test(form.birthday.trim());
   // Rehberden aktarılan kişilerde ilişki türü zorunlu değil — formu doldurmadan hızlıca kaydedilebilsin.
   const relationshipRequired = !importedName;
-  const canSave = !!form.fullName.trim() && emailValid && birthdayValid
-    && (!relationshipRequired || !!form.relationship);
+  // Kaydet hep tıklanabilir; eksik alan varsa hata mesajı alanın altında görünür.
+  const canSave = !saving;
 
   const validate = () => {
     const e: Partial<Record<keyof ContactForm, string>> = {};
-    if (!form.fullName.trim()) e.fullName = "Ad Soyad zorunlu.";
-    if (relationshipRequired && !form.relationship) e.relationship = "İlişki türü seçin.";
-    if (!emailValid)          e.email = "Geçerli bir e-posta adresi gir.";
-    if (!birthdayValid)       e.birthday = "Tarihi GG/AA/YYYY biçiminde gir.";
+    if (!form.fullName.trim()) e.fullName = t("Ad Soyad zorunlu.");
+    if (relationshipRequired && !form.relationship) e.relationship = t("İlişki türü seçin.");
+    if (!emailValid)          e.email = t("Geçerli bir e-posta adresi gir.");
+    if (!birthdayValid)       e.birthday = t("Tarihi GG/AA/YYYY biçiminde gir.");
+    if (form.website.trim() && !toSafeWebUrl(form.website)) e.website = t("Geçerli bir web adresi gir (https://…).");
     setErrors(e);
     return !Object.keys(e).length;
   };
 
-  const handleSave = async () => {
-    if (!validate()) return;
-    await addContact({
-      ...form,
-      tags: selectedTags.join(", "),
-      lastContactDate: form.lastContactDate || new Date().toISOString().split("T")[0],
-    });
+  const persist = async () => {
+    setSaving(true);
+    try {
+      const socials = [
+        ...(form.linkedin?.trim() ? [{ platform: "LinkedIn", handle: form.linkedin.trim() }] : []),
+        ...(form.instagram.trim() ? [{ platform: "Instagram", handle: form.instagram.trim() }] : []),
+        ...form.socials.filter((x) => x.handle.trim()),
+      ];
+      track("contact_added", { source: "manual" });
+      await addContact({
+        ...form,
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        socials,
+        website: form.website.trim() ? toSafeWebUrl(form.website) ?? "" : "",
+        tags: selectedTags.join(", "),
+        // Son görüşme bilinmiyorsa uydurma; hatırlatma aralığı bugünden başlasın.
+        lastContactDate: form.lastContactDate,
+        reminderIntervalStart: form.lastContactDate ? undefined : toISODate(new Date()),
+      });
+    } catch {
+      setSaving(false);
+      showToast(t("Kişi kaydedilemedi. Lütfen tekrar dene."));
+      return;
+    }
     navigation.goBack();
-    showToast("Kişi kaydedildi");
+    showToast(t("Kişi kaydedildi"));
+    // Hatırlatıcının işe yaraması için izni tam bu anda iste
+    if (form.reminderEnabled !== false) ensureNotificationPermissionAsync();
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (!validate()) {
+      showToast(t("Eksik veya hatalı alanları kontrol et"));
+      return;
+    }
+    const existing = await loadContacts();
+    if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing)) {
+      confirmDialog(t("Bu kişi zaten kayıtlı olabilir"), t("Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?"),
+        [
+          { text: t("Vazgeç"), style: "cancel" },
+          { text: t("Yine de ekle"), onPress: persist },
+        ]
+      );
+      return;
+    }
+    persist();
   };
 
   const handleBack = () => {
@@ -253,14 +324,14 @@ export default function AddContactScreen({ navigation }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colorScheme() === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
 
       {/* App bar */}
       <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={handleBack} style={styles.appBarSide} activeOpacity={0.7}>
-          <Text style={styles.appBarBack}>Geri</Text>
+          <Text style={styles.appBarBack}>{t("Geri")}</Text>
         </TouchableOpacity>
-        <Text style={styles.appBarTitle}>Kişi Ekle</Text>
+        <Text style={styles.appBarTitle}>{t("Kişi Ekle")}</Text>
         <TouchableOpacity
           onPress={handleSave}
           style={styles.appBarSide}
@@ -268,7 +339,7 @@ export default function AddContactScreen({ navigation }: Props) {
           disabled={!canSave}
         >
           <Text style={[styles.appBarSave, !canSave && styles.appBarSaveDisabled]}>
-            Kaydet
+            {t("Kaydet")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -290,8 +361,8 @@ export default function AddContactScreen({ navigation }: Props) {
               <ContactBookIcon />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.importTitle}>Rehberden kişi seç</Text>
-              <Text style={styles.importSub}>Telefon rehberinden bilgileri hızlıca aktar</Text>
+              <Text style={styles.importTitle}>{t("Rehberden kişi seç")}</Text>
+              <Text style={styles.importSub}>{t("Telefon rehberinden bilgileri hızlıca aktar")}</Text>
             </View>
             <ChevronRight />
           </TouchableOpacity>
@@ -306,102 +377,35 @@ export default function AddContactScreen({ navigation }: Props) {
                 {form.phone ? <Text style={styles.importedPhone}>{form.phone}</Text> : null}
               </View>
               <View style={styles.importedBadge}>
-                <Text style={styles.importedBadgeText}>Aktarıldı</Text>
+                <Text style={styles.importedBadgeText}>{t("Aktarıldı")}</Text>
               </View>
             </View>
           ) : null}
 
-          {/* ── Section 2: Basic info ── */}
-          <SectionLabel title="Temel Bilgiler" />
+          {/* ── Essentials ── */}
+          <Text style={styles.requiredLegend}>{t("* zorunlu alan")}</Text>
 
           <FieldGroup>
             <Field
-              label="Ad Soyad"
+              label={t("Ad Soyad")}
               required
               value={form.fullName}
               error={errors.fullName}
-              placeholder="Ahmet Yılmaz"
+              placeholder={t("Ahmet Yılmaz")}
               onChangeText={v => set("fullName", v)}
             />
             <Divider />
             <Field
-              label="Şirket / Kurum"
-              value={form.company}
-              placeholder="Acme A.Ş."
-              onChangeText={v => set("company", v)}
-            />
-            <Divider />
-            <Field
-              label="Unvan / Pozisyon"
-              value={form.jobTitle}
-              placeholder="Yazılım Mühendisi"
-              onChangeText={v => set("jobTitle", v)}
-            />
-            <Divider />
-            <Field
-              label="Doğum Tarihi"
-              value={form.birthday}
-              error={errors.birthday}
-              placeholder="GG / AA / YYYY"
-              onChangeText={v => set("birthday", v)}
-            />
-            <Divider />
-            <Field
-              label="Şehir"
-              value={form.city}
-              placeholder="İstanbul"
-              onChangeText={v => set("city", v)}
-            />
-          </FieldGroup>
-
-          <FieldGroup>
-            <Field
-              label="Telefon"
+              label={t("Telefon")}
               value={form.phone}
-              placeholder="+90 5xx xxx xx xx"
+              placeholder={t("+90 5xx xxx xx xx")}
               keyboardType="phone-pad"
               onChangeText={v => set("phone", v)}
             />
-            <Divider />
-            <Field
-              label="E-posta"
-              value={form.email}
-              error={errors.email}
-              placeholder="ornek@email.com"
-              keyboardType="email-address"
-              onChangeText={v => set("email", v)}
-            />
-            <Divider />
-            <Field
-              label="Website"
-              value={form.website}
-              placeholder="https://..."
-              keyboardType="url"
-              onChangeText={v => set("website", v)}
-            />
-            <Divider />
-            <Field
-              label="LinkedIn"
-              value={form.linkedin ?? ""}
-              placeholder="linkedin.com/in/kullanici"
-              autoCapitalize="none"
-              onChangeText={v => set("linkedin", v)}
-            />
-            <Divider />
-            <Field
-              label="Instagram"
-              value={form.instagram}
-              placeholder="@kullanici"
-              autoCapitalize="none"
-              onChangeText={v => set("instagram", v)}
-            />
           </FieldGroup>
 
-          {/* ── Section 3: Relationship ── */}
-          <SectionLabel title="İlişki" />
-
           <ChipSection
-            label="Bu kişi senin için kim?"
+            label={t("Bu kişi senin için kim?")}
             required={relationshipRequired}
             error={errors.relationship}
             chips={relationships}
@@ -410,56 +414,8 @@ export default function AddContactScreen({ navigation }: Props) {
             onManage={() => setRelationshipManagerOpen(true)}
           />
 
-          <FieldGroup>
-            <Field
-              label="Yakınlık"
-              value={form.closenessTag ?? ""}
-              placeholder="örn. Çok yakın, Yüzeysel"
-              onChangeText={v => set("closenessTag", v)}
-            />
-          </FieldGroup>
-
-          <ChipSection
-            label="Nerede tanıştınız?"
-            chips={MET_WHERE}
-            selected={form.metWhere}
-            onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
-          />
-
-          <ChipSection
-            label="Öncelik"
-            chips={PRIORITIES}
-            selected={form.priority}
-            onSelect={v => set("priority", v === form.priority ? "" : v)}
-            colorMap={{ Düşük: "#6B7280", Orta: "#D97706", Yüksek: "#DC2626" }}
-          />
-
-          {/* ── Section 4: Activity & reminders ── */}
-          <SectionLabel title="Son İletişim ve Hatırlatıcı" />
-
-          <ChipSection
-            label="En son ne zaman görüştünüz?"
-            chips={LAST_CONTACT_OPTIONS}
-            selected={form.lastContactDate}
-            onSelect={v => {
-              const map: Record<string, string> = {
-                "Bugün":       new Date().toISOString().split("T")[0],
-                "Dün":         daysAgo(1),
-                "1 hafta önce": daysAgo(7),
-                "1 ay önce":   daysAgo(30),
-              };
-              set("lastContactDate", map[v] ?? v);
-            }}
-            displayMap={{
-              [new Date().toISOString().split("T")[0]]: "Bugün",
-              [daysAgo(1)]: "Dün",
-              [daysAgo(7)]: "1 hafta önce",
-              [daysAgo(30)]: "1 ay önce",
-            }}
-          />
-
           <View style={styles.card}>
-            <Text style={styles.chipLabel}>Tekrar ne zaman hatırlatayım?</Text>
+            <Text style={styles.chipLabel}>{t("Tekrar ne zaman hatırlatayım?")}</Text>
             <View style={styles.chipRow}>
               {INTERVAL_PRESETS.map(preset => {
                 const active = !customInterval && form.reminderIntervalDays === preset.days;
@@ -473,9 +429,11 @@ export default function AddContactScreen({ navigation }: Props) {
                       set("reminderIntervalDays", preset.days);
                     }}
                     activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {preset.label}
+                      {t(preset.label)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -484,16 +442,18 @@ export default function AddContactScreen({ navigation }: Props) {
                 style={[styles.chip, customInterval && styles.chipActive]}
                 onPress={() => setCustomInterval(true)}
                 activeOpacity={0.75}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: customInterval }}
               >
                 <Text style={[styles.chipText, customInterval && styles.chipTextActive]}>
-                  {CUSTOM_INTERVAL}
+                  {t(CUSTOM_INTERVAL)}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {customInterval && (
               <View style={styles.customIntervalRow}>
-                <Text style={styles.customIntervalLabel}>Her</Text>
+                <Text style={styles.customIntervalLabel}>{t("Her")}</Text>
                 <TextInput
                   style={styles.customIntervalInput}
                   value={customIntervalText}
@@ -505,19 +465,161 @@ export default function AddContactScreen({ navigation }: Props) {
                   }}
                   keyboardType="number-pad"
                   placeholder="30"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={colors.placeholder}
                   maxLength={4}
                 />
-                <Text style={styles.customIntervalLabel}>günde bir iletişime geç</Text>
+                <Text style={styles.customIntervalLabel}>{t("günde bir iletişime geç")}</Text>
               </View>
             )}
           </View>
 
-          {/* ── Section 5: Tags ── */}
-          <SectionLabel title="Etiketler" />
+          <ChipSection
+            label={t("En son ne zaman görüştünüz?")}
+            chips={LAST_CONTACT_OPTIONS}
+            selected={form.lastContactDate}
+            onSelect={v => {
+              if (v === "Özel tarih") {
+                setCustomLastContact(true);
+                return;
+              }
+              setCustomLastContact(false);
+              const map: Record<string, string> = {
+                "Bugün":       toISODate(new Date()),
+                "Dün":         daysAgo(1),
+                "1 hafta önce": daysAgo(7),
+                "1 ay önce":   daysAgo(30),
+              };
+              set("lastContactDate", map[v] ?? v);
+            }}
+            displayMap={{
+              [toISODate(new Date())]: "Bugün",
+              [daysAgo(1)]: "Dün",
+              [daysAgo(7)]: "1 hafta önce",
+              [daysAgo(30)]: "1 ay önce",
+            }}
+          />
+
+          {customLastContact || (form.lastContactDate && ![toISODate(new Date()), daysAgo(1), daysAgo(7), daysAgo(30)].includes(form.lastContactDate)) ? (
+            <View style={styles.card}>
+              <DateField
+                label={t("Son görüşme tarihi")}
+                format="iso"
+                value={form.lastContactDate}
+                maximumDate={new Date()}
+                onChange={v => set("lastContactDate", v)}
+              />
+            </View>
+          ) : null}
+
+          {/* ── Optional details ── */}
+          <TouchableOpacity
+            style={styles.moreToggle}
+            onPress={() => setMoreOpen(o => !o)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: moreOpen }}
+          >
+            <Text style={styles.moreToggleText}>{moreOpen ? t("Daha az bilgi") : t("Daha fazla bilgi")}</Text>
+            <Text style={styles.moreToggleHint}>{t("İş, doğum günü, e-posta, sosyal medya, notlar")}</Text>
+          </TouchableOpacity>
+
+          {moreOpen ? (
+            <>
+              <FieldGroup>
+                <Field
+                  label={t("Şirket / Kurum")}
+                  value={form.company}
+                  placeholder={t("Acme A.Ş.")}
+                  onChangeText={v => set("company", v)}
+                />
+                <Divider />
+                <Field
+                  label={t("Unvan / Pozisyon")}
+                  value={form.jobTitle}
+                  placeholder={t("Yazılım Mühendisi")}
+                  onChangeText={v => set("jobTitle", v)}
+                />
+                <Divider />
+                <View style={{ paddingTop: 12 }}>
+                  <DateField
+                    label={t("Doğum Tarihi")}
+                    format="birthday"
+                    value={form.birthday}
+                    error={errors.birthday}
+                    placeholder={t("Tarih seç")}
+                    maximumDate={new Date()}
+                    onChange={v => set("birthday", v)}
+                  />
+                </View>
+                <Divider />
+                <Field
+                  label={t("Şehir")}
+                  value={form.city}
+                  placeholder={t("İstanbul")}
+                  onChangeText={v => set("city", v)}
+                />
+              </FieldGroup>
+
+              <FieldGroup>
+                <Field
+                  label={t("E-posta")}
+                  value={form.email}
+                  error={errors.email}
+                  placeholder={t("ornek@email.com")}
+                  keyboardType="email-address"
+                  onChangeText={v => set("email", v)}
+                />
+                <Divider />
+                <Field
+                  label={t("Web sitesi")}
+                  value={form.website}
+                  error={errors.website}
+                  placeholder={t("https://...")}
+                  keyboardType="url"
+                  onChangeText={v => set("website", v)}
+                />
+                <Divider />
+                <Field
+                  label={t("LinkedIn")}
+                  value={form.linkedin ?? ""}
+                  placeholder={t("linkedin.com/in/kullanici")}
+                  autoCapitalize="none"
+                  onChangeText={v => set("linkedin", v)}
+                />
+                <Divider />
+                <Field
+                  label={t("Instagram")}
+                  value={form.instagram}
+                  placeholder={t("@kullanici")}
+                  autoCapitalize="none"
+                  onChangeText={v => set("instagram", v)}
+                />
+              </FieldGroup>
+
+          <ChipSection
+            label={t("Nerede tanıştınız?")}
+            chips={MET_WHERE}
+            selected={form.metWhere}
+            onSelect={v => set("metWhere", v === form.metWhere ? "" : v)}
+          />
+          <ChipSection
+            label={t("Öncelik")}
+            chips={PRIORITIES}
+            selected={form.priority}
+            onSelect={v => set("priority", v === form.priority ? "" : v)}
+            colorMap={{ Düşük: colors.textSub, Orta: colors.warning, Yüksek: colors.danger }}
+          />
+          <FieldGroup>
+            <Field
+              label={t("Yakınlık")}
+              value={form.closenessTag ?? ""}
+              placeholder={t("örn. Çok yakın, Yüzeysel")}
+              onChangeText={v => set("closenessTag", v)}
+            />
+          </FieldGroup>
 
           <View style={styles.card}>
-            <Text style={styles.chipLabel}>Önerilen etiketler</Text>
+            <Text style={styles.chipLabel}>{t("Önerilen etiketler")}</Text>
             <View style={styles.chipRow}>
               {SUGGESTED_TAGS.map(tag => {
                 const active = selectedTags.includes(tag);
@@ -527,9 +629,11 @@ export default function AddContactScreen({ navigation }: Props) {
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => toggleTag(tag)}
                     activeOpacity={0.75}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: active }}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {tag}
+                      {tv(tag)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -537,42 +641,22 @@ export default function AddContactScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* ── Section 6: Notes ── */}
-          <SectionLabel title="Notlar" />
 
-          <View style={styles.card}>
-            <TextInput
-              style={styles.notesInput}
-              value={form.notes}
-              onChangeText={v => set("notes", v)}
-              placeholder="İlk izlenim, ortak ilgi alanları, önemli detaylar..."
-              placeholderTextColor={colors.textMuted}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.optionalToggle}
-            onPress={() => setNotesOpen(p => !p)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.optionalToggleText}>
-              {notesOpen ? "Ek bilgileri gizle" : "+ Aile, hediye ve kişisel notlar"}
-            </Text>
-          </TouchableOpacity>
-
-          {notesOpen && (
-            <View style={styles.card}>
-              <TextInput
-                style={styles.notesInput}
-                placeholder="Aile bilgisi, hediye fikirleri, özel günler..."
-                placeholderTextColor={colors.textMuted}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-          )}
+              <View style={styles.card}>
+                <Text style={styles.chipLabel}>{t("Notlar")}</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  value={form.notes}
+                  onChangeText={v => set("notes", v)}
+                  placeholder={t("İlk izlenim, ortak ilgi alanları, aile, hediye fikirleri...")}
+                  placeholderTextColor={colors.placeholder}
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel={t("Notlar")}
+                />
+              </View>
+            </>
+          ) : null}
 
           <View style={{ height: 120 }} />
         </ScrollView>
@@ -580,15 +664,17 @@ export default function AddContactScreen({ navigation }: Props) {
         {/* Sticky bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 12 }]}>
           <TouchableOpacity style={styles.cancelBtn} onPress={handleBack} activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>İptal</Text>
+            <Text style={styles.cancelBtnText}>{t("İptal")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.saveBtn, !canSave && styles.saveBtnOff]}
             onPress={handleSave}
             activeOpacity={0.85}
             disabled={!canSave}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSave, busy: saving }}
           >
-            <Text style={styles.saveBtnText}>Kişiyi Kaydet</Text>
+            <Text style={styles.saveBtnText}>{saving ? t("Kaydediliyor…") : t("Kişiyi Kaydet")}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -603,8 +689,8 @@ export default function AddContactScreen({ navigation }: Props) {
       {/* Contacts permission modal */}
       <PermissionDeniedModal
         visible={permissionModal}
-        title="Rehbere erişim izni gerekli"
-        description="Telefon rehberinden kişi ekleyebilmek için rehber erişimine izin vermelisin."
+        title={t("Rehbere erişim izni gerekli")}
+        description={t("Telefon rehberinden kişi ekleyebilmek için rehber erişimine izin vermelisin.")}
         onClose={() => setPermissionModal(false)}
       />
 
@@ -619,7 +705,7 @@ export default function AddContactScreen({ navigation }: Props) {
       {/* Relationship options manager */}
       <ManageOptionsModal
         visible={relationshipManagerOpen}
-        title="İlişki türlerini yönet"
+        title={t("İlişki türlerini yönet")}
         customOptions={customRelationships}
         onAdd={handleAddRelationship}
         onRemove={handleRemoveRelationship}
@@ -638,18 +724,10 @@ function initials(name: string) {
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().split("T")[0];
+  return toISODate(d);
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionLabel({ title }: { title: string }) {
-  return (
-    <View style={styles.sectionLabel}>
-      <Text style={styles.sectionLabelText}>{title}</Text>
-    </View>
-  );
-}
 
 function FieldGroup({ children }: { children: React.ReactNode }) {
   return <View style={styles.card}>{children}</View>;
@@ -672,14 +750,15 @@ function Field({
     <View style={styles.field}>
       <View style={styles.fieldTop}>
         <Text style={styles.fieldLabel}>{label}</Text>
-        {required && <View style={styles.requiredDot} />}
+        {required && <Text style={styles.requiredMark} accessibilityLabel={t("zorunlu")}>*</Text>}
       </View>
       <TextInput
+        accessibilityLabel={required ? `${label}, zorunlu` : label}
         style={[styles.fieldInput, error && styles.fieldInputError]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.placeholder}
         multiline={multiline}
         keyboardType={keyboardType ?? "default"}
         textAlignVertical={multiline ? "top" : "center"}
@@ -705,7 +784,7 @@ function ChipSection({
     <View style={styles.card}>
       <View style={styles.fieldTop}>
         <Text style={styles.chipLabel}>{label}</Text>
-        {required && <View style={styles.requiredDot} />}
+        {required && <Text style={styles.requiredMark} accessibilityLabel={t("zorunlu")}>*</Text>}
       </View>
       <View style={styles.chipRow}>
         {chips.map(chip => {
@@ -722,12 +801,14 @@ function ChipSection({
               ]}
               onPress={() => onSelect(chip)}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isActive }}
             >
               <Text style={[
                 styles.chipText,
                 isActive && (accent ? { color: accent, fontWeight: "600" } : styles.chipTextActive),
               ]}>
-                {chip}
+                {tv(chip)}
               </Text>
             </TouchableOpacity>
           );
@@ -737,6 +818,8 @@ function ChipSection({
             style={styles.chipAddBtn}
             onPress={onManage}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("İlişki türü ekle veya düzenle")}
           >
             <Text style={styles.chipAddBtnText}>+</Text>
           </TouchableOpacity>
@@ -771,7 +854,7 @@ function ManageOptionsModal({
         <Pressable style={styles.modalBox}>
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalDesc}>
-            Kendi seçeneğini ekle veya daha önce eklediklerini kaldır.
+            {t("Kendi seçeneğini ekle veya daha önce eklediklerini kaldır.")}
           </Text>
 
           <View style={styles.manageInputRow}>
@@ -779,8 +862,8 @@ function ManageOptionsModal({
               style={styles.manageInput}
               value={text}
               onChangeText={setText}
-              placeholder="Yeni seçenek yaz..."
-              placeholderTextColor={colors.textMuted}
+              placeholder={t("Yeni seçenek yaz...")}
+              placeholderTextColor={colors.placeholder}
               onSubmitEditing={handleAdd}
               returnKeyType="done"
             />
@@ -790,7 +873,7 @@ function ManageOptionsModal({
               activeOpacity={0.8}
               disabled={!text.trim()}
             >
-              <Text style={styles.manageAddBtnText}>Ekle</Text>
+              <Text style={styles.manageAddBtnText}>{t("Ekle")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -801,19 +884,21 @@ function ManageOptionsModal({
                   <Text style={styles.manageListText} numberOfLines={1}>{opt}</Text>
                   <TouchableOpacity
                     onPress={() => onRemove(opt)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("{name} türünü kaldır", { name: opt })}
                   >
-                    <Text style={styles.manageListRemove}>Kaldır</Text>
+                    <Text style={styles.manageListRemove}>{t("Kaldır")}</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
           ) : (
-            <Text style={styles.manageEmptyText}>Henüz özel seçenek eklemedin.</Text>
+            <Text style={styles.manageEmptyText}>{t("Henüz özel seçenek eklemedin.")}</Text>
           )}
 
           <TouchableOpacity style={styles.modalPrimary} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.modalPrimaryText}>Kapat</Text>
+            <Text style={styles.modalPrimaryText}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -828,15 +913,15 @@ function DiscardModal({ visible, onKeep, onDiscard }: {
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={styles.overlay} onPress={onKeep}>
         <Pressable style={styles.modalBox}>
-          <Text style={styles.modalTitle}>Değişiklikler kaybolacak</Text>
+          <Text style={styles.modalTitle}>{t("Değişiklikler kaybolacak")}</Text>
           <Text style={styles.modalDesc}>
-            Kaydetmeden çıkarsan girdiğin bilgiler silinecek.
+            {t("Kaydetmeden çıkarsan girdiğin bilgiler silinecek.")}
           </Text>
           <TouchableOpacity style={styles.modalPrimary} onPress={onKeep} activeOpacity={0.85}>
-            <Text style={styles.modalPrimaryText}>Düzenlemeye devam et</Text>
+            <Text style={styles.modalPrimaryText}>{t("Düzenlemeye devam et")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.modalSecondary} onPress={onDiscard} activeOpacity={0.75}>
-            <Text style={styles.modalSecondaryText}>Sil ve çık</Text>
+            <Text style={styles.modalSecondaryText}>{t("Sil ve çık")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -846,16 +931,16 @@ function DiscardModal({ visible, onKeep, onDiscard }: {
 
 function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
   visible: boolean;
-  contacts: Contacts.ExistingContact[];
-  onSelect: (c: Contacts.ExistingContact) => void;
+  contacts: DeviceContact[];
+  onSelect: (c: DeviceContact) => void;
   onClose: () => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.pickerBox}>
-          <Text style={styles.modalTitle}>Rehberden Seç</Text>
-          <Text style={styles.modalDesc}>Forma aktarmak istediğin kişiyi seç.</Text>
+          <Text style={styles.modalTitle}>{t("Rehberden Seç")}</Text>
+          <Text style={styles.modalDesc}>{t("Forma aktarmak istediğin kişiyi seç.")}</Text>
           <FlatList
             data={contacts}
             keyExtractor={(item, i) => item.id ?? String(i)}
@@ -870,16 +955,16 @@ function DeviceContactPickerModal({ visible, contacts, onSelect, onClose }: {
                   <Text style={styles.pickerAvatarText}>{initials(item.name || "?")}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || "İsimsiz"}</Text>
+                  <Text style={styles.pickerRowName} numberOfLines={1}>{item.name || t("İsimsiz")}</Text>
                   <Text style={styles.pickerRowSub} numberOfLines={1}>
-                    {item.phoneNumbers?.[0]?.number || item.emails?.[0]?.email || ""}
+                    {item.phone || item.email || ""}
                   </Text>
                 </View>
               </TouchableOpacity>
             )}
           />
           <TouchableOpacity style={styles.modalSecondary} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.modalSecondaryText}>Kapat</Text>
+            <Text style={styles.modalSecondaryText}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -999,7 +1084,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 4,
@@ -1011,25 +1096,31 @@ const styles = StyleSheet.create({
   // Field (grouped inside card)
   field: { paddingVertical: 4 },
   fieldTop: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub },
-  requiredDot: {
-    width: 5, height: 5, borderRadius: 3,
-    backgroundColor: colors.primary,
+  fieldLabel: { fontSize: 14, fontWeight: "600", color: colors.textSub },
+  requiredMark: { fontSize: 15, fontWeight: "800", color: colors.danger, marginTop: -2 },
+  requiredLegend: { fontSize: 13, color: colors.textSub, marginBottom: 8, marginTop: 4 },
+  moreToggle: {
+    marginTop: 4, marginBottom: 12, padding: 14, minHeight: 56,
+    borderRadius: radius.card, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primaryBorder,
+    backgroundColor: colors.primarySoft, justifyContent: "center",
   },
+  moreToggleText: { fontSize: 15, fontWeight: "800", color: colors.primary },
+  moreToggleHint: { fontSize: 13, color: colors.textSub, marginTop: 2 },
   fieldInput: {
-    fontSize: 15, color: colors.text,
-    paddingVertical: 0, minHeight: 28,
+    fontSize: 16, color: colors.text,
+    minHeight: 48, paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.bg,
   },
-  fieldInputError: { color: colors.danger },
-  fieldError: { fontSize: 11, color: colors.danger, marginTop: 4, fontWeight: "500" },
+  fieldInputError: { borderColor: colors.danger },
+  fieldError: { fontSize: 13, color: colors.danger, marginTop: 4, fontWeight: "600" },
 
-  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 10 },
+  divider: { height: 12 },
 
   // Chips
-  chipLabel: { fontSize: 13, fontWeight: "600", color: colors.textSub, marginBottom: 10 },
+  chipLabel: { fontSize: 14, fontWeight: "600", color: colors.textSub, marginBottom: 10 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 14, paddingVertical: 8, minHeight: 40, justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.card,
@@ -1038,7 +1129,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  chipText: { fontSize: 13, color: colors.textSub, fontWeight: "500" },
+  chipText: { fontSize: 14, color: colors.textSub, fontWeight: "600" },
   chipTextActive: { color: colors.primary, fontWeight: "700" },
   chipAddBtn: {
     width: 34, height: 34,
@@ -1070,8 +1161,6 @@ const styles = StyleSheet.create({
   },
 
   // Optional toggle
-  optionalToggle: { alignSelf: "flex-start", marginBottom: spacing.sm },
-  optionalToggleText: { fontSize: 13, color: colors.primary, fontWeight: "600" },
 
   // Bottom bar
   bottomBar: {
@@ -1084,7 +1173,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderLight,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -1103,11 +1192,11 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   saveBtnOff: { backgroundColor: colors.primary + "55" },
-  saveBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF", letterSpacing: 0.2 },
+  saveBtnText: { fontSize: 15, fontWeight: "800", color: colors.onFill, letterSpacing: 0.2 },
 
   // Modal
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
@@ -1116,7 +1205,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.14,
         shadowRadius: 20,
@@ -1130,7 +1219,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  modalPrimaryText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  modalPrimaryText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   modalSecondary: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.danger + "50",
@@ -1154,7 +1243,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   manageAddBtnOff: { backgroundColor: colors.primary + "55" },
-  manageAddBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  manageAddBtnText: { color: colors.onFill, fontSize: 14, fontWeight: "700" },
   manageList: { width: "100%", marginBottom: 14 },
   manageListRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -1174,7 +1263,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg, borderRadius: radius.modal, padding: 20,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.14,
         shadowRadius: 20,

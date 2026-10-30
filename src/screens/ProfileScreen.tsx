@@ -7,38 +7,40 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Alert,
   Platform,
   StatusBar,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "@react-navigation/native";
-import { loadSettings, saveSettings } from "../data/userSettings";
+import { loadSettings, saveSettings, updateSettings } from "../data/userSettings";
+import { runExportBackup, runRestoreBackup } from "../data/backupActions";
+import { GOALS } from "../data/goals";
+import { t } from "../i18n";
+import { isDue } from "../utils/reminderInterval";
 import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
+import { colors, colorScheme } from "../theme/colors";
+import { showToast } from "../components/Toast";
+import { hapticTap } from "../utils/haptics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const TEAL      = "#00B5AC";
-const TEAL_SOFT = "#E6FAF8";
-const TEAL_DARK = "#008E88";
-const TEXT      = "#111827";
-const TEXTSUB   = "#6B7280";
-const TEXTMUTED = "#9CA3AF";
-const BORDER    = "#E5E7EB";
-const BORDER_SOFT = "#F3F4F6";
-const BG        = "#FFFFFF";
-const CARD      = "#FFFFFF";
-const DANGER    = "#DC2626";
+const TEAL      = colors.primary;
+const TEAL_SOFT = colors.primarySoft;
+const TEAL_DARK = colors.primaryDark;
+const TEXT      = colors.text;
+const TEXTSUB   = colors.textSub;
+const TEXTMUTED = colors.textMuted;
+const BORDER    = colors.border;
+const BORDER_SOFT = colors.borderLight;
+const BG        = colors.bg;
+const CARD      = colors.surface;
+const DANGER    = colors.danger;
 
 const THRESHOLD_OPTIONS = [7, 14, 21, 30];
-const LANGUAGE_OPTIONS: { code: "tr" | "en" | "es" | "de"; label: string; native: string }[] = [
-  { code: "tr", label: "Türkçe",  native: "TR" },
-  { code: "en", label: "English", native: "EN" },
-  { code: "es", label: "Español", native: "ES" },
-  { code: "de", label: "Deutsch", native: "DE" },
-];
 
 const TOP_SAFE = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
 
@@ -61,8 +63,14 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [threshold,      setThreshold]      = useState(14);
   const [thresholdOpen,  setThresholdOpen]  = useState(false);
+  const [goalOpen,       setGoalOpen]       = useState(false);
   const [languageOpen,   setLanguageOpen]   = useState(false);
-  const [language,       setLanguage]       = useState<"tr" | "en" | "es" | "de">("tr");
+  const [weeklyGoal,     setWeeklyGoal]     = useState(3);
+  const [language,       setLanguage]       = useState<"system" | "tr" | "en">("system");
+  const [themeOpen,      setThemeOpen]      = useState(false);
+  const [theme,          setTheme]          = useState<"system" | "light" | "dark">("system");
+  const [haptics,        setHaptics]        = useState(true);
+  const [goals,          setGoals]          = useState<string[]>([]);
   const [userName,       setUserName]       = useState("");
   const [email,          setEmail]          = useState("");
   const [contactsList,   setContactsList]   = useState<ContactForm[]>([]);
@@ -78,11 +86,15 @@ export default function ProfileScreen({ navigation }: any) {
         setThreshold(t);
         setUserName(s.userName || "");
         setEmail(s.email || "");
-        setLanguage(s.language || "tr");
+        setGoals(s.goals || []);
+        setWeeklyGoal(s.weeklyGoal || 3);
+        setLanguage(s.language || "system");
+        setTheme(s.theme || "system");
+        setHaptics(s.haptics !== false);
         setContactsList(contacts);
         setTotalContacts(contacts.length);
         setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
-        setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= t).length);
+        setNeedsAttention(contacts.filter(c => isDue(c, t)).length);
       });
     }, [])
   );
@@ -94,42 +106,25 @@ export default function ProfileScreen({ navigation }: any) {
     await saveSettings({ ...s, reachOutThresholdDays: val });
     const contacts = await loadContacts();
     setContactsList(contacts);
-    setNeedsAttention(contacts.filter(c => daysSince(c.lastContactDate) >= val).length);
+    setNeedsAttention(contacts.filter(c => isDue(c, val)).length);
   };
 
-  const handleLanguageSelect = async (code: "tr" | "en" | "es" | "de") => {
-    setLanguage(code);
-    setLanguageOpen(false);
-    const s = await loadSettings();
-    await saveSettings({ ...s, language: code });
+  const toggleGoal = async (key: string) => {
+    const next = goals.includes(key) ? goals.filter(g => g !== key) : [...goals, key];
+    setGoals(next);
+    await updateSettings({ goals: next });
   };
 
-  const handleExport = async () => {
+  const reload = async () => {
     const contacts = await loadContacts();
-    if (!contacts.length) { Alert.alert("Kişi yok", "Dışa aktarılacak kişi bulunamadı."); return; }
-    const lines = contacts.map((c, i) =>
-      [`--- Kişi ${i + 1} ---`, `Ad: ${c.fullName}`, `İlişki: ${c.relationship || "-"}`,
-       `Şirket: ${c.company || "-"}`, `Telefon: ${c.phone || "-"}`, `E-posta: ${c.email || "-"}`,
-       `Son görüşme: ${c.lastContactDate || "-"}`, `Notlar: ${c.notes || "-"}`].join("\n")
-    ).join("\n\n");
-    try {
-      const FileSystem = require("expo-file-system");
-      const Sharing = require("expo-sharing");
-      const path = FileSystem.documentDirectory + "kisiler.txt";
-      await FileSystem.writeAsStringAsync(path, lines, { encoding: FileSystem.EncodingType.UTF8 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(path, { mimeType: "text/plain", dialogTitle: "Kişileri paylaş" });
-      } else {
-        Alert.alert("Kaydedildi", `Dosya: ${path}`);
-      }
-    } catch {
-      Alert.alert("Kişiler hazır", `${contacts.length} kişi hazır.\n\n` + lines.slice(0, 400), [{ text: "Tamam" }]);
-    }
+    setContactsList(contacts);
+    setTotalContacts(contacts.length);
+    setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
+    setNeedsAttention(contacts.filter(c => isDue(c, threshold)).length);
   };
 
   const health = averageHealthScore(contactsList, threshold);
   const healthColor = healthScoreColor(health);
-  const currentLang = LANGUAGE_OPTIONS.find(l => l.code === language);
 
   return (
     <View style={styles.screen}>
@@ -144,8 +139,8 @@ export default function ProfileScreen({ navigation }: any) {
 
           {/* Name + email */}
           <View style={styles.headerInfo}>
-            <Text style={styles.headerName} numberOfLines={1}>{userName || "Profil"}</Text>
-            <Text style={styles.headerEmail} numberOfLines={1}>{email || "Hesap ayarları"}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{userName || t("Profil")}</Text>
+            <Text style={styles.headerEmail} numberOfLines={1}>{email || t("Hesap ayarları")}</Text>
           </View>
 
           {/* Edit button */}
@@ -154,7 +149,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.navigate("ProfileSettings")}
             activeOpacity={0.8}
           >
-            <Text style={styles.editBtnText}>Düzenle</Text>
+            <Text style={styles.editBtnText}>{t("Düzenle")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -163,21 +158,26 @@ export default function ProfileScreen({ navigation }: any) {
 
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
-          <StatCard value={totalContacts}  label="Toplam kişi" />
-          <StatCard value={weeklyContacts} label="Bu hafta" />
-          <StatCard value={needsAttention} label="Bekleyen" danger={needsAttention > 0} />
+          <StatCard value={totalContacts}  label={t("Toplam kişi")} />
+          <StatCard value={weeklyContacts} label={t("Bu hafta")} />
+          <StatCard value={needsAttention} label={t("Yeniden bağlan")} danger={needsAttention > 0} />
         </View>
 
         {/* ── Health bar ── */}
         <View style={styles.healthCard}>
           <View style={styles.healthLeft}>
             <View style={styles.healthLabelRow}>
-              <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
-              <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.healthInfoIcon}>ⓘ</Text>
+              <Text style={styles.healthLabel}>{t("Bağlantın")}</Text>
+              <TouchableOpacity
+                onPress={() => setHealthInfoOpen(true)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t("Bağlantın nasıl hesaplanır?")}
+                >
+                <Ionicons name="information-circle-outline" size={18} color={colors.textSub} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.healthSub}>Bağlantı genel durumu</Text>
+            <Text style={styles.healthSub}>{t("Bağlantı genel durumu")}</Text>
             <View style={styles.barTrack}>
               <View style={[styles.barFill, { width: `${health}%` as any, backgroundColor: healthColor }]} />
             </View>
@@ -189,38 +189,38 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         {/* ── Hesap ── */}
-        <SectionLabel title="Hesap" />
+        <SectionLabel title={t("Hesap")} />
 
         <View style={styles.card}>
           <RowItem
             icon={<PersonIcon />}
-            title="Profil Ayarları"
-            sub="Ad, e-posta ve profil bilgileri"
+            title={t("Profil Ayarları")}
+            sub={t("Ad, e-posta ve profil bilgileri")}
             onPress={() => navigation.navigate("ProfileSettings")}
           />
           <RowItem
             icon={<BellIcon />}
-            title="Bildirim Ayarları"
-            sub="Hatırlatma ve bildirim tercihleri"
+            title={t("Bildirim Ayarları")}
+            sub={t("Hatırlatma ve bildirim tercihleri")}
             onPress={() => navigation.navigate("NotificationSettings")}
           />
           <RowItem
             icon={<ShieldIcon />}
-            title="Gizlilik ve Güvenlik"
-            sub="Veri ve güvenlik kontrolleri"
+            title={t("Gizlilik ve Güvenlik")}
+            sub={t("Veri ve güvenlik kontrolleri")}
             onPress={() => navigation.navigate("PrivacySecurity")}
           />
           <RowItem
             icon={<StarIcon />}
-            title="Abonelik"
-            sub="Plan ve ödeme yönetimi"
+            title={t("Abonelik")}
+            sub={t("Beta · tüm özellikler ücretsiz")}
             onPress={() => navigation.navigate("ManageSubscription")}
             last
           />
         </View>
 
         {/* ── Uygulama ── */}
-        <SectionLabel title="Uygulama" />
+        <SectionLabel title={t("Uygulama")} />
 
         <View style={styles.card}>
           <TouchableOpacity
@@ -232,8 +232,8 @@ export default function ProfileScreen({ navigation }: any) {
               <ClockIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Ulaş Eşiği</Text>
-              <Text style={styles.rowSub}>Son {threshold} günde görüşülmeyenler</Text>
+              <Text style={styles.rowTitle}>{t("Varsayılan görüşme sıklığı")}</Text>
+              <Text style={styles.rowSub}>{t("{days} gündür görüşmediğin kişileri hatırlat", { days: threshold })}</Text>
             </View>
             <View style={styles.pill}>
               <Text style={styles.pillText}>{threshold}g</Text>
@@ -242,32 +242,90 @@ export default function ProfileScreen({ navigation }: any) {
 
           <TouchableOpacity
             style={[styles.rowItem, styles.rowBorder]}
-            onPress={() => setLanguageOpen(true)}
+            onPress={() => setGoalOpen(true)}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Haftalık hedef: {count} kişi", { count: weeklyGoal })}
           >
-            <View style={[styles.iconWrap, { backgroundColor: "#EEF2FF" }]}>
-              <GlobeIcon />
+            <View style={[styles.iconWrap, { backgroundColor: colors.warningSoft }]}>
+              <Ionicons name="flame-outline" size={20} color={colors.warning} />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Dil</Text>
-              <Text style={styles.rowSub}>Uygulama dili</Text>
+              <Text style={styles.rowTitle}>{t("Haftalık hedef")}</Text>
+              <Text style={styles.rowSub}>{t("Her hafta kaç kişiyle bağ kurmak istersin?")}</Text>
             </View>
             <View style={styles.pill}>
-              <Text style={styles.pillText}>{currentLang?.native ?? "TR"}</Text>
+              <Text style={styles.pillText}>{weeklyGoal}</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.rowItem, styles.rowBorder]}
-            onPress={() => navigation.navigate("AddContact")}
+            onPress={() => setLanguageOpen(true)}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Dil: {language}", { language: languageLabel(language) })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="language-outline" size={20} color={colors.accent} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Dil")}</Text>
+              <Text style={styles.rowSub}>{languageLabel(language)}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setThemeOpen(true)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Görünüm: {theme}", { theme: themeLabel(theme) })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
+              <Ionicons name="contrast-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Görünüm")}</Text>
+              <Text style={styles.rowSub}>{themeLabel(theme)}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.rowItem, styles.rowBorder]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.warmSoft }]}>
+              <Ionicons name="pulse-outline" size={20} color={colors.warmStrong} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Titreşim")}</Text>
+              <Text style={styles.rowSub}>{t("Önemli anlarda hafif titreşim")}</Text>
+            </View>
+            <Switch
+              value={haptics}
+              onValueChange={async (v) => {
+                setHaptics(v);
+                await updateSettings({ haptics: v });
+                if (v) hapticTap();
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.white}
+              accessibilityLabel={t("Titreşim")}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => navigation.navigate("ImportContacts")}
+            activeOpacity={0.75}
+            accessibilityRole="button"
           >
             <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
               <UploadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Kişileri içe aktar</Text>
-              <Text style={styles.rowSub}>Rehberden kişi aktar</Text>
+              <Text style={styles.rowTitle}>{t("Kişileri içe aktar")}</Text>
+              <Text style={styles.rowSub}>{t("Rehberden kişi aktar")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -277,79 +335,156 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] })}
             activeOpacity={0.75}
           >
-            <View style={[styles.iconWrap, { backgroundColor: "#F3F0FF" }]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
               <RestartIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Onboarding'i tekrar göster</Text>
-              <Text style={styles.rowSub}>Tanıtım ekranlarını yeniden izle</Text>
+              <Text style={styles.rowTitle}>{t("Onboarding'i tekrar göster")}</Text>
+              <Text style={styles.rowSub}>{t("Tanıtım ekranlarını yeniden izle")}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={runExportBackup}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.successSoft }]}>
+              <DownloadIcon />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Yedek al")}</Text>
+              <Text style={styles.rowSub}>{t("Tüm verileri .json dosyası olarak kaydet")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.rowItem}
-            onPress={handleExport}
+            onPress={() => runRestoreBackup(reload)}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
-            <View style={[styles.iconWrap, { backgroundColor: "#F0FDF4" }]}>
-              <DownloadIcon />
+            <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
+              <UploadIcon />
             </View>
             <View style={styles.rowInfo}>
-              <Text style={styles.rowTitle}>Verileri dışa aktar</Text>
-              <Text style={styles.rowSub}>.txt formatında dışa aktar</Text>
+              <Text style={styles.rowTitle}>{t("Yedekten geri yükle")}</Text>
+              <Text style={styles.rowSub}>{t("Daha önce aldığın yedeği içe aktar")}</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Veri Özeti ── */}
-        <SectionLabel title="Veri Özeti" />
+        <SectionLabel title={t("Veri Özeti")} />
 
         <View style={styles.card}>
-          <DataRow label="Toplam kişi"         value={`${totalContacts}`} />
-          <DataRow label="Bu hafta iletişim"    value={`${weeklyContacts}`} />
-          <DataRow label="Ulaşılması gereken"   value={`${needsAttention}`} />
-          <DataRow label="Ulaş eşiği"           value={`${threshold} gün`} last />
+          <DataRow label={t("Toplam kişi")}         value={`${totalContacts}`} />
+          <DataRow label={t("Bu hafta iletişim")}    value={`${weeklyContacts}`} />
+          <DataRow label={t("Görüşmek isteyebileceğin")}   value={`${needsAttention}`} />
+          <DataRow label={t("Varsayılan sıklık")}           value={t("{days} gün", { days: threshold })} last />
         </View>
 
-        {/* ── Sign out ── */}
-        <TouchableOpacity style={styles.signOutBtn} disabled activeOpacity={0.6}>
-          <Text style={styles.signOutText}>Çıkış Yap</Text>
-        </TouchableOpacity>
+        {/* ── Hedefler ── */}
+        <SectionLabel title={t("Hedeflerin")} />
+
+        <View style={[styles.card, styles.goalsCard]}>
+          {GOALS.map(g => {
+            const active = goals.includes(g.key);
+            return (
+              <TouchableOpacity
+                key={g.key}
+                style={[styles.goalChip, active && styles.goalChipActive]}
+                onPress={() => toggleGoal(g.key)}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: active }}
+              >
+                <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>{g.icon} {t(g.short)}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
       </ScrollView>
 
       {/* ── Threshold modal ── */}
       <PickerModal
         visible={thresholdOpen}
-        title="Ulaş Eşiği"
-        desc="Kaç gün görüşülmeyenler listeye girsin?"
+        title={t("Varsayılan görüşme sıklığı")}
+        desc={t("Kişilere varsayılan olarak ne sıklıkla ulaşmak istersin?")}
         onClose={() => setThresholdOpen(false)}
       >
         {THRESHOLD_OPTIONS.map(val => (
           <PickerOption
             key={val}
-            label={`${val} gün`}
+            label={t("{days} gün", { days: val })}
             active={threshold === val}
             onPress={() => handleThresholdSelect(val)}
           />
         ))}
       </PickerModal>
 
-      {/* ── Language modal ── */}
+      <PickerModal
+        visible={goalOpen}
+        title={t("Haftalık hedef")}
+        desc={t("Her hafta kaç kişiyle bağ kurmak istersin?")}
+        onClose={() => setGoalOpen(false)}
+      >
+        {[1, 2, 3, 5, 7].map(val => (
+          <PickerOption
+            key={val}
+            label={t("{count} kişi", { count: val })}
+            active={weeklyGoal === val}
+            onPress={async () => {
+              setWeeklyGoal(val);
+              setGoalOpen(false);
+              await updateSettings({ weeklyGoal: val });
+            }}
+          />
+        ))}
+      </PickerModal>
+
       <PickerModal
         visible={languageOpen}
-        title="Dil Seçin"
-        desc="Uygulama dilini seçin"
+        title={t("Dil")}
+        desc={t("Uygulama dilini seç")}
         onClose={() => setLanguageOpen(false)}
       >
-        {LANGUAGE_OPTIONS.map(opt => (
+        {(["system", "tr", "en"] as const).map(code => (
           <PickerOption
-            key={opt.code}
-            label={`${opt.native}  ${opt.label}`}
-            active={language === opt.code}
-            onPress={() => handleLanguageSelect(opt.code)}
+            key={code}
+            label={languageLabel(code)}
+            active={language === code}
+            onPress={async () => {
+              setLanguageOpen(false);
+              await updateSettings({ language: code });
+            }}
+          />
+        ))}
+      </PickerModal>
+
+      <PickerModal
+        visible={themeOpen}
+        title={t("Görünüm")}
+        desc={t("Değişiklik uygulamayı yeniden açtığında uygulanır")}
+        onClose={() => setThemeOpen(false)}
+      >
+        {(["system", "light", "dark"] as const).map(code => (
+          <PickerOption
+            key={code}
+            label={themeLabel(code)}
+            active={theme === code}
+            onPress={async () => {
+              setThemeOpen(false);
+              setTheme(code);
+              await updateSettings({ theme: code });
+              const wanted = code === "system" ? null : code;
+              if (wanted && wanted !== colorScheme()) showToast(t("Uygulamayı yeniden açtığında uygulanacak"));
+            }}
           />
         ))}
       </PickerModal>
@@ -357,6 +492,18 @@ export default function ProfileScreen({ navigation }: any) {
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
+}
+
+function themeLabel(code: "system" | "light" | "dark") {
+  if (code === "light") return t("Açık");
+  if (code === "dark") return t("Koyu");
+  return t("Telefonun ayarı");
+}
+
+function languageLabel(code: "system" | "tr" | "en") {
+  if (code === "tr") return "Türkçe";
+  if (code === "en") return "English";
+  return t("Telefonun dili");
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -482,20 +629,12 @@ function ClockIcon() {
   );
 }
 
-function GlobeIcon() {
-  return (
-    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#6366F1", alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 14, height: 1.5, backgroundColor: "#6366F1", position: "absolute" }} />
-    </View>
-  );
-}
-
 function DownloadIcon() {
   return (
     <View style={{ alignItems: "center" }}>
-      <View style={{ width: 1.5, height: 8, backgroundColor: "#16A34A", borderRadius: 1 }} />
-      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#16A34A", marginTop: -1 }} />
-      <View style={{ width: 12, height: 1.5, backgroundColor: "#16A34A", marginTop: 2, borderRadius: 1 }} />
+      <View style={{ width: 1.5, height: 8, backgroundColor: colors.success, borderRadius: 1 }} />
+      <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: colors.success, marginTop: -1 }} />
+      <View style={{ width: 12, height: 1.5, backgroundColor: colors.success, marginTop: 2, borderRadius: 1 }} />
     </View>
   );
 }
@@ -512,8 +651,8 @@ function UploadIcon() {
 
 function RestartIcon() {
   return (
-    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: "#7C3AED", borderTopColor: "transparent", alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 4, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: "#7C3AED", position: "absolute", top: -3, right: -1 }} />
+    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: colors.accent, borderTopColor: "transparent", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 4, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: colors.accent, position: "absolute", top: -3, right: -1 }} />
     </View>
   );
 }
@@ -521,6 +660,14 @@ function RestartIcon() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  goalsCard: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 14 },
+  goalChip: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1, borderColor: BORDER, backgroundColor: BG,
+  },
+  goalChipActive: { borderColor: TEAL, backgroundColor: TEAL_SOFT },
+  goalChipText: { fontSize: 14, color: TEXTSUB, fontWeight: "600" },
+  goalChipTextActive: { color: TEAL_DARK },
   screen: { flex: 1, backgroundColor: BG },
 
   // Header
@@ -529,9 +676,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBF0",
+    borderBottomColor: colors.borderLight,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
       android: { elevation: 2 },
     }),
   },
@@ -562,7 +709,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 12, paddingVertical: 12,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
   statValue: { fontSize: 22, fontWeight: "700", color: TEXT },
@@ -575,7 +722,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, padding: 14,
     marginBottom: 4,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
   healthLeft: { flex: 1, marginRight: 16 },
@@ -583,7 +730,7 @@ const styles = StyleSheet.create({
   healthLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   healthInfoIcon: { fontSize: 12, color: TEXTMUTED },
   healthSub:   { fontSize: 11, color: TEXTSUB, marginTop: 2 },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: "#F3F4F6", marginTop: 10, overflow: "hidden" },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: colors.borderLight, marginTop: 10, overflow: "hidden" },
   barFill:  { height: 6, borderRadius: 3 },
   healthRight: { flexDirection: "row", alignItems: "flex-end" },
   healthScore:  { fontSize: 28, fontWeight: "700", letterSpacing: -0.5 },
@@ -601,7 +748,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 16,
     borderWidth: 1, borderColor: BORDER, overflow: "hidden",
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
 
@@ -636,23 +783,17 @@ const styles = StyleSheet.create({
   dataValue: { fontSize: 13, fontWeight: "600", color: TEXT },
 
   // Sign out
-  signOutBtn: {
-    marginTop: 20, height: 48, borderRadius: 14,
-    backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA",
-    alignItems: "center", justifyContent: "center", opacity: 0.5,
-  },
-  signOutText: { color: DANGER, fontSize: 14, fontWeight: "600" },
 
   // Modal
   overlay: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.28)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
     width: "100%", maxWidth: 380,
     backgroundColor: CARD, borderRadius: 18, padding: 22,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
       android: { elevation: 12 },
     }),
   },
@@ -662,7 +803,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingVertical: 13, paddingHorizontal: 14,
     borderRadius: 12, marginBottom: 8,
-    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: BORDER,
   },
   optionActive:    { backgroundColor: TEAL_SOFT, borderColor: TEAL + "60" },
   optionText:      { fontSize: 15, fontWeight: "500", color: TEXT },

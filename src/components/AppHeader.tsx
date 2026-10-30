@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
-import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 const HEADER_HEIGHT = 64;
 
@@ -93,17 +93,25 @@ function BackButton({ onPress }: { onPress?: () => void }) {
       onPress={onPress}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={t("Geri")}
     >
       <Text style={styles.backIcon}>‹</Text>
-      <Text style={styles.backLabel}>Geri</Text>
+      <Text style={styles.backLabel}>{t("Geri")}</Text>
     </TouchableOpacity>
   );
 }
 
 function IconButton({ label, onPress }: { label: string; color?: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.iconBtn} onPress={onPress} activeOpacity={0.82}>
-      <Text style={{ fontSize: 22, color: "#FFFFFF", fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
+    <TouchableOpacity
+      style={styles.iconBtn}
+      onPress={onPress}
+      activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={label === "+" || label === "＋" ? t("Ekle") : label}
+    >
+      <Text style={{ fontSize: 22, color: colors.onFill, fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -116,6 +124,8 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
       onPress={onPress}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={label === "+" || label === "＋" ? t("Ekle") : label}
     >
       <Text style={[styles.textBtn, { color: color ?? colors.primary }]}>{label}</Text>
     </TouchableOpacity>
@@ -124,10 +134,10 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F0EFF8",
-    shadowColor: "#000",
+    borderBottomColor: colors.borderLight,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },

@@ -1,47 +1,90 @@
 import { isRunningInExpoGo } from "expo";
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 import type * as ExpoNotifications from "expo-notifications";
+import type { ContactForm } from "../screens/AddContactScreen";
+import type { UserSettings } from "../data/userSettings";
+import { planReminders } from "./reminderPlan";
+import { getLanguage, t } from "../i18n";
 
 /**
- * True when running inside Expo Go. `expo-notifications` throws on import
- * on Android in Expo Go (SDK 53+ removed remote push support there), so this
- * app must never statically `import` that module — it is lazily `require`d
- * via {@link getNotificationsModule} only when this is false.
+ * True when running inside Expo Go on Android. `expo-notifications` throws on
+ * import there (SDK 53+ removed remote push support), so this module must
+ * never statically `import` it — it is lazily `require`d via
+ * {@link getNotificationsModule} only when this is false. iOS Expo Go still
+ * supports local notifications.
  */
-export const isExpoGo = isRunningInExpoGo();
+export const notificationsUnavailable = isRunningInExpoGo() && Platform.OS === "android";
+
+export const ACTION_CONTACTED = "contacted";
+export const ACTION_SNOOZE = "snooze_1d";
+export const CATEGORY_FOLLOW_UP = "follow_up";
+const CHANNEL_ID = "reminders";
 
 let cachedModule: typeof ExpoNotifications | null = null;
 
-/**
- * Lazily loads expo-notifications. Must never be called (and its result
- * never imported at module scope) while running in Expo Go — merely
- * importing the package throws on Android there.
- */
-function getNotificationsModule(): typeof ExpoNotifications {
+export function getNotificationsModule(): typeof ExpoNotifications | null {
+  if (notificationsUnavailable || Platform.OS === "web") return null;
   if (!cachedModule) {
-    cachedModule = require("expo-notifications") as typeof ExpoNotifications;
+    try {
+      cachedModule = require("expo-notifications") as typeof ExpoNotifications;
+    } catch (error) {
+      console.warn("expo-notifications yüklenemedi:", error);
+      return null;
+    }
   }
   return cachedModule;
 }
 
-/**
- * Requests local notification permission. Never throws.
- *
- * Note: merely `require`-ing expo-notifications throws on Android in Expo Go
- * (its DevicePushTokenAutoRegistration side-effect module registers a push
- * token listener at import time, unconditionally), so this is a no-op there
- * even though local notifications alone don't need remote push.
- */
-export async function ensureNotificationPermissionAsync(): Promise<boolean> {
-  if (isExpoGo) {
-    console.log("expo-notifications is unavailable in Expo Go on Android; skipping permission request.");
+let setupLang: string | null = null;
+
+/** Foreground presentation, Android channel and the "Görüştüm" action buttons. */
+export async function setupNotificationsAsync(): Promise<void> {
+  const N = getNotificationsModule();
+  if (!N || setupLang === getLanguage()) return;
+  setupLang = getLanguage();
+  try {
+    N.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+    if (Platform.OS === "android") {
+      await N.setNotificationChannelAsync(CHANNEL_ID, {
+        name: t("Hatırlatıcılar"),
+        importance: N.AndroidImportance.HIGH,
+      });
+    }
+    await N.setNotificationCategoryAsync(CATEGORY_FOLLOW_UP, [
+      { identifier: ACTION_CONTACTED, buttonTitle: t("Görüştüm ✓"), options: { opensAppToForeground: false } },
+      { identifier: ACTION_SNOOZE, buttonTitle: t("Yarın hatırlat"), options: { opensAppToForeground: false } },
+    ]);
+  } catch (error) {
+    console.warn("Bildirim kurulumu başarısız:", error);
+  }
+}
+
+export async function hasNotificationPermissionAsync(): Promise<boolean> {
+  const N = getNotificationsModule();
+  if (!N) return false;
+  try {
+    return (await N.getPermissionsAsync()).status === "granted";
+  } catch {
     return false;
   }
+}
 
+/** Requests local notification permission. Never throws. */
+export async function ensureNotificationPermissionAsync(): Promise<boolean> {
+  const N = getNotificationsModule();
+  if (!N) return false;
   try {
-    const Notifications = getNotificationsModule();
-    const { status } = await Notifications.requestPermissionsAsync();
+    const current = await N.getPermissionsAsync();
+    if (current.status === "granted") return true;
+    if (!current.canAskAgain) return false;
+    const { status } = await N.requestPermissionsAsync();
     return status === "granted";
   } catch (error) {
     console.warn("Notification permission request failed:", error);
@@ -49,47 +92,51 @@ export async function ensureNotificationPermissionAsync(): Promise<boolean> {
   }
 }
 
+let syncChain: Promise<void> = Promise.resolve();
+
 /**
- * Registers the device for remote push notifications and returns the Expo push
- * token. Remote push is unsupported in Expo Go since SDK 53, so this is a no-op
- * there. Safe to call from anywhere; never throws and never blocks app startup.
+ * Replaces every scheduled reminder with a fresh plan. Runs serialised so
+ * overlapping saves cannot interleave cancel/schedule calls.
  */
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (isExpoGo) {
-    console.log("Remote push notifications are disabled in Expo Go.");
-    return null;
-  }
+export function syncRemindersAsync(contacts: ContactForm[], settings: UserSettings): Promise<void> {
+  syncChain = syncChain.then(() => doSync(contacts, settings)).catch((e) => {
+    console.warn("Hatırlatıcılar zamanlanamadı:", e);
+  });
+  return syncChain;
+}
 
+async function doSync(contacts: ContactForm[], settings: UserSettings) {
+  const N = getNotificationsModule();
+  if (!N) return;
+  if (!(await hasNotificationPermissionAsync())) return;
+  await setupNotificationsAsync();
+  await N.cancelAllScheduledNotificationsAsync();
+
+  for (const item of planReminders(contacts, settings)) {
+    const content: ExpoNotifications.NotificationContentInput = {
+      title: item.title,
+      body: item.body,
+      data: { kind: item.kind, contactId: "contactId" in item ? item.contactId : undefined },
+      categoryIdentifier: item.kind === "followUp" || item.kind === "smartNudge" ? CATEGORY_FOLLOW_UP : undefined,
+    };
+    const trigger: ExpoNotifications.NotificationTriggerInput =
+      item.kind === "weeklySummary"
+        ? {
+            type: N.SchedulableTriggerInputTypes.WEEKLY,
+            weekday: item.weekday,
+            hour: item.hour,
+            minute: item.minute,
+            channelId: CHANNEL_ID,
+          }
+        : { type: N.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: CHANNEL_ID };
+    await N.scheduleNotificationAsync({ content, trigger });
+  }
+}
+
+export async function cancelAllRemindersAsync(): Promise<void> {
+  const N = getNotificationsModule();
+  if (!N) return;
   try {
-    const Notifications = getNotificationsModule();
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== "granted") {
-      return null;
-    }
-
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "default",
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
-    }
-
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const { data: token } = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined
-    );
-
-    return token ?? null;
-  } catch (error) {
-    console.warn("Push notification registration failed:", error);
-    return null;
-  }
+    await N.cancelAllScheduledNotificationsAsync();
+  } catch {}
 }

@@ -6,14 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { loadSettings, saveSettings } from "../data/userSettings";
+import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import { t } from "../i18n";
 
 export default function ProfileSettingsScreen({ navigation }: any) {
   const [name, setName] = useState("");
@@ -44,14 +45,13 @@ export default function ProfileSettingsScreen({ navigation }: any) {
       city: city.trim(),
     });
     setSaving(false);
-    Alert.alert("Kaydedildi", "Profil bilgilerin güncellendi.", [
-      { text: "Tamam", onPress: () => navigation.goBack() },
-    ]);
+    showToast(t("Profil bilgilerin güncellendi"));
+    navigation.goBack();
   };
 
   return (
     <View style={styles.screen}>
-      <AppHeader type="settings" centerTitle="Profil Ayarları" onBack={() => navigation.goBack()} />
+      <AppHeader type="settings" centerTitle={t("Profil Ayarları")} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.avatarWrap}>
@@ -60,49 +60,53 @@ export default function ProfileSettingsScreen({ navigation }: any) {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>KİŞİSEL BİLGİLER</Text>
+        <Text style={styles.sectionLabel}>{t("KİŞİSEL BİLGİLER")}</Text>
 
         <View style={styles.card}>
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>Ad Soyad</Text>
+            <Text style={styles.fieldLabel}>{t("Ad Soyad")}</Text>
             <TextInput
+              accessibilityLabel={t("Ad Soyad")}
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Adın ve soyadın"
+              placeholder={t("Adın ve soyadın")}
               placeholderTextColor={colors.textMuted}
             />
           </View>
           <View style={[styles.fieldWrap, styles.fieldBorderTop]}>
-            <Text style={styles.fieldLabel}>E-posta</Text>
+            <Text style={styles.fieldLabel}>{t("E-posta")}</Text>
             <TextInput
+              accessibilityLabel={t("E-posta")}
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="E-posta adresin"
+              placeholder={t("E-posta adresin")}
               placeholderTextColor={colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </View>
           <View style={[styles.fieldWrap, styles.fieldBorderTop]}>
-            <Text style={styles.fieldLabel}>Telefon</Text>
+            <Text style={styles.fieldLabel}>{t("Telefon")}</Text>
             <TextInput
+              accessibilityLabel={t("Telefon")}
               style={styles.input}
               value={phone}
               onChangeText={setPhone}
-              placeholder="+90 5xx xxx xx xx"
+              placeholder={t("+90 5xx xxx xx xx")}
               placeholderTextColor={colors.textMuted}
               keyboardType="phone-pad"
             />
           </View>
           <View style={[styles.fieldWrap, styles.fieldBorderTop]}>
-            <Text style={styles.fieldLabel}>Şehir</Text>
+            <Text style={styles.fieldLabel}>{t("Şehir")}</Text>
             <TextInput
+              accessibilityLabel={t("Şehir")}
               style={styles.input}
               value={city}
               onChangeText={setCity}
-              placeholder="Şehrin"
+              placeholder={t("Şehrin")}
               placeholderTextColor={colors.textMuted}
             />
           </View>
@@ -114,17 +118,17 @@ export default function ProfileSettingsScreen({ navigation }: any) {
           disabled={saving}
           activeOpacity={0.8}
         >
-          <Text style={styles.saveBtnText}>{saving ? "Kaydediliyor…" : "Kaydet"}</Text>
+          <Text style={styles.saveBtnText}>{saving ? t("Kaydediliyor…") : t("Kaydet")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionLabel}>UYGULAMA</Text>
+        <Text style={styles.sectionLabel}>{t("UYGULAMA")}</Text>
 
         <TouchableOpacity
           style={styles.linkRow}
           onPress={() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] })}
           activeOpacity={0.75}
         >
-          <Text style={styles.linkRowText}>Tanıtımı Tekrar Göster</Text>
+          <Text style={styles.linkRowText}>{t("Tanıtımı Tekrar Göster")}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -143,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { color: "#fff", fontSize: 30, fontWeight: "700" },
+  avatarText: { color: colors.onFill, fontSize: 30, fontWeight: "700" },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -171,7 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  saveBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
   linkRow: {
     backgroundColor: colors.card,
     borderRadius: radius.card,

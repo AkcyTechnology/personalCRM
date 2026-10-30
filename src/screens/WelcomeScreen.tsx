@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 const TEAL = colors.primary;
 
@@ -19,9 +20,9 @@ export default function WelcomeScreen({ navigation }: any) {
             <Text style={styles.icon}>👋</Text>
           </View>
 
-          <Text style={styles.title}>Merhaba, seni tanıyalım</Text>
+          <Text style={styles.title}>{t("Merhaba, seni tanıyalım")}</Text>
           <Text style={styles.desc}>
-            Kişisel CRM deneyimini sana göre ayarlamak için birkaç bilgiye ihtiyacımız var.
+            {t("Kişisel CRM deneyimini sana göre ayarlamak için birkaç bilgiye ihtiyacımız var.")}
           </Text>
 
           <View style={styles.btnShadow}>
@@ -31,12 +32,12 @@ export default function WelcomeScreen({ navigation }: any) {
               style={styles.btnTouch}
             >
               <LinearGradient
-                colors={["#4DD9CF", TEAL]}
+                colors={[colors.gradientFrom, TEAL]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.btn}
               >
-                <Text style={styles.btnText}>Devam et</Text>
+                <Text style={styles.btnText}>{t("Devam et")}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -49,7 +50,7 @@ export default function WelcomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FAFEFE",
+    backgroundColor: colors.card,
   },
   centerer: {
     flex: 1,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: {
-    color: "#FFF",
+    color: colors.onFill,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.2,

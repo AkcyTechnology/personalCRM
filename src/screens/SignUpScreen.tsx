@@ -1,10 +1,13 @@
 import {
   View, Text, Image, StyleSheet, TouchableOpacity,
-  ScrollView, useWindowDimensions,
+  ScrollView, useWindowDimensions, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
+import { updateSettings } from "../data/userSettings";
+import { t } from "../i18n";
 
 const TEAL = colors.primary;
 
@@ -34,49 +37,64 @@ export default function SignUpScreen({ navigation }: any) {
               resizeMode="contain"
             />
             <View style={styles.betaBadge}>
-              <Text style={styles.betaText}>BETA</Text>
+              <Text style={styles.betaText}>{t("BETA")}</Text>
             </View>
           </View>
 
           {/* Headings */}
-          <Text style={styles.title}>Hoş Geldin</Text>
-          <Text style={styles.subtitle}>
-            Senin için önemli olan kişilerle{"\n"}bağını hiç kaybetme.
-          </Text>
+          <Text style={styles.title}>{t("Hoş Geldin")}</Text>
+          <Text style={styles.subtitle}>{t("Senin için önemli olan kişilerle\nbağını hiç kaybetme.")}</Text>
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
 
-          {/* Disabled login options */}
-          <View style={styles.disabledGroup}>
-            <DisabledBtn icon="🍎" label="Apple ile devam et" />
-            <DisabledBtn icon="G" label="Google ile devam et" isGoogle />
-            <DisabledBtn icon="✉" label="E-posta ile devam et" />
+          {/* Privacy promises */}
+          <View style={styles.promiseGroup}>
+            <PromiseRow icon="lock-closed-outline" text={Platform.OS === "web" ? t("Verilerin yalnızca bu cihazda saklanır") : t("Verilerin cihazında şifreli saklanır")} />
+            <PromiseRow icon="cloud-offline-outline" text={t("Hesap yok, sunucu yok, reklam yok")} />
+            <PromiseRow icon="trash-outline" text={t("İstediğin an tek dokunuşla hepsini sil")} />
           </View>
 
           {/* Primary CTA */}
           <View style={styles.guestWrap}>
             <TouchableOpacity
-              onPress={() => navigation.navigate("Welcome")}
+              onPress={async () => {
+                await updateSettings({ acceptedTermsAt: new Date().toISOString() });
+                navigation.navigate("Welcome");
+              }}
               activeOpacity={0.85}
               style={styles.guestTouch}
+              accessibilityRole="button"
             >
               <LinearGradient
-                colors={["#4DD9CF", TEAL]}
+                colors={[colors.gradientFrom, TEAL]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.guestBtn}
               >
-                <Text style={styles.guestBtnText}>Misafir olarak devam et</Text>
+                <Text style={styles.guestBtnText}>{t("Başlayalım")}</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.guestNote}>Beta sürecinde hesap gerekmez.</Text>
+            <Text style={styles.guestNote}>{t("Hesap oluşturman gerekmez.")}</Text>
           </View>
 
           {/* Footer */}
           <Text style={styles.footer}>
-            Devam ederek{" "}
-            <Text style={styles.link}>Kullanım Şartları</Text>
-            {"'"}nı ve{" "}
-            <Text style={styles.link}>Gizlilik Politikası</Text>
-            {"'"}nı kabul etmiş olursun.{"\n"}Verilerin şifrelenir ve asla satılmaz.
+            {t("Devam ederek ")}
+            <Text
+              style={styles.link}
+              onPress={() => navigation.navigate("Legal", { doc: "terms" })}
+              accessibilityRole="link"
+            >
+              {t("Kullanım Şartları")}
+            </Text>
+            {t("'nı ve ")}
+            <Text
+              style={styles.link}
+              onPress={() => navigation.navigate("Legal", { doc: "privacy" })}
+              accessibilityRole="link"
+            >
+              {t("Gizlilik Politikası")}
+            </Text>
+            {t("'nı kabul etmiş olursun.")}{"\n"}{t("Verilerin asla satılmaz.")}
           </Text>
         </ScrollView>
       </View>
@@ -84,28 +102,23 @@ export default function SignUpScreen({ navigation }: any) {
   );
 }
 
-function DisabledBtn({
-  icon, label, isGoogle,
-}: {
-  icon: string; label: string; isGoogle?: boolean;
-}) {
+function PromiseRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
-    <View style={styles.disabledBtn}>
-      <View style={styles.disabledLeft}>
-        <Text style={[styles.disabledIcon, isGoogle && styles.googleIcon]}>{icon}</Text>
-        <Text style={styles.disabledLabel}>{label}</Text>
-      </View>
-      <View style={styles.comingSoonPill}>
-        <Text style={styles.comingSoonText}>Yakında</Text>
+    <View style={styles.promiseRow}>
+      <View style={styles.promiseLeft}>
+        <Ionicons name={icon} size={20} color={colors.primary} style={styles.promiseIcon} />
+        <Text style={styles.promiseLabel}>{text}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  tagline: { marginTop: 10, fontSize: 14, fontWeight: "700", color: colors.primary, textAlign: "center", letterSpacing: 0.3 },
+  promiseLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   outer: {
     flex: 1,
-    backgroundColor: "#FAFAFE",
+    backgroundColor: colors.card,
   },
   centerer: {
     flex: 1,
@@ -136,29 +149,22 @@ const styles = StyleSheet.create({
   betaText: { fontSize: 11, fontWeight: "900", color: TEAL, letterSpacing: 1 },
 
   title: {
-    fontSize: 26, fontWeight: "900", color: "#1A1830",
+    fontSize: 26, fontWeight: "900", color: colors.text,
     marginTop: 12, textAlign: "center",
   },
   subtitle: {
-    fontSize: 14, color: "#8E8AA3",
+    fontSize: 14, color: colors.textSub,
     textAlign: "center", lineHeight: 22, marginTop: 8,
   },
 
-  disabledGroup: { width: "100%", gap: 10, marginTop: 24, opacity: 0.5 },
-  disabledBtn: {
+  promiseGroup: { width: "100%", gap: 10, marginTop: 24 },
+  promiseRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#FFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8E4F4",
+    backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  disabledLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  disabledIcon: { fontSize: 18, width: 24, textAlign: "center" },
-  googleIcon: { fontWeight: "900", fontSize: 17, color: "#4285F4" },
-  disabledLabel: { fontSize: 14, fontWeight: "700", color: "#1A1830" },
-  comingSoonPill: {
-    backgroundColor: colors.primarySoft, borderRadius: 999,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  comingSoonText: { fontSize: 11, fontWeight: "700", color: TEAL },
+  promiseLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  promiseIcon: { fontSize: 18, width: 24, textAlign: "center" },
 
   guestWrap: { width: "100%", marginTop: 18 },
   guestTouch: {
@@ -167,9 +173,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.38, shadowRadius: 16, elevation: 10,
   },
   guestBtn: { height: 56, alignItems: "center", justifyContent: "center" },
-  guestBtnText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
-  guestNote: { textAlign: "center", marginTop: 10, fontSize: 12, color: "#A0A0B0" },
+  guestBtnText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
+  guestNote: { textAlign: "center", marginTop: 10, fontSize: 12, color: colors.textMuted },
 
-  footer: { marginTop: 20, fontSize: 11, color: "#A0A0B0", textAlign: "center", lineHeight: 18 },
+  footer: { marginTop: 20, fontSize: 11, color: colors.textMuted, textAlign: "center", lineHeight: 18 },
   link: { color: TEAL, fontWeight: "600" },
 });

@@ -1,4 +1,5 @@
 import type { ContactForm } from "../screens/AddContactScreen";
+import { t } from "../i18n";
 
 export function effectiveIntervalDays(contact: ContactForm, globalThreshold: number): number {
   return contact.reminderIntervalDays ?? globalThreshold;
@@ -44,6 +45,6 @@ export const INTERVAL_PRESETS = [
 
 export function intervalLabel(days: number): string {
   const preset = INTERVAL_PRESETS.find((p) => p.days === days);
-  if (preset) return preset.label;
-  return `Her ${days} günde bir`;
+  if (preset) return t(preset.label);
+  return t("Her {days} günde bir", { days });
 }

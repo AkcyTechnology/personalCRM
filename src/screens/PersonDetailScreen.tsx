@@ -1,11 +1,11 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Linking,
+  AppState,
   Platform,
   Modal,
   TextInput,
@@ -13,16 +13,26 @@ import {
 import AppHeader from "../components/AppHeader";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { loadContacts, saveContacts } from "../data/contacts";
+import { addContacts, deleteContact as deleteContactById, deleteInteraction, getContact, updateContact } from "../data/contacts";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import DateField from "../components/DateField";
+import LogInteractionModal, { interactionMeta } from "../components/LogInteractionModal";
+import { openEmail, openPhoneCall, openWhatsApp as openWhatsAppLink, openWebUrl, socialProfileUrl } from "../utils/links";
+import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import { loadSettings } from "../data/userSettings";
-import type { ContactForm } from "./AddContactScreen";
-import { colors } from "../theme/colors";
+import type { ContactForm, InteractionType } from "./AddContactScreen";
+import { categorical, colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { effectiveIntervalDays, intervalLabel, INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { healthScore as centralHealthScore, healthScoreColor } from "../utils/healthScore";
-import { showToast } from "../components/Toast";
+import { showToast, showUndoToast } from "../components/Toast";
+import { hapticWarning } from "../utils/haptics";
+import { logMoment } from "../app/momentActions";
+import { locale, t, tv } from "../i18n";
+import { relationshipJourney } from "../utils/engagement";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
+import { confirmDialog } from "../utils/confirm";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PersonDetail">;
 type TabKey = "timeline" | "info";
@@ -48,7 +58,6 @@ const MUTED = colors.textSub;
 const GREEN = colors.success;
 const ORANGE = colors.warning;
 const RED = colors.danger;
-const BLUE = "#2563EB";
 const PINK = colors.secondary;
 
 function initials(name?: string) {
@@ -62,7 +71,7 @@ function initials(name?: string) {
 }
 
 function avatarColor(name?: string) {
-  const p = [colors.primary, "#2563EB", colors.success, colors.warning, "#0891B2", colors.secondary];
+  const p = categorical();
   let h = 0;
   for (const c of name || "") h += c.charCodeAt(0);
   return p[h % p.length];
@@ -70,28 +79,31 @@ function avatarColor(name?: string) {
 
 function parseDate(value?: string) {
   if (!value) return null;
-  const d = new Date(value);
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const d = ymd ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])) : new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function daysSince(iso?: string) {
   const d = parseDate(iso);
   if (!d) return null;
-  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return Math.max(0, Math.floor((startOfToday - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86_400_000));
 }
 
 function prettyDate(value?: string) {
   const d = parseDate(value);
-  if (!d) return value || "Belirtilmedi";
-  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  if (!d) return value || t("Belirtilmedi");
+  return d.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
 }
 
 function relativeDate(value?: string) {
   const days = daysSince(value);
-  if (days === null) return "Tarih yok";
-  if (days === 0) return "Bugün";
-  if (days === 1) return "Dün";
-  return `${days} gün önce`;
+  if (days === null) return t("Tarih yok");
+  if (days === 0) return t("Bugün");
+  if (days === 1) return t("Dün");
+  return t("{days} gün önce", { days });
 }
 
 function cleanText(value?: string) {
@@ -127,9 +139,28 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   const [intervalPickerOpen, setIntervalPickerOpen] = useState(false);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
   const [composerVisible, setComposerVisible] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logType, setLogType] = useState<InteractionType>("other");
+  const pendingAction = useRef<InteractionType | null>(null);
 
   useEffect(() => {
     loadSettings().then((s) => setGlobalThreshold(s.reachOutThresholdDays || 14));
+    // Başka bir ekranda/bildirimde yapılan değişiklikleri yakala
+    if (initialContact.id) {
+      getContact(initialContact.id).then((fresh) => fresh && setContact(fresh as EditableContact));
+    }
+  }, [initialContact.id]);
+
+  // Arama / WhatsApp / e-postadan dönünce "Görüştün mü?" diye sor
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active" && pendingAction.current) {
+        setLogType(pendingAction.current);
+        pendingAction.current = null;
+        setTimeout(() => setLogOpen(true), 400);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   const [form, setForm] = useState({
@@ -154,54 +185,56 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   const scoreColor = score === null ? MUTED : healthScoreColor(score);
 
   const timeline = useMemo(() => {
-    const items: { title: string; subtitle: string; icon: string; color: string }[] = [];
+    const items: TimelineItem[] = [];
 
     if (contact.createdAt || contact.addedAt) {
       items.push({
-        title: "Kişi CRM’e eklendi",
+        title: t("Kişi eklendi"),
         subtitle: prettyDate(contact.createdAt || contact.addedAt),
-        icon: "+",
+        icon: "person-add-outline",
         color: PURPLE,
       });
     }
 
     if (contact.metWhere) {
       items.push({
-        title: "Tanışma bilgisi",
-        subtitle: contact.metWhere,
-        icon: "📍",
+        title: t("Tanışma bilgisi"),
+        subtitle: tv(contact.metWhere),
+        icon: "location-outline",
         color: PINK,
       });
     }
 
-    if (contact.lastContactDate) {
-      items.push({
-        title: "Son etkileşim",
+    const interactions = [...(contact.interactions ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+    const history: TimelineItem[] = interactions.map((i) => ({
+      id: i.id,
+      title: interactionMeta(i.type).label,
+      subtitle: `${relativeDate(i.date)} · ${prettyDate(i.date)}${i.note ? `\n${i.note}` : ""}`,
+      icon: interactionMeta(i.type).icon,
+      color: GREEN,
+    }));
+
+    if (contact.lastContactDate && !interactions.some((i) => i.date === contact.lastContactDate)) {
+      history.push({
+        title: t("Son görüşme"),
         subtitle: `${relativeDate(contact.lastContactDate)} · ${prettyDate(contact.lastContactDate)}`,
-        icon: "💬",
+        icon: "chatbubbles-outline",
         color: GREEN,
       });
     }
 
-    if (contact.notes) {
-      items.push({
-        title: "Not eklendi",
-        subtitle: contact.notes,
-        icon: "✍️",
-        color: ORANGE,
-      });
-    }
+    const all = [...history, ...items.reverse()];
 
-    if (items.length === 0) {
-      items.push({
-        title: "Henüz ilişki geçmişi yok",
-        subtitle: "İlk notunu veya son iletişim tarihini ekleyerek timeline’ı başlatabilirsin.",
-        icon: "✨",
+    if (all.length === 0) {
+      all.push({
+        title: t("Hikâyeniz burada başlıyor"),
+        subtitle: t("İlk anınızı kaydetmek için “Görüştüm”e dokun."),
+        icon: "sparkles-outline",
         color: PURPLE,
       });
     }
 
-    return items;
+    return all;
   }, [contact]);
 
   const updateField = (key: keyof typeof form, value: string) => {
@@ -209,18 +242,40 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   };
 
   const openPhone = () => {
-    if (contact.phone) Linking.openURL(`tel:${contact.phone}`);
+    if (!contact.phone) return;
+    pendingAction.current = "call";
+    openPhoneCall(contact.phone);
   };
 
   const openWhatsApp = () => {
     if (!contact.phone) return;
-    const cleaned = contact.phone.replace(/[^0-9]/g, "");
-    Linking.openURL(`https://wa.me/${cleaned}`);
+    pendingAction.current = "whatsapp";
+    openWhatsAppLink(contact.phone);
+  };
+
+  const openMail = () => {
+    if (!contact.email) return;
+    pendingAction.current = "email";
+    openEmail(contact.email);
+  };
+
+  const persist = async (patch: Partial<ContactForm>) => {
+    if (!contact.id) return;
+    try {
+      const saved = await updateContact(contact.id, patch);
+      if (saved) {
+        setContact(saved as EditableContact);
+        navigation.setParams({ contact: saved });
+      }
+      return saved;
+    } catch {
+      showToast(t("Kaydedilemedi. Lütfen tekrar dene."));
+    }
   };
 
   const saveEdit = async () => {
-    const updated: EditableContact = {
-      ...contact,
+    const lastContactDate = cleanText(form.lastContactDate) || contact.lastContactDate;
+    const saved = await persist({
       fullName: cleanText(form.fullName) || contact.fullName,
       relationship: cleanText(form.relationship),
       jobTitle: cleanText(form.jobTitle),
@@ -229,51 +284,75 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
       email: cleanText(form.email),
       birthday: cleanText(form.birthday),
       metWhere: cleanText(form.metWhere),
-      lastContactDate: cleanText(form.lastContactDate) || contact.lastContactDate,
+      lastContactDate,
+      // Tarih elle değiştiyse hatırlatma aralığı oradan yeniden başlar
+      reminderIntervalStart: lastContactDate !== contact.lastContactDate ? undefined : contact.reminderIntervalStart,
       tags: cleanText(form.tags),
       notes: cleanText(form.notes),
       socials: parseSocials(form.socialsText),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const all = (await loadContacts()) as EditableContact[];
-    const saved = all.map((item) => {
-      const sameId = contact.id && item.id === contact.id;
-      const samePerson = item.fullName === contact.fullName && (item.email || "") === (contact.email || "");
-      return sameId || samePerson ? updated : item;
     });
-
-    await saveContacts(saved as ContactForm[]);
-    setContact(updated);
-    setIsEditing(false);
-    navigation.setParams({ contact: updated });
+    if (saved) {
+      setIsEditing(false);
+      showToast(t("Değişiklikler kaydedildi"));
+    }
   };
 
   const saveInterval = async (days: number) => {
-    const updated: EditableContact = { ...contact, reminderIntervalDays: days };
-    const all = (await loadContacts()) as EditableContact[];
-    const saved = all.map((item) => {
-      const sameId = contact.id && item.id === contact.id;
-      const samePerson = item.fullName === contact.fullName && (item.email || "") === (contact.email || "");
-      return sameId || samePerson ? updated : item;
-    });
-    await saveContacts(saved as ContactForm[]);
-    setContact(updated);
+    await persist({ reminderIntervalDays: days, reminderEnabled: true });
     setIntervalPickerOpen(false);
-    navigation.setParams({ contact: updated });
+    ensureNotificationPermissionAsync();
+  };
+
+  const toggleReminder = async () => {
+    const enabled = contact.reminderEnabled === false;
+    await persist({ reminderEnabled: enabled });
+    showToast(enabled ? t("Hatırlatıcı açıldı") : t("Hatırlatıcı kapatıldı"));
+    if (enabled) ensureNotificationPermissionAsync();
+  };
+
+  const logInteraction = async (type: InteractionType, note: string, date: string) => {
+    setLogOpen(false);
+    await logMoment(contact, type, note, date, (saved) => {
+      if (!saved) return;
+      setContact(saved as EditableContact);
+      setForm((prev) => ({ ...prev, lastContactDate: saved.lastContactDate }));
+      navigation.setParams({ contact: saved });
+    });
+  };
+
+  const removeInteraction = (interactionId: string) => {
+    if (!contact.id) return;
+    confirmDialog(t("Görüşme kaydı silinsin mi?"), undefined, [
+      { text: t("Vazgeç"), style: "cancel" },
+      {
+        text: t("Sil"),
+        style: "destructive",
+        onPress: async () => {
+          const before = contact.interactions;
+          const saved = await deleteInteraction(contact.id!, interactionId);
+          if (!saved) return;
+          setContact(saved as EditableContact);
+          showUndoToast(t("Görüşme kaydı silindi"), async () => {
+            const restored = await updateContact(contact.id!, { interactions: before });
+            if (restored) setContact(restored as EditableContact);
+          });
+        },
+      },
+    ]);
   };
 
   const deleteContact = async () => {
-    const all = (await loadContacts()) as EditableContact[];
-    const updated = all.filter((item) => {
-      const sameId = contact.id && item.id === contact.id;
-      const samePerson = item.fullName === contact.fullName && (item.email || "") === (contact.email || "");
-      return !(sameId || samePerson);
-    });
-    await saveContacts(updated as ContactForm[]);
-    setShowDeleteConfirm(false);
-    navigation.goBack();
-    showToast("Kişi silindi");
+    if (!contact.id) return;
+    try {
+      const snapshot: ContactForm = { ...contact };
+      await deleteContactById(contact.id);
+      setShowDeleteConfirm(false);
+      hapticWarning();
+      navigation.goBack();
+      showUndoToast(t("Kişi silindi"), () => { addContacts([snapshot]); });
+    } catch {
+      showToast(t("Silinemedi. Lütfen tekrar dene."));
+    }
   };
 
   return (
@@ -285,10 +364,10 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         rightActions={
           isEditing
             ? [
-                { label: "Sil", color: colors.danger, onPress: () => setShowDeleteConfirm(true) },
-                { label: "Kaydet", color: colors.primary, onPress: saveEdit },
+                { label: t("Sil"), color: colors.danger, onPress: () => setShowDeleteConfirm(true) },
+                { label: t("Kaydet"), color: colors.primary, onPress: saveEdit },
               ]
-            : [{ label: "Düzenle", onPress: () => setIsEditing(true) }]
+            : [{ label: t("Düzenle"), onPress: () => setIsEditing(true) }]
         }
       />
 
@@ -302,20 +381,20 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
 
           {isEditing ? (
             <View style={styles.editBlock}>
-              <Input label="İsim" value={form.fullName} onChangeText={(v) => updateField("fullName", v)} />
-              <Input label="İlişki" value={form.relationship} onChangeText={(v) => updateField("relationship", v)} />
-              <Input label="Ünvan / okul" value={form.jobTitle} onChangeText={(v) => updateField("jobTitle", v)} />
-              <Input label="Şirket / şehir" value={form.company} onChangeText={(v) => updateField("company", v)} />
+              <Input label={t("İsim")} value={form.fullName} onChangeText={(v) => updateField("fullName", v)} />
+              <Input label={t("İlişki")} value={form.relationship} onChangeText={(v) => updateField("relationship", v)} />
+              <Input label={t("Ünvan / okul")} value={form.jobTitle} onChangeText={(v) => updateField("jobTitle", v)} />
+              <Input label={t("Şirket / şehir")} value={form.company} onChangeText={(v) => updateField("company", v)} />
             </View>
           ) : (
             <>
               <Text style={styles.name}>{contact.fullName}</Text>
-              <Text style={styles.subtitle}>
-                {[contact.jobTitle, contact.company].filter(Boolean).join(" · ") || "Kişi bilgisi eklenebilir"}
-              </Text>
+              {contact.jobTitle || contact.company ? (
+                <Text style={styles.subtitle}>{[contact.jobTitle, contact.company].filter(Boolean).join(" · ")}</Text>
+              ) : null}
               {contact.relationship ? (
                 <View style={styles.relationPill}>
-                  <Text style={styles.relationText}>{contact.relationship}</Text>
+                  <Text style={styles.relationText}>{tv(contact.relationship)}</Text>
                 </View>
               ) : null}
             </>
@@ -324,12 +403,17 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
           <View style={styles.healthMiniCard}>
             <View style={{ flex: 1 }}>
               <View style={styles.healthLabelRow}>
-                <Text style={styles.healthLabel}>İlişki Sağlığı</Text>
-                <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={styles.healthInfoIcon}>ⓘ</Text>
+                <Text style={styles.healthLabel}>{t("Bağlantın")}</Text>
+                <TouchableOpacity
+                  onPress={() => setHealthInfoOpen(true)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Bağlantın nasıl hesaplanır?")}
+                  >
+                  <Ionicons name="information-circle-outline" size={18} color={MUTED} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.healthSub}>{days === null ? "Son iletişim tarihi eklenmemiş" : `${days} gündür iletişim yok`}</Text>
+              <Text style={styles.healthSub}>{days === null ? t("Henüz görüşme kaydı yok") : days === 0 ? t("Bugün görüşüldü") : t("{days} gündür görüşülmedi", { days })}</Text>
             </View>
             <View style={[styles.healthCircle, { borderColor: scoreColor }]}> 
               <Text style={[styles.healthScore, { color: scoreColor }]}>{score === null ? "—" : score}</Text>
@@ -337,27 +421,49 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.actions}>
-            <Action icon="📞" label="Ara" color={GREEN} disabled={!contact.phone} onPress={openPhone} />
-            <Action icon="💬" label="WhatsApp" color={GREEN} disabled={!contact.phone} onPress={openWhatsApp} />
-            <Action icon="✉️" label="Mail" color={PURPLE} disabled={!contact.email} onPress={() => contact.email && Linking.openURL(`mailto:${contact.email}`)} />
-            <Action icon="✍️" label="Mesaj" color={ORANGE} onPress={() => setComposerVisible(true)} />
+            <Action icon="call-outline" label={t("Ara")} color={GREEN} disabled={!contact.phone} onPress={openPhone} />
+            <Action icon="logo-whatsapp" label={t("WhatsApp")} color={GREEN} disabled={!contact.phone} onPress={openWhatsApp} />
+            <Action icon="mail-outline" label={t("E-posta")} color={PURPLE} disabled={!contact.email} onPress={openMail} />
+            <Action icon="create-outline" label={t("Mesaj")} color={ORANGE} onPress={() => setComposerVisible(true)} />
           </View>
+
+          <TouchableOpacity
+            style={styles.contactedBtn}
+            onPress={() => { setLogType("other"); setLogOpen(true); }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
+          >
+            <Ionicons name="checkmark-circle" size={20} color={colors.onFill} />
+            <Text style={styles.contactedText}>{t("Görüştüm")}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.tabsWrap}>
-          <TabButton title="Timeline" active={activeTab === "timeline"} onPress={() => setActiveTab("timeline")} />
-          <TabButton title="Genel Bilgiler" active={activeTab === "info"} onPress={() => setActiveTab("info")} />
+          <TabButton title={t("Geçmiş")} active={activeTab === "timeline"} onPress={() => setActiveTab("timeline")} />
+          <TabButton title={t("Genel Bilgiler")} active={activeTab === "info"} onPress={() => setActiveTab("info")} />
         </View>
 
         {activeTab === "timeline" ? (
           <View>
-            <Text style={styles.sectionTitle}>İlişki Timeline</Text>
+            <JourneyStrip contact={contact} />
+            <Text style={styles.sectionTitle}>{t("Hikâyeniz")}</Text>
+            {(contact.interactions?.length ?? 0) > 0 ? (
+              <Text style={styles.historyHint}>{t("Bir kaydı silmek için üzerine basılı tut")}</Text>
+            ) : null}
             <View style={styles.timelineCard}>
               {timeline.map((item, index) => (
-                <View key={`${item.title}-${index}`} style={styles.timelineRow}>
+                <TouchableOpacity
+                  key={item.id ?? `${item.title}-${index}`}
+                  style={styles.timelineRow}
+                  activeOpacity={item.id ? 0.7 : 1}
+                  disabled={!item.id}
+                  onLongPress={() => item.id && removeInteraction(item.id)}
+                  accessibilityHint={item.id ? t("Silmek için basılı tut") : undefined}
+                >
                   <View style={styles.timelineRail}>
                     <View style={[styles.timelineDot, { backgroundColor: item.color }]}>
-                      <Text style={styles.timelineIcon}>{item.icon}</Text>
+                      <Ionicons name={item.icon} size={14} color={colors.onFill} />
                     </View>
                     {index < timeline.length - 1 ? <View style={styles.timelineLine} /> : null}
                   </View>
@@ -365,90 +471,101 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
                     <Text style={styles.timelineTitle}>{item.title}</Text>
                     <Text style={styles.timelineSub}>{item.subtitle}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>Notlar</Text>
+            <Text style={styles.sectionTitle}>{t("Notlar")}</Text>
             {isEditing ? (
               <Input
-                label="Not"
+                label={t("Not")}
                 value={form.notes}
                 onChangeText={(v) => updateField("notes", v)}
                 multiline
-                placeholder="Bu kişiyle ilgili hatırlamak istediğin detayları yaz..."
+                placeholder={t("Bu kişiyle ilgili hatırlamak istediğin detayları yaz...")}
               />
             ) : (
               <View style={styles.cardSoft}>
                 <Text style={contact.notes ? styles.notes : styles.emptyText}>
-                  {contact.notes || "Henüz not yok. Düzenle’ye basarak not ekleyebilirsin."}
+                  {contact.notes || t("Henüz not yok")}
                 </Text>
               </View>
             )}
 
             {isEditing ? (
               <>
-                <Text style={styles.sectionTitle}>Timeline Bilgileri</Text>
-                <Input label="Son iletişim tarihi" value={form.lastContactDate} onChangeText={(v) => updateField("lastContactDate", v)} placeholder="YYYY-MM-DD" />
-                <Input label="Nerede tanıştınız?" value={form.metWhere} onChangeText={(v) => updateField("metWhere", v)} />
+                <Text style={styles.sectionTitle}>{t("Görüşme Bilgileri")}</Text>
+                <DateField label={t("Son iletişim tarihi")} format="iso" value={form.lastContactDate} onChange={(v) => updateField("lastContactDate", v)} maximumDate={new Date()} />
+                <Input label={t("Nerede tanıştınız?")} value={form.metWhere} onChangeText={(v) => updateField("metWhere", v)} />
               </>
             ) : null}
           </View>
         ) : (
           <View>
-            <Text style={styles.sectionTitle}>Kişisel Bilgiler</Text>
+            <Text style={styles.sectionTitle}>{t("Kişisel Bilgiler")}</Text>
             {isEditing ? (
               <View style={styles.editBlockNoMargin}>
-                <Input label="Telefon" value={form.phone} onChangeText={(v) => updateField("phone", v)} keyboardType="phone-pad" />
-                <Input label="E-posta" value={form.email} onChangeText={(v) => updateField("email", v)} keyboardType="email-address" />
-                <Input label="Doğum günü" value={form.birthday} onChangeText={(v) => updateField("birthday", v)} placeholder="GG/AA/YYYY" />
-                <Input label="Etiketler" value={form.tags} onChangeText={(v) => updateField("tags", v)} placeholder="Yakın, iş, okul" />
+                <Input label={t("Telefon")} value={form.phone} onChangeText={(v) => updateField("phone", v)} keyboardType="phone-pad" />
+                <Input label={t("E-posta")} value={form.email} onChangeText={(v) => updateField("email", v)} keyboardType="email-address" />
+                <DateField label={t("Doğum günü")} format="birthday" value={form.birthday} onChange={(v) => updateField("birthday", v)} maximumDate={new Date()} />
+                <Input label={t("Etiketler")} value={form.tags} onChangeText={(v) => updateField("tags", v)} placeholder={t("Yakın, iş, okul")} />
                 <Input
-                  label="Sosyal medya"
+                  label={t("Sosyal medya")}
                   value={form.socialsText}
                   onChangeText={(v) => updateField("socialsText", v)}
                   multiline
-                  placeholder={"Instagram: @kullanici\nLinkedIn: linkedin.com/in/..."}
+                  placeholder={t("Instagram: @kullanici\nLinkedIn: linkedin.com/in/...")}
                 />
               </View>
             ) : (
               <View style={styles.card}>
-                {contact.phone ? <InfoRow icon="📞" label="Telefon" value={contact.phone} border /> : null}
-                {contact.email ? <InfoRow icon="✉️" label="E-posta" value={contact.email} border={!!contact.birthday} /> : null}
-                {contact.birthday ? <InfoRow icon="🎂" label="Doğum günü" value={contact.birthday} /> : null}
-                {!contact.phone && !contact.email && !contact.birthday ? (
-                  <Text style={styles.emptyInside}>Henüz personal info yok. Düzenle’ye basarak ekleyebilirsin.</Text>
+                {contact.phone ? <InfoRow icon="call-outline" label={t("Telefon")} value={contact.phone} border onPress={openPhone} /> : null}
+                {contact.email ? <InfoRow icon="mail-outline" label={t("E-posta")} value={contact.email} border={!!contact.birthday || !!contact.website} onPress={openMail} /> : null}
+                {contact.website ? <InfoRow icon="globe-outline" label={t("Web sitesi")} value={contact.website} border={!!contact.birthday} onPress={() => openWebUrl(contact.website)} /> : null}
+                {contact.birthday ? <InfoRow icon="gift-outline" label={t("Doğum günü")} value={contact.birthday} /> : null}
+                {!contact.phone && !contact.email && !contact.birthday && !contact.website ? (
+                  <Text style={styles.emptyInside}>{t("Henüz kişisel bilgi yok. Düzenle’ye basarak ekleyebilirsin.")}</Text>
                 ) : null}
               </View>
             )}
 
             {!isEditing && contact.socials && contact.socials.length > 0 ? (
               <>
-                <Text style={styles.sectionTitle}>Sosyal Medya</Text>
+                <Text style={styles.sectionTitle}>{t("Sosyal Medya")}</Text>
                 <View style={styles.card}>
-                  {contact.socials.map((s, i) => (
-                    <InfoRow key={`${s.platform}-${i}`} icon="🔗" label={s.platform} value={s.handle} border={i < (contact.socials?.length || 0) - 1} />
-                  ))}
+                  {contact.socials.map((s, i) => {
+                    const url = socialProfileUrl(s.platform, s.handle);
+                    return (
+                      <InfoRow
+                        key={`${s.platform}-${i}`}
+                        icon="link-outline"
+                        label={s.platform}
+                        value={s.handle}
+                        border={i < (contact.socials?.length || 0) - 1}
+                        onPress={url ? () => openWebUrl(url) : undefined}
+                      />
+                    );
+                  })}
                 </View>
               </>
             ) : null}
 
-            <Text style={styles.sectionTitle}>Tanışma & İlişki</Text>
+            <Text style={styles.sectionTitle}>{t("Tanışma & İlişki")}</Text>
             <View style={styles.card}>
-              {contact.relationship ? <InfoRow icon="🤝" label="İlişki" value={contact.relationship} border /> : null}
-              {contact.metWhere ? <InfoRow icon="📍" label="Nerede" value={contact.metWhere} border /> : null}
-              {!contact.relationship && !contact.metWhere ? <Text style={styles.emptyInside}>Tanışma bilgisi eklenmemiş.</Text> : null}
+              {contact.relationship ? <InfoRow icon="people-outline" label={t("İlişki")} value={tv(contact.relationship)} border /> : null}
+              {contact.metWhere ? <InfoRow icon="location-outline" label={t("Nerede")} value={tv(contact.metWhere)} border /> : null}
+              {!contact.relationship && !contact.metWhere ? <Text style={styles.emptyInside}>{t("Tanışma bilgisi eklenmemiş.")}</Text> : null}
               <InfoRow
-                icon="🔔"
-                label="İletişim aralığı"
-                value={intervalLabel(interval)}
+                icon="notifications-outline"
+                label={t("İletişim aralığı")}
+                value={contact.reminderEnabled === false ? t("Hatırlatıcı kapalı") : intervalLabel(interval)}
                 onPress={() => setIntervalPickerOpen(true)}
               />
             </View>
 
             {contact.tags ? (
               <>
-                <Text style={styles.sectionTitle}>Etiketler</Text>
+                <Text style={styles.sectionTitle}>{t("Etiketler")}</Text>
                 <View style={styles.tagsRow}>
                   {contact.tags.split(",").map((t) => t.trim()).filter(Boolean).map((tag, i) => (
                     <View key={`${tag}-${i}`} style={styles.tag}>
@@ -465,17 +582,17 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
       <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.confirmCard}>
-            <View style={styles.warningIcon}><Text style={styles.warningText}>!</Text></View>
-            <Text style={styles.confirmTitle}>Bu kişiyi silmek istiyor musun?</Text>
+            <View style={styles.warningIcon}><Ionicons name="warning" size={24} color={colors.danger} /></View>
+            <Text style={styles.confirmTitle}>{t("Bu kişiyi silmek istiyor musun?")}</Text>
             <Text style={styles.confirmDesc}>
-              {contact.fullName} ile ilgili tüm ilişki geçmişi, notlar ve kayıtlı bilgiler silinecek. Bu işlem geri alınamaz.
+              {t("{name} ve tüm notları, görüşme geçmişi silinecek. Hemen ardından “Geri al” diyebilirsin.", { name: contact.fullName })}
             </Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDeleteConfirm(false)} activeOpacity={0.75}>
-                <Text style={styles.cancelText}>Vazgeç</Text>
+                <Text style={styles.cancelText}>{t("Vazgeç")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.dangerBtn} onPress={deleteContact} activeOpacity={0.75}>
-                <Text style={styles.dangerText}>Evet, sil</Text>
+                <Text style={styles.dangerText}>{t("Evet, sil")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -485,8 +602,8 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
       <Modal visible={intervalPickerOpen} transparent animationType="fade" onRequestClose={() => setIntervalPickerOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>İletişim aralığı</Text>
-            <Text style={styles.confirmDesc}>Bu kişiyle ne sıklıkla iletişime geçmek istersin?</Text>
+            <Text style={styles.confirmTitle}>{t("İletişim aralığı")}</Text>
+            <Text style={styles.confirmDesc}>{t("Bu kişiyle ne sıklıkla iletişime geçmek istersin?")}</Text>
             <View style={styles.intervalOptions}>
               {INTERVAL_PRESETS.map((preset) => (
                 <TouchableOpacity
@@ -496,13 +613,22 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
                   activeOpacity={0.75}
                 >
                   <Text style={[styles.intervalOptionText, interval === preset.days && styles.intervalOptionTextActive]}>
-                    {preset.label}
+                    {t(preset.label)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { marginBottom: 10 }]}
+              onPress={async () => { await toggleReminder(); setIntervalPickerOpen(false); }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.cancelText, contact.reminderEnabled !== false && { color: colors.danger }]}>
+                {contact.reminderEnabled === false ? t("Hatırlatıcıyı aç") : t("Bu kişi için hatırlatıcıyı kapat")}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setIntervalPickerOpen(false)} activeOpacity={0.75}>
-              <Text style={styles.cancelText}>Kapat</Text>
+              <Text style={styles.cancelText}>{t("Kapat")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -510,20 +636,65 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
 
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
 
+      <LogInteractionModal
+        visible={logOpen}
+        contactName={contact.fullName}
+        initialType={logType}
+        onClose={() => setLogOpen(false)}
+        onSave={logInteraction}
+      />
+
       <MessageComposer
         visible={composerVisible}
         contact={contact}
         onClose={() => setComposerVisible(false)}
+        onExternalSend={() => { pendingAction.current = "whatsapp"; }}
       />
     </View>
   );
 }
 
-function Action({ icon, label, color, onPress, disabled }: { icon: string; label: string; color: string; onPress?: () => void; disabled?: boolean }) {
+type IconName = keyof typeof Ionicons.glyphMap;
+
+/** "Your story together" — a glanceable summary of the relationship. */
+function JourneyStrip({ contact }: { contact: ContactForm }) {
+  const j = relationshipJourney(contact);
+  const since = j.since ? new Date(j.since) : null;
+  const items: { icon: IconName; value: string; label: string }[] = [
+    {
+      icon: "calendar-outline",
+      value: since ? since.toLocaleDateString(locale(), { month: "short", year: "numeric" }) : "—",
+      label: t("tanışma"),
+    },
+    { icon: "sparkles-outline", value: String(j.moments), label: t("an") },
+    { icon: "repeat-outline", value: j.averageGapDays ? t("{days}g", { days: j.averageGapDays }) : "—", label: t("ortalama ara") },
+  ];
   return (
-    <TouchableOpacity style={[styles.actionItem, disabled && styles.disabled]} onPress={disabled ? undefined : onPress} activeOpacity={0.72}>
-      <View style={[styles.actionBox, { backgroundColor: color + "14", borderColor: color + "35" }]}> 
-        <Text style={styles.actionIcon}>{icon}</Text>
+    <View style={styles.journey}>
+      {items.map((it) => (
+        <View key={it.label} style={styles.journeyItem} accessible accessibilityLabel={`${it.label}: ${it.value}`}>
+          <Ionicons name={it.icon} size={18} color={colors.accent} />
+          <Text style={styles.journeyValue}>{it.value}</Text>
+          <Text style={styles.journeyLabel}>{it.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+type TimelineItem = { id?: string; title: string; subtitle: string; icon: IconName; color: string };
+
+function Action({ icon, label, color, onPress, disabled }: { icon: IconName; label: string; color: string; onPress?: () => void; disabled?: boolean }) {
+  return (
+    <TouchableOpacity
+      style={[styles.actionItem, disabled && styles.disabled]}
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={0.72}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+    >
+      <View style={[styles.actionBox, { backgroundColor: color + "14", borderColor: color + "35" }]}>
+        <Ionicons name={icon} size={22} color={color} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
@@ -532,20 +703,26 @@ function Action({ icon, label, color, onPress, disabled }: { icon: string; label
 
 function TabButton({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.tabButton, active && styles.tabButtonActive]} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={[styles.tabButton, active && styles.tabButtonActive]}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{title}</Text>
     </TouchableOpacity>
   );
 }
 
-function InfoRow({ icon, label, value, border, onPress }: { icon: string; label: string; value: string; border?: boolean; onPress?: () => void }) {
+function InfoRow({ icon, label, value, border, onPress }: { icon: IconName; label: string; value: string; border?: boolean; onPress?: () => void }) {
   const Wrapper = onPress ? TouchableOpacity : View;
   return (
     <Wrapper
       style={[styles.infoRow, border && styles.rowBorder]}
-      {...(onPress ? { onPress, activeOpacity: 0.7 } : {})}
+      {...(onPress ? { onPress, activeOpacity: 0.7, accessibilityRole: "button" as const, accessibilityLabel: `${label}: ${value}` } : {})}
     >
-      <Text style={styles.infoIcon}>{icon}</Text>
+      <Ionicons name={icon} size={18} color={colors.textSub} style={styles.infoIcon} />
       <View style={{ flex: 1 }}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoText}>{value}</Text>
@@ -567,6 +744,7 @@ function Input({ label, value, onChangeText, placeholder, multiline, keyboardTyp
     <View style={styles.inputWrap}>
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
+        accessibilityLabel={label}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -639,8 +817,20 @@ const styles = StyleSheet.create({
   actionItem: { alignItems: "center", width: "24%" },
   disabled: { opacity: 0.35 },
   actionBox: { width: 55, height: 55, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  actionIcon: { fontSize: 19 },
-  actionLabel: { marginTop: 7, fontSize: 10.5, color: MUTED, fontWeight: "800", textAlign: "center" },
+  journey: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  journeyItem: {
+    flex: 1, alignItems: "center", gap: 2, paddingVertical: 12, borderRadius: 16,
+    backgroundColor: colors.accentSoft,
+  },
+  journeyValue: { fontSize: 16, fontWeight: "900", color: colors.text },
+  journeyLabel: { fontSize: 12, fontWeight: "700", color: MUTED },
+  historyHint: { fontSize: 13, color: MUTED, marginTop: -6, marginBottom: 10 },
+  contactedBtn: {
+    width: "100%", marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14,
+  },
+  contactedText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
+  actionLabel: { marginTop: 7, fontSize: 11.5, color: MUTED, fontWeight: "800", textAlign: "center" },
 
   tabsWrap: {
     marginTop: 18,
@@ -664,7 +854,6 @@ const styles = StyleSheet.create({
   timelineRow: { flexDirection: "row", minHeight: 68 },
   timelineRail: { width: 56, alignItems: "center" },
   timelineDot: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  timelineIcon: { color: CARD, fontSize: 12, fontWeight: "900" },
   timelineLine: { flex: 1, width: 2, backgroundColor: BORDER, marginTop: 5 },
   timelineContent: { flex: 1, paddingBottom: 18 },
   timelineTitle: { color: TEXT, fontSize: 14, fontWeight: "900" },
@@ -673,7 +862,7 @@ const styles = StyleSheet.create({
   notes: { color: colors.textSub, fontSize: 13, lineHeight: 21 },
   infoRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 15, paddingVertical: 13 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
-  infoIcon: { width: 28, fontSize: 16 },
+  infoIcon: { width: 28 },
   infoLabel: { color: MUTED, fontSize: 11, fontWeight: "800", marginBottom: 3 },
   infoText: { color: colors.textSub, fontSize: 13, fontWeight: "500" },
   infoChevron: { fontSize: 20, color: MUTED },
@@ -698,7 +887,7 @@ const styles = StyleSheet.create({
   },
   inputMulti: { minHeight: 94, textAlignVertical: "top" },
 
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(25,24,38,0.38)", alignItems: "center", justifyContent: "center", padding: 22 },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: "center", justifyContent: "center", padding: 22 },
   confirmCard: { width: "100%", backgroundColor: CARD, borderRadius: 24, padding: 20, alignItems: "center" },
   warningIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: RED + "15", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   warningText: { color: RED, fontSize: 24, fontWeight: "900" },
@@ -713,7 +902,7 @@ const styles = StyleSheet.create({
   intervalOptions: { width: "100%", gap: 8, marginTop: 18, marginBottom: 16 },
   intervalOption: {
     paddingVertical: 13, borderRadius: 14,
-    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: BORDER,
     alignItems: "center",
   },
   intervalOptionActive: { backgroundColor: colors.primarySoft, borderColor: PURPLE + "60" },

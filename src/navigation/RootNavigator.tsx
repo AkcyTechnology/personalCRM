@@ -3,7 +3,6 @@ import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import SignUpScreen from "../screens/SignUpScreen";
-import SignInScreen from "../screens/SignInScreen";
 import WelcomeScreen from "../screens/WelcomeScreen";
 import OnboardingFlowScreen from "../screens/OnboardingFlowScreen";
 import MainTabs from "./MainTabs";
@@ -17,13 +16,15 @@ import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 import PrivacySecurityScreen from "../screens/PrivacySecurityScreen";
 import ManageSubscriptionScreen from "../screens/ManageSubscriptionScreen";
 import BusinessCardScreen from "../screens/BusinessCardScreen";
+import LegalScreen from "../screens/LegalScreen";
+import ShuffleScreen from "../screens/ShuffleScreen";
+import StoryScreen from "../screens/StoryScreen";
 import { loadSettings } from "../data/userSettings";
 import { colors } from "../theme/colors";
 
 export type RootStackParamList = {
   Onboarding:              undefined;
   SignUp:                  undefined;
-  SignIn:                  undefined;
   Welcome:                 undefined;
   OnboardingFlow:          undefined;
   MainTabs:                undefined;
@@ -37,6 +38,9 @@ export type RootStackParamList = {
   PrivacySecurity:         undefined;
   ManageSubscription:      undefined;
   BusinessCard:            undefined;
+  Legal:                   { doc: "privacy" | "terms" };
+  Shuffle:                 undefined;
+  Story:                   undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,7 +68,6 @@ export default function RootNavigator() {
     <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Onboarding"     component={OnboardingScreen} />
       <Stack.Screen name="SignUp"          component={SignUpScreen} />
-      <Stack.Screen name="SignIn"          component={SignInScreen} />
       <Stack.Screen name="Welcome"          component={WelcomeScreen} />
       <Stack.Screen name="OnboardingFlow"  component={OnboardingFlowScreen} />
       <Stack.Screen name="MainTabs"        component={MainTabs} />
@@ -78,6 +81,9 @@ export default function RootNavigator() {
       <Stack.Screen name="PrivacySecurity"      component={PrivacySecurityScreen} />
       <Stack.Screen name="ManageSubscription"   component={ManageSubscriptionScreen} />
       <Stack.Screen name="BusinessCard"          component={BusinessCardScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Legal"                 component={LegalScreen} />
+      <Stack.Screen name="Shuffle"               component={ShuffleScreen} options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="Story"                 component={StoryScreen} options={{ presentation: "fullScreenModal", animation: "fade" }} />
     </Stack.Navigator>
   );
 }

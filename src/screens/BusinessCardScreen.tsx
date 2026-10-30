@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -14,10 +13,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureGetItem, secureSetItem, secureRemoveItem } from "../storage/secureStorage";
 import QrCode from "../components/QrCode";
 import { showToast } from "../components/Toast";
+import { confirmDialog } from "../utils/confirm";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 type BusinessCardForm = {
   fullName: string;
@@ -67,7 +68,7 @@ export default function BusinessCardScreen({ navigation }: any) {
 
   const loadCard = async () => {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await secureGetItem(STORAGE_KEY);
 
       if (!raw) {
         setMode("edit");
@@ -101,7 +102,7 @@ export default function BusinessCardScreen({ navigation }: any) {
 
   const saveCard = async () => {
     if (!isValid) {
-      Alert.alert("Eksik bilgi", "Kartvizit oluşturmak için en az ad soyad alanını doldurmalısın.");
+      showToast(t("Kartvizit için ad soyad gerekli"));
       return;
     }
 
@@ -119,14 +120,14 @@ export default function BusinessCardScreen({ navigation }: any) {
         linkedin: form.linkedin.trim(),
       };
 
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+      await secureSetItem(STORAGE_KEY, JSON.stringify(cleaned));
       setForm(cleaned);
       setHasCard(true);
       setMode("view");
 
-      Alert.alert("Kartvizit hazır", "Dijital kartvizitin başarıyla kaydedildi.");
+      showToast(t("Kartvizit kaydedildi"));
     } catch {
-      Alert.alert("Hata", "Kartvizit kaydedilemedi. Lütfen tekrar dene.");
+      showToast(t("Kartvizit kaydedilemedi. Lütfen tekrar dene."));
     }
   };
 
@@ -135,30 +136,30 @@ export default function BusinessCardScreen({ navigation }: any) {
   const shareCard = async () => {
     try {
       await Share.share({
-        title: "Dijital Kartvizit",
+        title: t("Dijital Kartvizit"),
         message: cardSummary(),
       });
     } catch {
-      Alert.alert("Hata", "Paylaşım başlatılamadı.");
+      showToast(t("Paylaşım başlatılamadı"));
     }
   };
 
   const showQr = () => {
     setQrModalOpen(true);
-    showToast("QR kod hazır");
+    showToast(t("QR kod hazır"));
   };
 
   const resetCard = () => {
-    Alert.alert("Kartviziti sıfırla", "Kartvizit bilgilerini temizlemek istediğine emin misin?", [
+    confirmDialog(t("Kartviziti sıfırla"), t("Kartvizit bilgilerini temizlemek istediğine emin misin?"), [
       {
-        text: "Vazgeç",
+        text: t("Vazgeç"),
         style: "cancel",
       },
       {
-        text: "Sıfırla",
+        text: t("Sıfırla"),
         style: "destructive",
         onPress: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
+          await secureRemoveItem(STORAGE_KEY);
           setForm(initialForm);
           setHasCard(false);
           setMode("edit");
@@ -174,19 +175,21 @@ export default function BusinessCardScreen({ navigation }: any) {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.75}
+          accessibilityRole="button"
         >
-          <Text style={styles.backText}>Geri</Text>
+          <Text style={styles.backText}>{t("Geri")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.appTitle}>Dijital Kartvizit</Text>
+        <Text style={styles.appTitle}>{t("Dijital Kartvizit")}</Text>
 
         {hasCard ? (
           <TouchableOpacity
             style={styles.topAction}
             onPress={() => setMode(mode === "view" ? "edit" : "view")}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
-            <Text style={styles.topActionText}>{mode === "view" ? "Düzenle" : "Önizle"}</Text>
+            <Text style={styles.topActionText}>{mode === "view" ? t("Düzenle") : t("Önizle")}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.topActionGhost} />
@@ -203,27 +206,27 @@ export default function BusinessCardScreen({ navigation }: any) {
               <Text style={styles.successIconText}>✓</Text>
             </View>
 
-            <Text style={styles.successTitle}>Kartvizitin hazır</Text>
-            <Text style={styles.successSub}>Bilgilerini paylaşabilir veya dilediğin zaman düzenleyebilirsin.</Text>
+            <Text style={styles.successTitle}>{t("Kartvizitin hazır")}</Text>
+            <Text style={styles.successSub}>{t("Bilgilerini paylaşabilir veya dilediğin zaman düzenleyebilirsin.")}</Text>
           </View>
 
           <BusinessCardPreview form={form} />
 
           <View style={styles.quickActions}>
-            <ActionButton label="Paylaş" onPress={shareCard} />
-            <ActionButton label="Düzenle" onPress={() => setMode("edit")} variant="light" />
-            <ActionButton label="QR Göster" onPress={showQr} variant="light" />
+            <ActionButton label={t("Paylaş")} onPress={shareCard} />
+            <ActionButton label={t("Düzenle")} onPress={() => setMode("edit")} variant="light" />
+            <ActionButton label={t("QR Göster")} onPress={showQr} variant="light" />
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Kartvizit bilgilerin senkron kalır</Text>
+            <Text style={styles.infoTitle}>{t("Kartvizit bilgilerin senkron kalır")}</Text>
             <Text style={styles.infoText}>
-              Bilgilerini güncellediğinde dijital kartvizit görünümün de yenilenir.
+              {t("Bilgilerini güncellediğinde dijital kartvizit görünümün de yenilenir.")}
             </Text>
           </View>
 
           <TouchableOpacity style={styles.dangerButton} onPress={resetCard} activeOpacity={0.75}>
-            <Text style={styles.dangerButtonText}>Kartviziti sıfırla</Text>
+            <Text style={styles.dangerButtonText}>{t("Kartviziti sıfırla")}</Text>
           </TouchableOpacity>
         </ScrollView>
       ) : (
@@ -235,76 +238,49 @@ export default function BusinessCardScreen({ navigation }: any) {
           <View style={styles.editHero}>
             {!hasCard ? <Text style={styles.editHeroIcon}>📇</Text> : null}
             <Text style={styles.editHeroTitle}>
-              {hasCard ? "Kartvizitini düzenle" : "Kartvizitini tamamla"}
+              {hasCard ? t("Kartvizitini düzenle") : t("Kartvizitini tamamla")}
             </Text>
             <Text style={styles.editHeroText}>
               {hasCard
-                ? "İş bilgilerini ekle, dijital kartvizitini hızlıca paylaşılabilir hale getir."
-                : "Paylaşılabilir bir dijital kartvizit oluşturmak için temel bilgilerini ekle."}
+                ? t("İş bilgilerini ekle, dijital kartvizitini hızlıca paylaşılabilir hale getir.") : t("Paylaşılabilir bir dijital kartvizit oluşturmak için temel bilgilerini ekle.")}
             </Text>
           </View>
 
-          <View style={styles.photoRow}>
-            <TouchableOpacity
-              style={styles.mediaBox}
-              activeOpacity={0.8}
-              onPress={() => showToast("Bu özellik yakında eklenecek")}
-            >
-              <View style={styles.mediaIcon}>
-                <Text style={styles.mediaIconText}>+</Text>
-              </View>
-              <Text style={styles.mediaTitle}>Fotoğraf ekle</Text>
-              <Text style={styles.mediaSub}>Opsiyonel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.mediaBox}
-              activeOpacity={0.8}
-              onPress={() => showToast("Bu özellik yakında eklenecek")}
-            >
-              <View style={styles.mediaIcon}>
-                <Text style={styles.mediaIconText}>□</Text>
-              </View>
-              <Text style={styles.mediaTitle}>Logo ekle</Text>
-              <Text style={styles.mediaSub}>Opsiyonel</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Section title="Temel bilgiler">
+          <Section title={t("Temel bilgiler")}>
             <Input
-              label="Ad Soyad"
-              placeholder="Tuğçe Ulucan"
+              label={t("Ad Soyad")}
+              placeholder={t("Ayşe Yılmaz")}
               value={form.fullName}
               onChangeText={(v) => updateField("fullName", v)}
               required
             />
 
             <Input
-              label="Unvan / Pozisyon"
-              placeholder="Proje Mühendisi"
+              label={t("Unvan / Pozisyon")}
+              placeholder={t("Yazılım Mühendisi")}
               value={form.title}
               onChangeText={(v) => updateField("title", v)}
             />
 
             <Input
-              label="Şirket / Kurum"
-              placeholder="GEST Mühendislik"
+              label={t("Şirket / Kurum")}
+              placeholder={t("Acme A.Ş.")}
               value={form.company}
               onChangeText={(v) => updateField("company", v)}
             />
 
             <Input
-              label="Hakkımda"
-              placeholder="Kısa bir açıklama yaz..."
+              label={t("Hakkımda")}
+              placeholder={t("Kısa bir açıklama yaz...")}
               value={form.about}
               onChangeText={(v) => updateField("about", v)}
               multiline
             />
           </Section>
 
-          <Section title="İletişim bilgileri">
+          <Section title={t("İletişim bilgileri")}>
             <Input
-              label="Telefon"
+              label={t("Telefon")}
               placeholder="+90 555 123 45 67"
               value={form.phone}
               onChangeText={(v) => updateField("phone", v)}
@@ -312,8 +288,8 @@ export default function BusinessCardScreen({ navigation }: any) {
             />
 
             <Input
-              label="E-posta"
-              placeholder="ornek@mail.com"
+              label={t("E-posta")}
+              placeholder={t("ornek@mail.com")}
               value={form.email}
               onChangeText={(v) => updateField("email", v)}
               keyboardType="email-address"
@@ -321,63 +297,63 @@ export default function BusinessCardScreen({ navigation }: any) {
             />
 
             <Input
-              label="Website"
-              placeholder="www.site.com"
+              label={t("Web sitesi")}
+              placeholder={"www.site.com"}
               value={form.website}
               onChangeText={(v) => updateField("website", v)}
               autoCapitalize="none"
             />
 
             <Input
-              label="LinkedIn"
-              placeholder="linkedin.com/in/kullanici"
+              label={t("LinkedIn")}
+              placeholder={t("linkedin.com/in/kullanici")}
               value={form.linkedin}
               onChangeText={(v) => updateField("linkedin", v)}
               autoCapitalize="none"
             />
 
             <Input
-              label="Adres"
-              placeholder="İlçe, İl, Ülke"
+              label={t("Adres")}
+              placeholder={t("İlçe, İl, Ülke")}
               value={form.address}
               onChangeText={(v) => updateField("address", v)}
               multiline
             />
           </Section>
 
-          <Section title="Görünürlük">
+          <Section title={t("Görünürlük")}>
             <VisibilityRow
-              label="Telefonu göster"
+              label={t("Telefonu göster")}
               value={form.showPhone}
               onChange={(v) => setForm((prev) => ({ ...prev, showPhone: v }))}
             />
             <VisibilityRow
-              label="E-postayı göster"
+              label={t("E-postayı göster")}
               value={form.showEmail}
               onChange={(v) => setForm((prev) => ({ ...prev, showEmail: v }))}
             />
             <VisibilityRow
-              label="Website göster"
+              label={t("Web sitesini göster")}
               value={form.showWebsite}
               onChange={(v) => setForm((prev) => ({ ...prev, showWebsite: v }))}
             />
             <VisibilityRow
-              label="LinkedIn göster"
+              label={t("LinkedIn göster")}
               value={form.showLinkedin}
               onChange={(v) => setForm((prev) => ({ ...prev, showLinkedin: v }))}
             />
             <VisibilityRow
-              label="Adres göster"
+              label={t("Adres göster")}
               value={form.showAddress}
               onChange={(v) => setForm((prev) => ({ ...prev, showAddress: v }))}
             />
           </Section>
 
           <View style={styles.previewMiniCard}>
-            <Text style={styles.previewMiniLabel}>Canlı önizleme</Text>
-            <Text style={styles.previewMiniName}>{form.fullName || "Ad Soyad"}</Text>
+            <Text style={styles.previewMiniLabel}>{t("Canlı önizleme")}</Text>
+            <Text style={styles.previewMiniName}>{form.fullName || t("Ad Soyad")}</Text>
             <Text style={styles.previewMiniText}>
-              {[form.title, form.company].filter(Boolean).join(" · ") || "Unvan · Şirket"}
+              {[form.title, form.company].filter(Boolean).join(" · ") || t("Unvan · Şirket")}
             </Text>
           </View>
 
@@ -387,7 +363,7 @@ export default function BusinessCardScreen({ navigation }: any) {
             activeOpacity={0.8}
           >
             <Text style={styles.saveButtonText}>
-              {hasCard ? "Değişiklikleri kaydet" : "Kartviziti oluştur"}
+              {hasCard ? t("Değişiklikleri kaydet") : t("Kartviziti oluştur")}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -396,13 +372,13 @@ export default function BusinessCardScreen({ navigation }: any) {
       <Modal visible={qrModalOpen} transparent animationType="fade" onRequestClose={() => setQrModalOpen(false)}>
         <Pressable style={styles.qrModalOverlay} onPress={() => setQrModalOpen(false)}>
           <Pressable style={styles.qrModalBox}>
-            <Text style={styles.qrModalTitle}>{form.fullName || "Kartvizit"}</Text>
-            <Text style={styles.qrModalSub}>Bu QR kodu okutarak kartvizit bilgilerine ulaşabilirsin.</Text>
+            <Text style={styles.qrModalTitle}>{form.fullName || t("Kartvizit")}</Text>
+            <Text style={styles.qrModalSub}>{t("Bu QR kodu okutarak kartvizit bilgilerine ulaşabilirsin.")}</Text>
             <View style={styles.qrModalCodeWrap}>
-              <QrCode value={cardSummary()} size={220} />
+              <QrCode value={businessCardVCard(form)} size={220} accessibilityLabel={t("Kartvizit QR kodu. Okutulunca kişi rehbere eklenir.")} />
             </View>
-            <TouchableOpacity style={styles.qrModalClose} onPress={() => setQrModalOpen(false)} activeOpacity={0.75}>
-              <Text style={styles.qrModalCloseText}>Kapat</Text>
+            <TouchableOpacity style={styles.qrModalClose} onPress={() => setQrModalOpen(false)} activeOpacity={0.75} accessibilityRole="button">
+              <Text style={styles.qrModalCloseText}>{t("Kapat")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -411,17 +387,45 @@ export default function BusinessCardScreen({ navigation }: any) {
   );
 }
 
+function vcardEscape(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
+}
+
+/** vCard 3.0 payload so scanning the QR offers to save the contact. */
+function businessCardVCard(form: BusinessCardForm) {
+  const parts = form.fullName.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts.pop()! : "";
+  const first = parts.join(" ");
+  return [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `N:${vcardEscape(last)};${vcardEscape(first)};;;`,
+    `FN:${vcardEscape(form.fullName.trim())}`,
+    form.company ? `ORG:${vcardEscape(form.company)}` : "",
+    form.title ? `TITLE:${vcardEscape(form.title)}` : "",
+    form.showPhone && form.phone ? `TEL;TYPE=CELL:${form.phone.replace(/[^\d+]/g, "")}` : "",
+    form.showEmail && form.email ? `EMAIL:${vcardEscape(form.email)}` : "",
+    form.showWebsite && form.website ? `URL:${vcardEscape(form.website)}` : "",
+    form.showLinkedin && form.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${vcardEscape(form.linkedin)}` : "",
+    form.showAddress && form.address ? `ADR:;;${vcardEscape(form.address)};;;;` : "",
+    form.about ? `NOTE:${vcardEscape(form.about)}` : "",
+    "END:VCARD",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function businessCardSummary(form: BusinessCardForm) {
   return [
     form.fullName,
     form.title || "",
     form.company || "",
     "",
-    form.showPhone && form.phone ? `Telefon: ${form.phone}` : "",
-    form.showEmail && form.email ? `E-posta: ${form.email}` : "",
-    form.showWebsite && form.website ? `Website: ${form.website}` : "",
-    form.showLinkedin && form.linkedin ? `LinkedIn: ${form.linkedin}` : "",
-    form.showAddress && form.address ? `Adres: ${form.address}` : "",
+    form.showPhone && form.phone ? t("Telefon: {value}", { value: form.phone }) : "",
+    form.showEmail && form.email ? t("E-posta: {value}", { value: form.email }) : "",
+    form.showWebsite && form.website ? t("Web sitesi: {value}", { value: form.website }) : "",
+    form.showLinkedin && form.linkedin ? t("LinkedIn: {value}", { value: form.linkedin }) : "",
+    form.showAddress && form.address ? t("Adres: {value}", { value: form.address }) : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -454,11 +458,11 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
 
           <View style={styles.cardDivider} />
 
-          <CardLine label="E-posta" value={form.showEmail ? form.email : ""} />
-          <CardLine label="Telefon" value={form.showPhone ? form.phone : ""} />
-          <CardLine label="Website" value={form.showWebsite ? form.website : ""} />
-          <CardLine label="LinkedIn" value={form.showLinkedin ? form.linkedin : ""} />
-          <CardLine label="Adres" value={form.showAddress ? form.address : ""} />
+          <CardLine label={t("E-posta")} value={form.showEmail ? form.email : ""} />
+          <CardLine label={t("Telefon")} value={form.showPhone ? form.phone : ""} />
+          <CardLine label={t("Web sitesi")} value={form.showWebsite ? form.website : ""} />
+          <CardLine label={t("LinkedIn")} value={form.showLinkedin ? form.linkedin : ""} />
+          <CardLine label={t("Adres")} value={form.showAddress ? form.address : ""} />
         </View>
 
         <View style={styles.cardRight}>
@@ -467,10 +471,10 @@ function BusinessCardPreview({ form }: { form: BusinessCardForm }) {
           </View>
 
           <View style={styles.qrBox}>
-            <QrCode value={businessCardSummary(form)} size={66} />
+            <QrCode value={businessCardVCard(form)} size={66} accessibilityLabel={t("Kartvizit QR kodu")} />
           </View>
 
-          <Text style={styles.qrText}>QR Kart</Text>
+          <Text style={styles.qrText}>{t("QR Kart")}</Text>
         </View>
       </View>
     </View>
@@ -504,6 +508,7 @@ function ActionButton({
       style={[styles.actionButton, variant === "light" && styles.actionButtonLight]}
       onPress={onPress}
       activeOpacity={0.78}
+      accessibilityRole="button"
     >
       <Text
         style={[
@@ -527,7 +532,7 @@ function Section({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{title}</Text>
         <View style={styles.sectionLine} />
       </View>
 
@@ -561,15 +566,16 @@ function Input({
         <Text style={styles.inputLabel}>{label}</Text>
         {required ? (
           <View style={styles.requiredBadge}>
-            <Text style={styles.requiredText}>Zorunlu</Text>
+            <Text style={styles.requiredText}>{t("Zorunlu")}</Text>
           </View>
         ) : null}
       </View>
 
       <TextInput
+        accessibilityLabel={required ? t("{label}, zorunlu", { label }) : label}
         style={[styles.input, multiline && styles.inputMultiline]}
         placeholder={placeholder}
-        placeholderTextColor="#9AA3B2"
+        placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
@@ -595,8 +601,9 @@ function VisibilityRow({
       <Switch
         value={value}
         onValueChange={onChange}
+        accessibilityLabel={label}
         trackColor={{ false: colors.border, true: colors.primary + "88" }}
-        thumbColor={value ? colors.primary : "#FFFFFF"}
+        thumbColor={value ? colors.primary : colors.white}
       />
     </View>
   );
@@ -617,26 +624,26 @@ function getInitials(name: string) {
 const TOP_SAFE =
   Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 10 : 54;
 
-const TEAL = "#00B5AC";
-const TEAL_DARK = "#008E88";
-const TEXT = "#111827";
-const SUB = "#687084";
-const BORDER = "#E8ECF3";
-const SOFT = "#F8FAFC";
+const TEAL = colors.primary;
+const TEAL_DARK = colors.primaryDark;
+const TEXT = colors.text;
+const SUB = colors.textSub;
+const BORDER = colors.borderLight;
+const SOFT = colors.card;
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
   },
 
   appBar: {
     paddingTop: TOP_SAFE,
     paddingHorizontal: 18,
     paddingBottom: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F2F6",
+    borderBottomColor: colors.borderLight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -666,7 +673,7 @@ const styles = StyleSheet.create({
     minWidth: 64,
     height: 36,
     borderRadius: 12,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -697,7 +704,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 24,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
@@ -726,12 +733,12 @@ const styles = StyleSheet.create({
   },
 
   cardPreview: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
-    shadowColor: "#64748B",
+    shadowColor: colors.textSub,
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
@@ -789,8 +796,8 @@ const styles = StyleSheet.create({
   },
 
   cardLineLabel: {
-    fontSize: 10.5,
-    color: "#8A93A5",
+    fontSize: 11.5,
+    color: colors.textMuted,
     fontWeight: "600",
   },
 
@@ -811,9 +818,9 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -831,7 +838,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     padding: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -845,12 +852,12 @@ const styles = StyleSheet.create({
   },
 
   qrModalOverlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.5)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   qrModalBox: {
     width: "100%", maxWidth: 340,
-    backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24,
+    backgroundColor: colors.surface, borderRadius: 24, padding: 24,
     alignItems: "center",
   },
   qrModalTitle: { fontSize: 17, fontWeight: "700", color: TEXT, textAlign: "center" },
@@ -858,11 +865,11 @@ const styles = StyleSheet.create({
   qrModalCodeWrap: {
     marginTop: 20, padding: 16,
     borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
   },
   qrModalClose: {
     marginTop: 20, width: "100%", height: 48,
-    borderRadius: 14, backgroundColor: "#F3F4F6",
+    borderRadius: 14, backgroundColor: colors.borderLight,
     alignItems: "center", justifyContent: "center",
   },
   qrModalCloseText: { fontSize: 14, fontWeight: "700", color: TEXT },
@@ -883,13 +890,13 @@ const styles = StyleSheet.create({
   },
 
   actionButtonLight: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: BORDER,
   },
 
   actionButtonText: {
-    color: "#FFFFFF",
+    color: colors.onFill,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -902,9 +909,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: "#F3FFFE",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
   },
 
   infoTitle: {
@@ -927,7 +934,7 @@ const styles = StyleSheet.create({
   },
 
   dangerButtonText: {
-    color: "#EF4444",
+    color: colors.danger,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -935,9 +942,9 @@ const styles = StyleSheet.create({
   editHero: {
     padding: 18,
     borderRadius: 20,
-    backgroundColor: "#F3FFFE",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.primaryBorder,
   },
 
   editHeroIcon: {
@@ -981,7 +988,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 16,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
@@ -1040,7 +1047,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 10,
   },
-  visibilityLabel: { fontSize: 13, color: "#4B5565", fontWeight: "600" },
+  visibilityLabel: { fontSize: 13, color: colors.textSub, fontWeight: "600" },
 
   inputLabelRow: {
     marginBottom: 7,
@@ -1051,7 +1058,7 @@ const styles = StyleSheet.create({
 
   inputLabel: {
     fontSize: 13,
-    color: "#4B5565",
+    color: colors.textSub,
     fontWeight: "600",
   },
 
@@ -1059,11 +1066,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#E6FAF8",
+    backgroundColor: colors.primarySoft,
   },
 
   requiredText: {
-    fontSize: 10,
+    fontSize: 11,
     color: TEAL_DARK,
     fontWeight: "700",
   },
@@ -1073,7 +1080,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     fontSize: 14,
     color: TEXT,
@@ -1090,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     padding: 16,
   },
 
@@ -1127,7 +1134,7 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
-    color: "#FFFFFF",
+    color: colors.onFill,
     fontSize: 15,
     fontWeight: "700",
   },

@@ -10,10 +10,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { loadSettings, saveSettings } from "../data/userSettings";
-import { ensureNotificationPermissionAsync } from "../utils/notifications";
+import { ensureNotificationPermissionAsync, notificationsUnavailable } from "../utils/notifications";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import { t } from "../i18n";
 
 export default function NotificationSettingsScreen({ navigation }: any) {
   const [birthday, setBirthday] = useState(true);
@@ -70,57 +71,64 @@ export default function NotificationSettingsScreen({ navigation }: any) {
   const handleWeeklySummary = (v: boolean) => toggleWithPermission(v, setWeeklySummary, "notif_weeklySummary");
   const handleSmartNudge = (v: boolean) => toggleWithPermission(v, setSmartNudge, "notif_smartNudge");
 
-  if (!loaded) return <View style={styles.screen}><AppHeader type="settings" centerTitle="Bildirim Ayarları" onBack={() => navigation.goBack()} /></View>;
+  if (!loaded) return <View style={styles.screen}><AppHeader type="settings" centerTitle={t("Bildirim Ayarları")} onBack={() => navigation.goBack()} /></View>;
 
   return (
     <View style={styles.screen}>
-      <AppHeader type="settings" centerTitle="Bildirim Ayarları" onBack={() => navigation.goBack()} />
+      <AppHeader type="settings" centerTitle={t("Bildirim Ayarları")} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionLabel}>HATIRLATICILAR</Text>
+        {notificationsUnavailable ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>
+              {t("Expo Go (Android) bildirimleri desteklemiyor. Hatırlatıcıların gelmesi için uygulamanın development build veya mağaza sürümünü kullan.")}
+            </Text>
+          </View>
+        ) : null}
+        <Text style={styles.sectionLabel}>{t("HATIRLATICILAR")}</Text>
 
         <View style={styles.card}>
           <SwitchRow
-            label="Doğum günü hatırlatıcısı"
-            desc="Kişilerin doğum günlerinden 1 gün önce bildirim al"
+            label={t("Doğum günü hatırlatıcısı")}
+            desc={t("Kişilerin doğum günlerinden 1 gün önce bildirim al")}
             value={birthday}
             onChange={handleBirthday}
           />
           <SwitchRow
-            label="Takip hatırlatıcısı"
-            desc="Ulaşma eşiğini aşan kişiler için uyarı"
+            label={t("Takip hatırlatıcısı")}
+            desc={t("Bir süredir konuşmadığın kişiler için nazik bir hatırlatma")}
             value={followUp}
             onChange={handleFollowUp}
             border
           />
           <SwitchRow
-            label="Akıllı dokunuş önerisi"
-            desc="En uygun zamanda bağlantı önerileri"
+            label={t("Akıllı dokunuş önerisi")}
+            desc={t("En uygun zamanda bağlantı önerileri")}
             value={smartNudge}
             onChange={handleSmartNudge}
             border
           />
         </View>
 
-        <Text style={styles.sectionLabel}>ÖZET</Text>
+        <Text style={styles.sectionLabel}>{t("ÖZET")}</Text>
 
         <View style={styles.card}>
           <SwitchRow
-            label="Haftalık özet"
-            desc="Her pazartesi ilişki sağlığı özetini al"
+            label={t("Haftalık özet")}
+            desc={t("Her pazartesi ilişki sağlığı özetini al")}
             value={weeklySummary}
             onChange={handleWeeklySummary}
           />
         </View>
 
         <Text style={styles.hint}>
-          Bildirimler için cihaz izinleri gerekir. Ayarlar › Bildirimler bölümünden yönetebilirsin.
+          {t("Bildirimler için cihaz izinleri gerekir. Ayarlar › Bildirimler bölümünden yönetebilirsin.")}
         </Text>
       </ScrollView>
 
       <PermissionDeniedModal
         visible={permissionModalOpen}
-        title="Bildirim izni gerekli"
-        description="Hatırlatıcılar için bildirim gönderebilmemiz için bildirim iznine izin vermelisin."
+        title={t("Bildirim izni gerekli")}
+        description={t("Hatırlatıcılar için bildirim gönderebilmemiz için bildirim iznine izin vermelisin.")}
         onClose={() => setPermissionModalOpen(false)}
       />
     </View>
@@ -149,14 +157,18 @@ function SwitchRow({
       <Switch
         value={value}
         onValueChange={onChange}
+        accessibilityLabel={label}
+        accessibilityHint={desc}
         trackColor={{ false: colors.border, true: colors.primary + "88" }}
-        thumbColor={value ? colors.primary : "#FFFFFF"}
+        thumbColor={value ? colors.primary : colors.white}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  notice: { backgroundColor: colors.warningSoft, borderRadius: 12, padding: 14, marginBottom: 16 },
+  noticeText: { fontSize: 13, lineHeight: 19, color: colors.text },
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.xxl, paddingBottom: 60 },
   sectionLabel: {

@@ -1,1246 +1,939 @@
 import { useState, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  StatusBar,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import * as Clipboard from "expo-clipboard";
-import { loadContacts, saveContacts } from "../data/contacts";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { copyWithAutoClear } from "../utils/clipboard";
+import { loadContacts, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
-import messageSuggestions from "./messageSuggestions.json";
+import { dailyMessage } from "../data/messages";
 import type { ContactForm } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
-import { spacing } from "../theme/spacing";
-import { isDue, isSnoozed, effectiveIntervalDays } from "../utils/reminderInterval";
-import { averageHealthScore } from "../utils/healthScore";
+import { isDue, daysSinceIntervalStart } from "../utils/reminderInterval";
+import { averageHealthScore, healthScore, healthScoreColor, healthScoreLabel } from "../utils/healthScore";
+import { nextBirthday } from "../utils/dates";
+import {
+  onThisDay,
+  peopleThisWeek,
+  personOfTheDay,
+  reasonFor,
+  todaysSparks,
+  treeState,
+  weeklyStreak,
+  TREE_STAGES,
+  type Spark,
+  type TreeState,
+} from "../utils/engagement";
+import { logMoment } from "../app/momentActions";
 import SnoozeModal from "../components/SnoozeModal";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
-import { showToast } from "../components/Toast";
+import LogInteractionModal from "../components/LogInteractionModal";
+import ProgressRing from "../components/ProgressRing";
+import BondTree from "../components/BondTree";
+import Appear from "../components/Appear";
+import AnalyticsConsent from "../components/AnalyticsConsent";
+import CountUp from "../components/CountUp";
+import Avatar from "../components/Avatar";
+import { showToast, showUndoToast } from "../components/Toast";
+import { reasonText } from "./ShuffleScreen";
+import { track } from "../utils/analytics";
+import { t } from "../i18n";
 
-type DashboardFilter = "all" | "reachOut" | "upcoming" | "recent";
+type IconName = keyof typeof Ionicons.glyphMap;
 
-type DailySuggestion = {
-  id: number;
-  title: string;
-  message: string;
-  category?: string;
-  tone?: string;
-};
-
-function initials(name: string) {
-  return name
-    .trim()
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+function firstName(name: string) {
+  return name.trim().split(/\s+/)[0] || name;
 }
 
-function avatarColor(name: string) {
-  const palette = ["#00B5AC", "#7C3AED", "#0369A1", colors.success, colors.warning];
-  let h = 0;
-  for (const c of name) h += c.charCodeAt(0);
-  return palette[h % palette.length];
-}
-
-function daysSince(iso?: string): number {
-  if (!iso) return 9999;
-  const time = new Date(iso).getTime();
-  if (Number.isNaN(time)) return 9999;
-  return Math.max(0, Math.floor((Date.now() - time) / 86_400_000));
-}
-
-function dayLabel(days: number) {
-  if (days <= 0) return "Bugün";
-  if (days === 1) return "Dün";
-  if (days >= 9999) return "Tarih yok";
-  return `${days}g önce`;
-}
-
-function contactMeta(c: ContactForm) {
-  return [c.relationship, c.jobTitle, c.company].filter(Boolean).join(" · ") || "Bağlantı";
-}
-
-function suggestionFor(c: ContactForm, threshold: number) {
-  const days = daysSince(c.lastContactDate);
-  const name = c.fullName.split(" ")[0] || "Bu kişi";
-
-  if (days >= threshold) return `${name} ile kısa bir check-in iyi olabilir.`;
-  if (c.notes?.trim()) return "Notlarına göz atıp kişisel bir mesaj gönder.";
-  if (c.company || c.jobTitle) return "İşleri nasıl gidiyor diye sıcak bir mesaj at.";
-  return "Kısa ve samimi bir selam bağlantıyı güçlendirir.";
-}
-
-function getDayOfYear() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-}
-
-function getDailySuggestion(): DailySuggestion {
-  const list = messageSuggestions as DailySuggestion[];
-
-  if (!Array.isArray(list) || list.length === 0) {
-    return {
-      id: 0,
-      title: "Bugünün mesaj fikri",
-      message: "Uzun zamandır konuşmadığın birine kısa ve samimi bir selam gönder.",
-      category: "Genel",
-      tone: "Sıcak",
-    };
-  }
-
-  const index = (getDayOfYear() - 1) % list.length;
-  return list[index];
+function shortDays(days: number) {
+  if (days <= 0) return t("Bugün");
+  if (days >= 9999) return "—";
+  return t("{days}g", { days });
 }
 
 export default function HomeScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [contacts, setContacts] = useState<ContactForm[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [threshold, setThreshold] = useState(14);
+  const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [userName, setUserName] = useState("");
-  const [snoozeVisible, setSnoozeVisible] = useState(false);
+  const [snoozeTarget, setSnoozeTarget] = useState<ContactForm | null>(null);
+  const [composerTarget, setComposerTarget] = useState<ContactForm | null>(null);
+  const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
-  const [composerVisible, setComposerVisible] = useState(false);
+  const [treeInfoOpen, setTreeInfoOpen] = useState(false);
+
+  const reload = useCallback(() => loadContacts().then(setContacts), []);
 
   useFocusEffect(
     useCallback(() => {
       Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
         setContacts(c);
         setThreshold(s.reachOutThresholdDays || 14);
+        setWeeklyGoal(s.weeklyGoal || 3);
         setUserName(s.userName || "");
+        setLoaded(true);
       });
+      return subscribeContacts(setContacts);
     }, [])
   );
 
   const goToContact = (contact: ContactForm) => navigation.navigate("PersonDetail", { contact });
-  const goToPeople = (filter: DashboardFilter = "all") =>
-    navigation.navigate("People", { filter, threshold });
-  const goToReminders = (filter: DashboardFilter = "all") =>
-    navigation.navigate("Reminders", { filter, threshold });
-  const goToAddContact = () => navigation.navigate("AddContact");
-  const goToImportContacts = () => navigation.navigate("ImportContacts");
 
-  // Business card ekranının route adı farklıysa burayı değiştir.
-  const goToBusinessCard = () => navigation.navigate("BusinessCard");
-
-  const dailySuggestion = useMemo(() => getDailySuggestion(), []);
-
-  const dashboard = useMemo(() => {
-    const active = contacts.filter((c) => !isSnoozed(c));
-
-    const sortedOldest = [...active].sort(
-      (a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate)
-    );
-
-    const sortedRecent = [...active].sort(
-      (a, b) => daysSince(a.lastContactDate) - daysSince(b.lastContactDate)
-    );
-
-    const reachOut = sortedOldest.filter((c) => isDue(c, threshold));
-
-    const nearThreshold = sortedOldest.filter((c) => {
-      const d = daysSince(c.lastContactDate);
-      const interval = effectiveIntervalDays(c, threshold);
-      return d >= Math.floor(interval * 0.55) && d < interval;
-    });
-
-    const fallbackUpcoming = sortedOldest.filter(
-      (c) => daysSince(c.lastContactDate) < effectiveIntervalDays(c, threshold)
-    );
-
-    const upcoming = (nearThreshold.length > 0 ? nearThreshold : fallbackUpcoming)
-      .filter((c) => !reachOut.includes(c))
-      .slice(0, 5);
-
-    const recent = sortedRecent.slice(0, 5);
-    const focusContact = reachOut[0] || upcoming[0] || recent[0];
-    const contactedThisWeek = active.filter((c) => daysSince(c.lastContactDate) <= 7).length;
-
-    const health = averageHealthScore(active, threshold);
-
+  const data = useMemo(() => {
+    const now = new Date();
+    const due = contacts
+      .filter((c) => isDue(c, threshold))
+      .sort((a, b) => daysSinceIntervalStart(b) - daysSinceIntervalStart(a));
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const birthdays = contacts
+      .map((c) => ({ contact: c, date: nextBirthday(c.birthday, now) }))
+      .filter((b): b is { contact: ContactForm; date: Date } => !!b.date)
+      .map((b) => ({ ...b, daysLeft: Math.round((b.date.getTime() - startOfToday) / 86_400_000) }))
+      .filter((b) => b.daysLeft <= 30)
+      .sort((a, b) => a.daysLeft - b.daysLeft)
+      .slice(0, 8);
+    const pod = personOfTheDay(contacts, threshold, now);
     return {
-      reachOut,
-      upcoming,
-      recent,
-      focusContact,
-      contactedThisWeek,
-      health,
+      due,
+      birthdays,
+      pod,
+      sparks: todaysSparks(contacts, threshold, now),
+      memories: onThisDay(contacts, now),
+      streak: weeklyStreak(contacts, now),
+      thisWeek: peopleThisWeek(contacts, now),
+      tree: treeState(contacts, now),
+      health: averageHealthScore(contacts, threshold),
     };
   }, [contacts, threshold]);
 
-  const handleSnoozeConfirm = useCallback(async (date: string) => {
-    setSnoozeVisible(false);
-    const target = dashboard.focusContact;
-    if (!target) return;
-    const all = await loadContacts();
-    const updated = all.map((c) => {
-      const sameId = target.id && c.id === target.id;
-      const samePerson = c.fullName === target.fullName && (c.email || "") === (target.email || "");
-      return sameId || samePerson ? { ...c, snoozedUntil: date } : c;
-    });
-    await saveContacts(updated);
-    setContacts(updated);
-    showToast("Hatırlatma ertelendi");
-  }, [dashboard.focusContact]);
+  const handleSnoozeConfirm = useCallback(
+    async (date: string) => {
+      const target = snoozeTarget;
+      setSnoozeTarget(null);
+      if (!target?.id) return;
+      try {
+        const previous = target.snoozedUntil;
+        await snoozeContact(target.id, date);
+        await reload();
+        showUndoToast(t("{name} ertelendi", { name: firstName(target.fullName) }), async () => {
+          await updateContact(target.id!, { snoozedUntil: previous });
+          await reload();
+        });
+      } catch {
+        showToast(t("Ertelenemedi. Lütfen tekrar dene."));
+      }
+    },
+    [snoozeTarget, reload]
+  );
 
-  if (contacts.length === 0) {
-    return (
-      <View style={styles.screen}>
-        <HomeTopBar
-          userName={userName}
-          subtitle="Kişisel CRM alanını birlikte kuralım."
-          onBusinessCard={goToBusinessCard}
-          onReminders={() => goToReminders("all")}
-        />
+  const dueCount = data.due.length;
+  const subtitle = !loaded
+    ? " "
+    : contacts.length === 0
+      ? t("Hadi ilk kişini ekleyelim")
+      : dueCount === 1
+        ? t("Görüşmek isteyebileceğin biri var")
+        : dueCount > 1
+          ? t("Görüşmek isteyebileceğin birkaç kişi var")
+          : t("Bugün her şey yolunda ✓");
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity style={styles.emptyCard} onPress={goToAddContact} activeOpacity={0.82}>
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyIconText}>+</Text>
-            </View>
+  const sparksDone = data.sparks.filter((s) => s.done).length;
 
-            <Text style={styles.emptyTitle}>İlk bağlantını ekle</Text>
-
-            <Text style={styles.emptyDesc}>
-              Aile, arkadaş, iş ve okul bağlantılarını ekledikçe ana sayfan kişisel önerilerle dolacak.
-            </Text>
-
-            <View style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Kişi ekle</Text>
-            </View>
-          </TouchableOpacity>
-
-          <QuickImportBlock onOpen={goToImportContacts} />
-
-          <DailyMessageCard suggestion={dailySuggestion} empty />
-        </ScrollView>
-      </View>
-    );
-  }
+  const onSpark = (s: Spark) => {
+    track("spark_opened", { kind: s.kind });
+    if (s.kind === "meetUp") navigation.navigate("Shuffle");
+    else if (s.kind === "birthday" || s.kind === "reconnect") setComposerTarget(s.contact);
+    else goToContact(s.contact);
+  };
 
   return (
     <View style={styles.screen}>
-      <HomeTopBar
-        userName={userName}
-        subtitle="Bugün bağlantılarını güçlendirebilirsin."
-        onBusinessCard={goToBusinessCard}
-        onReminders={() => goToReminders("all")}
-      />
+      {/* ── Header ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greeting} numberOfLines={1} accessibilityRole="header">
+            {userName ? t("Merhaba, {name}", { name: firstName(userName) }) : t("Merhaba 👋")}
+          </Text>
+          <Text style={[styles.greetingSub, dueCount > 0 && styles.greetingSubAccent]} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        </View>
+        <IconButton icon="id-card-outline" label={t("Dijital kartvizit")} onPress={() => navigation.navigate("BusinessCard")} />
+        <IconButton
+          icon="notifications-outline"
+          label={dueCount > 0 ? t("Hatırlatıcılar, {count} kişi", { count: dueCount }) : t("Hatırlatıcılar")}
+          badge={dueCount}
+          onPress={() => navigation.navigate("Reminders", { filter: "all", threshold })}
+        />
+      </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <View style={styles.heroTop}>
-            <View>
-              <View style={styles.heroKickerRow}>
-                <Text style={styles.heroKicker}>İlişki Sağlığı</Text>
-                <TouchableOpacity onPress={() => setHealthInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={styles.infoIcon}>ⓘ</Text>
+      {!loaded ? (
+        <HomeSkeleton />
+      ) : contacts.length === 0 ? (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <LinearGradient colors={[colors.primarySoft, colors.accentSoft]} style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="heart" size={30} color={colors.secondary} />
+            </View>
+            <Text style={styles.emptyTitle}>{t("İlk kişini ekle")}</Text>
+            <Text style={styles.emptyDesc}>{t("Kimi unutmak istemiyorsun?")}</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate("AddContact")} accessibilityRole="button">
+              <Ionicons name="add" size={20} color={colors.onFill} />
+              <Text style={styles.primaryButtonText}>{t("Kişi ekle")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate("ImportContacts")} accessibilityRole="button">
+              <Ionicons name="download-outline" size={18} color={colors.primary} />
+              <Text style={styles.secondaryButtonText}>{t("Rehberden aktar")}</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* ── Bond tree ── */}
+          <Appear index={0}>
+            <TreeCard tree={data.tree} onPress={() => setTreeInfoOpen(true)} />
+          </Appear>
+
+          {/* ── This week: goal ring · streak · connection ── */}
+          <Appear index={1}>
+          <View style={styles.weekCard}>
+            <ProgressRing
+              size={104}
+              stroke={11}
+              progress={data.thisWeek / weeklyGoal}
+              color={colors.primary}
+              accessibilityLabel={t("Bu hafta {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
+            >
+              <CountUp value={data.thisWeek} style={styles.ringValue} format={(n) => `${n}/${weeklyGoal}`} />
+              <Text style={styles.ringLabel}>{t("bu hafta")}</Text>
+            </ProgressRing>
+
+            <View style={styles.weekRight}>
+              <View style={styles.streakRow} accessible accessibilityLabel={t("{count} haftalık seri", { count: data.streak.current })}>
+                <Text style={styles.flame}>{data.streak.current > 0 ? "🔥" : "🌱"}</Text>
+                <View style={styles.streakTextCol}>
+                  <Text style={styles.streakValue}>
+                    {data.streak.current > 0 ? t("{count} hafta", { count: data.streak.current }) : t("Seriyi başlat")}
+                  </Text>
+                  <Text style={styles.streakSub}>
+                    {data.streak.thisWeekDone ? t("Bu haftayı kurtardın") : data.streak.current > 0 ? t("Seriyi sürdürmek için bir an kaydet") : t("Haftada bir an yeter")}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.weekMetaRow}>
+                {data.streak.freezes > 0 ? (
+                  <View style={styles.metaPill} accessible accessibilityLabel={t("{count} dondurma hakkı", { count: data.streak.freezes })}>
+                    <Text style={styles.metaPillText}>{"❄️".repeat(data.streak.freezes)}</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.metaPill, { backgroundColor: healthScoreColor(data.health) + "1A" }]}
+                  onPress={() => setHealthInfoOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Bağlantı durumu: {label}. Nasıl hesaplanır?", { label: t(healthScoreLabel(data.health)) })}
+                >
+                  <View style={[styles.healthDot, { backgroundColor: healthScoreColor(data.health) }]} />
+                  <Text style={[styles.metaPillText, { color: healthScoreColor(data.health) }]}>{t(healthScoreLabel(data.health))}</Text>
+                  <Ionicons name="information-circle-outline" size={15} color={healthScoreColor(data.health)} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.healthLine}>
-                <Text style={styles.healthNumber}>{dashboard.health}</Text>
-                <Text style={styles.healthTotal}>/100</Text>
-              </View>
-              <Text style={styles.heroDesc}>
-                {dashboard.reachOut.length > 0
-                  ? "Bazı bağlantıların yeniden temas bekliyor."
-                  : "Bağlantıların iyi görünüyor."}
-              </Text>
-            </View>
-
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressIcon}>◎</Text>
             </View>
           </View>
+          </Appear>
 
-          <View style={styles.divider} />
-
-          <View style={styles.summaryRow}>
-            <MiniStat label="Kişi toplam" value={contacts.length} />
-            <MiniStat label="Bu hafta" value={dashboard.contactedThisWeek} />
-            <MiniStat
-              label="Bekleyen"
-              value={dashboard.reachOut.length}
-              danger={dashboard.reachOut.length > 0}
-            />
-          </View>
-        </View>
-
-        {dashboard.focusContact ? (
-          <View style={styles.focusCard}>
-            <View style={styles.focusTop}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.focusLabel}>Bugünün önceliği</Text>
-                <Text style={styles.focusName} numberOfLines={1}>
-                  {dashboard.focusContact.fullName}
-                </Text>
-
-                <Text style={styles.focusDate}>
-                  Son görüşme:{" "}
-                  <Text style={styles.focusDateStrong}>
-                    {dayLabel(daysSince(dashboard.focusContact.lastContactDate))}
-                  </Text>
-                </Text>
-
-                <Text style={styles.focusReason} numberOfLines={2}>
-                  {suggestionFor(dashboard.focusContact, threshold)}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.focusAvatar,
-                  {
-                    backgroundColor: avatarColor(dashboard.focusContact.fullName) + "18",
-                    borderColor: avatarColor(dashboard.focusContact.fullName) + "35",
-                  },
-                ]}
+          {/* ── Person of the day ── */}
+          {data.pod ? (
+            <Appear index={2}>
+            <LinearGradient colors={[colors.primarySoft, colors.accentSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.podCard}>
+              <Text style={styles.podKicker}>{t("Günün kişisi")}</Text>
+              <TouchableOpacity
+                style={styles.podTop}
+                onPress={() => goToContact(data.pod!)}
+                accessibilityRole="button"
+                accessibilityLabel={`${data.pod.fullName}. ${reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}`}
               >
-                <Text
-                  style={[
-                    styles.focusAvatarText,
-                    { color: avatarColor(dashboard.focusContact.fullName) },
-                  ]}
+                <Avatar name={data.pod.fullName} size={68} ringColor={healthScoreColor(healthScore(data.pod, threshold))} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.podName} numberOfLines={1}>{data.pod.fullName}</Text>
+                  <Text style={styles.podReason} numberOfLines={2}>{reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={styles.podActions}>
+                <TouchableOpacity style={styles.podPrimary} onPress={() => setComposerTarget(data.pod)} accessibilityRole="button">
+                  <Ionicons name="chatbubble-ellipses" size={18} color={colors.onFill} />
+                  <Text style={styles.podPrimaryText}>{t("Merhaba de")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.podIcon}
+                  onPress={() => setLogTarget(data.pod)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("{name} ile görüştüm", { name: data.pod.fullName })}
                 >
-                  {initials(dashboard.focusContact.fullName)}
+                  <Ionicons name="checkmark" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.podIcon}
+                  onPress={() => navigation.navigate("Shuffle")}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Başka birini göster")}
+                >
+                  <Ionicons name="shuffle" size={22} color={colors.accent} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+            </Appear>
+          ) : null}
+
+          {/* ── Today's sparks ── */}
+          {data.sparks.length > 0 ? (
+            <Appear index={3}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.rowCenter}>
+                  <Text style={styles.sectionTitle} accessibilityRole="header">{t("Bugünün kıvılcımları")}</Text>
+                </View>
+                <ProgressRing
+                  size={36}
+                  stroke={5}
+                  progress={sparksDone / data.sparks.length}
+                  color={colors.accent}
+                  accessibilityLabel={t("{done} / {total} tamamlandı", { done: sparksDone, total: data.sparks.length })}
+                >
+                  <Text style={styles.miniRingText}>{sparksDone}</Text>
+                </ProgressRing>
+              </View>
+              <View style={styles.list}>
+                {data.sparks.map((s) => (
+                  <SparkRow key={s.id} spark={s} onPress={() => onSpark(s)} />
+                ))}
+              </View>
+            </Appear>
+          ) : null}
+
+          {/* ── People to reconnect with ── */}
+          {dueCount > 0 ? (
+            <Appear index={4}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle} accessibilityRole="header">{t("Yeniden bağlan")}</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("People", { filter: "reachOut", threshold })}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Yeniden bağlan: tümünü gör")}
+                >
+                  <Text style={styles.seeAll}>{t("Tümü")}</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel} style={styles.carouselWrap}>
+                {data.due.slice(0, 10).map((c) => (
+                  <TodayCard
+                    key={c.id}
+                    contact={c}
+                    days={daysSinceIntervalStart(c)}
+                    ring={healthScoreColor(healthScore(c, threshold))}
+                    onOpen={() => goToContact(c)}
+                    onDone={() => setLogTarget(c)}
+                    onMessage={() => setComposerTarget(c)}
+                    onSnooze={() => setSnoozeTarget(c)}
+                  />
+                ))}
+              </ScrollView>
+            </Appear>
+          ) : null}
+
+          {/* ── On this day ── */}
+          {data.memories.map((m, i) => (
+            <TouchableOpacity
+              key={`${m.contact.id}-${i}`}
+              style={styles.memoryCard}
+              onPress={() => goToContact(m.contact)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.memoryEmoji}>{m.kind === "added" ? "🤝" : "📸"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memoryKicker}>{t("Bugün {count} yıl önce", { count: m.yearsAgo })}</Text>
+                <Text style={styles.memoryText} numberOfLines={2}>
+                  {m.kind === "added"
+                    ? t("{name} hayatına girdi", { name: m.contact.fullName })
+                    : m.interaction?.note
+                      ? `${m.contact.fullName}: “${m.interaction.note}”`
+                      : t("{name} ile görüşmüştün", { name: m.contact.fullName })}
                 </Text>
               </View>
-            </View>
-
-            <View style={styles.focusActions}>
-              <TouchableOpacity
-                style={styles.messageButton}
-                activeOpacity={0.8}
-                onPress={() => setComposerVisible(true)}
-              >
-                <Text style={styles.messageButtonText}>Mesaj hazırla</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                activeOpacity={0.8}
-                onPress={() => setSnoozeVisible(true)}
-              >
-                <Text style={styles.secondaryButtonText}>Ertele</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {dashboard.reachOut.length > 0 ? (
-          <>
-            <SectionHeader
-              title={`Bugün ulaşılacak kişiler (${dashboard.reachOut.length})`}
-              onPress={() => goToPeople("reachOut")}
-            />
-
-            <View style={styles.compactList}>
-              {dashboard.reachOut.slice(0, 3).map((c, i) => (
-                <ContactRow
-                  key={`reach-${i}`}
-                  contact={c}
-                  rightText="Mesaj"
-                  rightColor="#00B5AC"
-                  subtitle={`Son görüşme: ${dayLabel(daysSince(c.lastContactDate))}`}
-                  onPress={() => goToContact(c)}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        <QuickImportBlock onOpen={goToImportContacts} />
-
-        <SectionHeader title="Yaklaşanlar" onPress={() => goToReminders("upcoming")} />
-
-        <View style={styles.compactList}>
-          {dashboard.upcoming.length > 0 ? (
-            dashboard.upcoming.map((c, i) => (
-              <ContactRow
-                key={`upcoming-${i}`}
-                contact={c}
-                rightText={`${Math.max(0, effectiveIntervalDays(c, threshold) - daysSince(c.lastContactDate))}g kaldı`}
-                rightColor={colors.warning}
-                subtitle={contactMeta(c)}
-                onPress={() => goToContact(c)}
-              />
-            ))
-          ) : (
-            <EmptyMiniCard text="Yaklaşan hatırlatma bulunmuyor." />
-          )}
-        </View>
-
-        <SectionHeader title="Son görüştüklerin" onPress={() => goToPeople("recent")} />
-
-        <View style={styles.compactList}>
-          {dashboard.recent.map((c, i) => (
-            <ContactRow
-              key={`recent-${i}`}
-              contact={c}
-              rightText={dayLabel(daysSince(c.lastContactDate))}
-              rightColor={colors.success}
-              subtitle={contactMeta(c)}
-              onPress={() => goToContact(c)}
-            />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
           ))}
-        </View>
 
-        <DailyMessageCard suggestion={dailySuggestion} />
-      </ScrollView>
+          {/* ── Birthdays ── */}
+          {data.birthdays.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <View style={styles.rowCenter}>
+                  <Ionicons name="gift-outline" size={18} color={colors.text} />
+                  <Text style={styles.sectionTitle} accessibilityRole="header">{t("Doğum günleri")}</Text>
+                </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel} style={styles.carouselWrap}>
+                {data.birthdays.map(({ contact, daysLeft }) => (
+                  <TouchableOpacity
+                    key={contact.id}
+                    style={styles.bdayChip}
+                    onPress={() => setComposerTarget(contact)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      daysLeft === 0
+                        ? t("{name}, doğum günü bugün", { name: contact.fullName })
+                        : t("{name}, doğum günü {days} gün sonra", { name: contact.fullName, days: daysLeft })
+                    }
+                  >
+                    <Avatar name={contact.fullName} size={36} />
+                    <View>
+                      <Text style={styles.bdayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
+                      <Text style={[styles.bdayDays, daysLeft <= 1 && { color: colors.secondary }]}>
+                        {daysLeft === 0 ? t("Bugün 🎉") : daysLeft === 1 ? t("Yarın") : t("{days}g", { days: daysLeft })}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {contacts.length < 3 ? (
+            <TouchableOpacity style={styles.importRow} onPress={() => navigation.navigate("ImportContacts")} accessibilityRole="button">
+              <Ionicons name="download-outline" size={20} color={colors.primary} />
+              <Text style={styles.importText}>{t("Rehberden kişi aktar")}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+
+          <DailyMessageCard />
+          <Text style={styles.tagline}>{t("Life happens between people.")}</Text>
+        </ScrollView>
+      )}
 
       <SnoozeModal
-        visible={snoozeVisible}
-        contactName={dashboard.focusContact?.fullName ?? ""}
-        onCancel={() => setSnoozeVisible(false)}
+        visible={!!snoozeTarget}
+        contactName={snoozeTarget?.fullName ?? ""}
+        onCancel={() => setSnoozeTarget(null)}
         onConfirm={handleSnoozeConfirm}
       />
-
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
-
-      <MessageComposer
-        visible={composerVisible}
-        contact={dashboard.focusContact ?? null}
-        onClose={() => setComposerVisible(false)}
+      <TreeInfoModal visible={treeInfoOpen} tree={data.tree} onClose={() => setTreeInfoOpen(false)} />
+      <AnalyticsConsent ready={loaded && contacts.length > 0} />
+      <LogInteractionModal
+        visible={!!logTarget}
+        contactName={logTarget?.fullName ?? ""}
+        onClose={() => setLogTarget(null)}
+        onSave={(type, note, date) => {
+          const target = logTarget;
+          setLogTarget(null);
+          if (target) logMoment(target, type, note, date, () => reload());
+        }}
       />
+      <MessageComposer visible={!!composerTarget} contact={composerTarget} onClose={() => setComposerTarget(null)} />
     </View>
   );
 }
 
-function HomeTopBar({
-  userName,
-  subtitle,
-  onBusinessCard,
-  onReminders,
-}: {
-  userName: string;
-  subtitle: string;
-  onBusinessCard: () => void;
-  onReminders: () => void;
-}) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function IconButton({ icon, label, badge, onPress }: { icon: IconName; label: string; badge?: number; onPress: () => void }) {
   return (
-    <View style={styles.topBar}>
-      <View style={styles.topBarRow}>
-        <View style={styles.greetingWrap}>
-          <Text style={styles.greeting}>Merhaba, {userName || "Tuğçe"}</Text>
-          <Text style={styles.greetingSub}>
-            {subtitle.includes("Bugün") ? (
-              <>
-                Bugün <Text style={styles.accentText}>4 kişiyle</Text> bağlantını güçlendirebilirsin.
-              </>
-            ) : (
-              subtitle
-            )}
-          </Text>
+    <TouchableOpacity style={styles.iconBtn} onPress={onPress} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={label}>
+      <Ionicons name={icon} size={22} color={colors.text} />
+      {badge ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText} allowFontScaling={false}>{badge > 9 ? "9+" : badge}</Text>
         </View>
-
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerButtonWide}
-            onPress={onBusinessCard}
-            activeOpacity={0.78}
-          >
-            <Text style={styles.headerButtonWideText}>Kart</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={onReminders}
-            activeOpacity={0.78}
-          >
-            <View style={styles.notificationDot} />
-            <Text style={styles.headerButtonIcon}>!</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function DailyMessageCard({ suggestion, empty }: { suggestion: DailySuggestion; empty?: boolean }) {
-  const [revealed, setRevealed] = useState(false);
-
-  const copyMessage = async () => {
-    await Clipboard.setStringAsync(suggestion.message);
-    showToast("Mesaj kopyalandı");
-  };
-
-  if (empty && !revealed) {
-    return (
-      <View style={styles.dailyCard}>
-        <View style={styles.dailyIcon}>
-          <Text style={styles.dailyIconText}>i</Text>
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.dailyLabel}>Mesaj önerisi</Text>
-          <Text style={styles.dailyTitle}>Mesaj önerisi hazır değil</Text>
-          <Text style={styles.dailyMessage} numberOfLines={3}>
-            Kişi notları veya son görüşme bilgileri ekleyerek daha iyi öneriler alabilirsin.
-          </Text>
-          <TouchableOpacity onPress={() => setRevealed(true)} activeOpacity={0.75}>
-            <Text style={styles.dailyLinkText}>Genel mesaj öner</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <TouchableOpacity style={styles.dailyCard} activeOpacity={0.86} onPress={copyMessage}>
-      <View style={styles.dailyIcon}>
-        <Text style={styles.dailyIconText}>i</Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <Text style={styles.dailyLabel}>Mesaj önerisi</Text>
-        <Text style={styles.dailyTitle}>{suggestion.title}</Text>
-        <Text style={styles.dailyMessage} numberOfLines={3}>
-          “{suggestion.message}”
-        </Text>
-      </View>
-
-      <Text style={styles.chevron}>›</Text>
+      ) : null}
     </TouchableOpacity>
   );
 }
 
-function QuickImportBlock({ onOpen }: { onOpen: () => void }) {
-  return (
-    <View>
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>İlişki ekle</Text>
-          <Text style={styles.sectionSub}>Rehberindeki kişilerle bağlantı kur.</Text>
-        </View>
+function sparkContent(s: Spark): { icon: IconName; color: string; text: string } {
+  switch (s.kind) {
+    case "reconnect":
+      return {
+        icon: "paper-plane-outline",
+        color: colors.primary,
+        text: s.days > 0
+          ? t("{days} gündür konuşmadığın {name}'e yaz", { days: s.days, name: firstName(s.contact.fullName) })
+          : t("{name}'e bir merhaba gönder", { name: firstName(s.contact.fullName) }),
+      };
+    case "birthday":
+      return {
+        icon: "gift-outline",
+        color: colors.secondary,
+        text: s.days === 0
+          ? t("{name}'in doğum gününü kutla 🎂", { name: firstName(s.contact.fullName) })
+          : t("{name}'in doğum günü {days} gün sonra — bir sürpriz düşün", { name: firstName(s.contact.fullName), days: s.days }),
+      };
+    case "followUp":
+      return {
+        icon: "chatbubbles-outline",
+        color: colors.accent,
+        text: t("{name}'e şunu sor: “{note}”", { name: firstName(s.contact.fullName), note: s.note.length > 40 ? `${s.note.slice(0, 40)}…` : s.note }),
+      };
+    default:
+      return { icon: "cafe-outline", color: colors.warning, text: t("Bir arkadaşınla kahve planla") };
+  }
+}
 
-        <TouchableOpacity onPress={onOpen} activeOpacity={0.75}>
-          <Text style={styles.seeAll}>Rehberi tara</Text>
-        </TouchableOpacity>
+function SparkRow({ spark, onPress }: { spark: Spark; onPress: () => void }) {
+  const c = sparkContent(spark);
+  return (
+    <TouchableOpacity
+      style={styles.sparkRow}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={c.text}
+      accessibilityState={{ checked: spark.done }}
+    >
+      <View style={[styles.sparkCheck, spark.done && { backgroundColor: colors.success, borderColor: colors.success }]}>
+        {spark.done ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : <Ionicons name={c.icon} size={16} color={c.color} />}
       </View>
-
-      <TouchableOpacity style={styles.importBanner} onPress={onOpen} activeOpacity={0.82}>
-        <View style={styles.importIcon}>
-          <Text style={styles.importIconText}>+</Text>
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.importBannerTitle}>Rehberden kişi seç</Text>
-          <Text style={styles.importBannerSub}>Telefon rehberinden hızlıca aktar.</Text>
-        </View>
-
-        <Text style={styles.importBannerArrow}>›</Text>
-      </TouchableOpacity>
-    </View>
+      <Text style={[styles.sparkText, spark.done && styles.sparkTextDone]} numberOfLines={2}>{c.text}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
-function MiniStat({
-  label,
-  value,
-  danger,
-}: {
-  label: string;
-  value: number;
-  danger?: boolean;
-}) {
-  return (
-    <View style={styles.miniStat}>
-      <Text style={[styles.miniValue, danger && { color: colors.danger }]}>{value}</Text>
-      <Text style={styles.miniLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function SectionHeader({
-  title,
-  onPress,
-}: {
-  title: string;
-  onPress: () => void;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-
-      <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
-        <Text style={styles.seeAll}>Tümünü gör</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function ContactRow({
-  contact,
-  subtitle,
-  rightText,
-  rightColor,
-  onPress,
+function TodayCard({
+  contact, days, ring, onOpen, onDone, onMessage, onSnooze,
 }: {
   contact: ContactForm;
-  subtitle: string;
-  rightText: string;
-  rightColor: string;
-  onPress: () => void;
+  days: number;
+  ring: string;
+  onOpen: () => void;
+  onDone: () => void;
+  onMessage: () => void;
+  onSnooze: () => void;
 }) {
-  const color = avatarColor(contact.fullName);
-
   return (
-    <TouchableOpacity style={styles.contactRow} onPress={onPress} activeOpacity={0.75}>
-      <View
-        style={[
-          styles.avatarSmall,
-          {
-            backgroundColor: color + "16",
-            borderColor: color + "35",
-          },
-        ]}
+    <View style={styles.todayCard}>
+      <TouchableOpacity
+        style={styles.todayTop}
+        onPress={onOpen}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={days >= 9999 ? contact.fullName : t("{name}, {days} gündür görüşülmedi", { name: contact.fullName, days })}
       >
-        <Text style={[styles.avatarTextSmall, { color }]}>{initials(contact.fullName)}</Text>
+        <Avatar name={contact.fullName} size={56} ringColor={ring} />
+        <Text style={styles.todayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
+        <View style={styles.rowCenter}>
+          <Ionicons name="time-outline" size={13} color={colors.textSub} />
+          <Text style={styles.todayDays}>{shortDays(days)}</Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.doneBtn}
+        onPress={onDone}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
+      >
+        <Ionicons name="checkmark" size={16} color={colors.onFill} />
+        <Text style={styles.doneText}>{t("Görüştüm")}</Text>
+      </TouchableOpacity>
+      <View style={styles.todayActions}>
+        <TouchableOpacity
+          style={styles.smallIconBtn}
+          onPress={onMessage}
+          accessibilityRole="button"
+          accessibilityLabel={t("{name} için mesaj hazırla", { name: contact.fullName })}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.smallIconBtn}
+          onPress={onSnooze}
+          accessibilityRole="button"
+          accessibilityLabel={t("{name} hatırlatmasını ertele", { name: contact.fullName })}
+        >
+          <Ionicons name="alarm-outline" size={18} color={colors.textSub} />
+        </TouchableOpacity>
       </View>
-
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName} numberOfLines={1}>
-          {contact.fullName}
-        </Text>
-        <Text style={styles.contactDetail} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
-
-      <View style={[styles.tag, { backgroundColor: rightColor + "16" }]}>
-        <Text style={[styles.tagText, { color: rightColor }]}>{rightText}</Text>
-      </View>
-
-      <Text style={styles.rowChevron}>›</Text>
-    </TouchableOpacity>
-  );
-}
-
-function EmptyMiniCard({ text }: { text: string }) {
-  return (
-    <View style={styles.emptyMiniCard}>
-      <Text style={styles.emptyMiniText}>{text}</Text>
     </View>
   );
 }
 
-const TOP_SAFE =
-  Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
+function DailyMessageCard() {
+  const message = useMemo(() => dailyMessage(), []);
+  const copyMessage = async () => {
+    await copyWithAutoClear(message);
+    showToast(t("Kopyalandı · 90 sn sonra panodan silinir"));
+  };
+  return (
+    <TouchableOpacity
+      style={styles.dailyCard}
+      activeOpacity={0.86}
+      onPress={copyMessage}
+      accessibilityRole="button"
+      accessibilityLabel={t("Günün mesajı: {message}", { message })}
+      accessibilityHint={t("Mesajı kopyalar")}
+    >
+      <Ionicons name="sparkles-outline" size={20} color={colors.accent} />
+      <Text style={styles.dailyMessage} numberOfLines={2}>“{message}”</Text>
+      <Ionicons name="copy-outline" size={18} color={colors.textSub} />
+    </TouchableOpacity>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <View style={styles.content} accessibilityLabel={t("Yükleniyor")} accessibilityRole="progressbar">
+      <View style={[styles.skeleton, { height: 140 }]} />
+      <View style={[styles.skeleton, { height: 170, marginTop: 16 }]} />
+      <View style={[styles.skeleton, { height: 140, marginTop: 16 }]} />
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+// ── Bond tree ─────────────────────────────────────────────────────────────────
+
+function vitalityText(tree: TreeState): string {
+  if (tree.stage === 0) return t("İlk anını kaydet, tohum filizlensin 🌱");
+  if (tree.vitality === "resting") return t("Ağacın dinleniyor. Bir an onu uyandırır 🌙");
+  if (tree.vitality === "thriving") return t("Ağacın ışıl ışıl ✨");
+  return t("Ağacın büyüyor 🌿");
+}
+
+function TreeCard({ tree, onPress }: { tree: TreeState; onPress: () => void }) {
+  const stageName = t(TREE_STAGES[tree.stage].name);
+  return (
+    <TouchableOpacity
+      style={styles.treeCard}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={t("Bağ ağacın: {stage}. {moments} an. {status}", { stage: stageName, moments: tree.moments, status: vitalityText(tree) })}
+      accessibilityHint={t("Ağacın nasıl büyüdüğünü gösterir")}
+    >
+      <BondTree tree={tree} size={120} />
+      <View style={styles.treeInfo}>
+        <Text style={styles.treeKicker}>{t("Bağ ağacın")}</Text>
+        <Text style={styles.treeStage}>{stageName}</Text>
+        <Text style={styles.treeStatus}>{vitalityText(tree)}</Text>
+        <View style={styles.treeBarTrack}>
+          <View style={[styles.treeBarFill, { width: `${Math.round(tree.progress * 100)}%` }]} />
+        </View>
+        <Text style={styles.treeNext}>
+          {tree.toNext > 0 ? t("{count} an daha ve ağacın büyüyecek", { count: tree.toNext }) : t("Ağacın en güzel halinde 🌸")}
+        </Text>
+        {tree.blossoms > 0 ? (
+          <Text style={styles.treeBlossoms}>{t("Bu hafta {count} çiçek açtı", { count: tree.blossoms })}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function TreeInfoModal({ visible, tree, onClose }: { visible: boolean; tree: TreeState; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.treeBackdrop} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel={t("Kapat")}>
+        <View style={styles.treeSheet} onStartShouldSetResponder={() => true}>
+          <Text style={styles.treeSheetTitle} accessibilityRole="header">{t("Bağ ağacın nasıl büyür?")}</Text>
+          <Text style={styles.treeSheetBody}>
+            {t("Kaydettiğin her an ağacına bir yaprak ekler. Bu hafta konuştuğun her kişi bir çiçek açtırır. Ağacın asla solmaz; sen uzaktayken sadece dinlenir.")}
+          </Text>
+          {TREE_STAGES.map((st, i) => {
+            const reached = tree.stage >= i;
+            return (
+              <View key={st.name} style={styles.treeStageRow} accessible accessibilityLabel={`${t(st.name)}, ${t("{count} an", { count: st.at })}${reached ? `, ${t("ulaşıldı")}` : ""}`}>
+                <Ionicons name={reached ? "checkmark-circle" : "ellipse-outline"} size={20} color={reached ? colors.success : colors.textMuted} />
+                <Text style={[styles.treeStageName, reached && { color: colors.text }]}>{t(st.name)}</Text>
+                <Text style={styles.treeStageAt}>{t("{count} an", { count: st.at })}</Text>
+              </View>
+            );
+          })}
+          <TouchableOpacity style={styles.treeSheetBtn} onPress={onClose} accessibilityRole="button">
+            <Text style={styles.treeSheetBtnText}>{t("Tamam")}</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  rowCenter: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  // ── Header ──────────────────────────────────────────────────────────────────
   topBar: {
-    paddingTop: TOP_SAFE,
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBF0",
-  },
-
-  topBarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-
-  greetingWrap: {
-    flex: 1,
-  },
-
-  greeting: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#111827",
-    letterSpacing: -0.4,
-  },
-
-  greetingSub: {
-    marginTop: 3,
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 19,
-    fontWeight: "400",
-  },
-
-  accentText: {
-    color: "#00B5AC",
-    fontWeight: "600",
-  },
-
-  headerActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg,
   },
-
-  headerButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+  greeting: { fontSize: 24, fontWeight: "800", color: colors.text, letterSpacing: -0.4 },
+  greetingSub: { fontSize: 15, color: colors.textSub, marginTop: 2 },
+  greetingSubAccent: { color: colors.primary, fontWeight: "700" },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-      android: { elevation: 1 },
-    }),
-  },
-
-  headerButtonIcon: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-  },
-
-  headerButtonWide: {
-    height: 38,
-    paddingHorizontal: 13,
-    borderRadius: 12,
-    backgroundColor: "#E6FAF8",
-    borderWidth: 1,
-    borderColor: "#BDEDEA",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  headerButtonWideText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#008E88",
-  },
-
-  notificationDot: {
+  badge: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "#00B5AC",
+    top: -2,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: colors.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.bg,
   },
+  badgeText: { color: colors.onFill, fontSize: 11, fontWeight: "800" },
 
-  // ── Scroll content ──────────────────────────────────────────────────────────
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 110,
-  },
+  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 140 },
 
-  // ── Hero card ───────────────────────────────────────────────────────────────
-  heroCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    ...Platform.select({
-      ios: { shadowColor: "#64748B", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-      android: { elevation: 2 },
-    }),
-  },
-
-  heroTop: {
+  treeCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderRadius: radius.card,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+  treeInfo: { flex: 1, minWidth: 0 },
+  treeKicker: { fontSize: 13, fontWeight: "800", color: colors.warmStrong, textTransform: "uppercase", letterSpacing: 0.8 },
+  treeStage: { fontSize: 20, fontWeight: "900", color: colors.text, marginTop: 2 },
+  treeStatus: { fontSize: 14, fontWeight: "600", color: colors.textSub, marginTop: 2 },
+  treeBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.borderLight, marginTop: 10, overflow: "hidden" },
+  treeBarFill: { height: 8, borderRadius: 4, backgroundColor: colors.success },
+  treeNext: { fontSize: 13, fontWeight: "600", color: colors.textMuted, marginTop: 6 },
+  treeBlossoms: { fontSize: 13, fontWeight: "700", color: colors.warmStrong, marginTop: 4 },
+  treeBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: 20 },
+  treeSheet: { backgroundColor: colors.surface, borderRadius: 24, padding: 22 },
+  treeSheetTitle: { fontSize: 20, fontWeight: "900", color: colors.text },
+  treeSheetBody: { fontSize: 15, lineHeight: 22, color: colors.textSub, marginTop: 8, marginBottom: 12 },
+  treeStageRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  treeStageName: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textSub },
+  treeStageAt: { fontSize: 14, fontWeight: "600", color: colors.textMuted },
+  treeSheetBtn: { marginTop: 14, minHeight: 50, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  treeSheetBtnText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
 
-  heroKicker: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+  weekCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    padding: 18,
+    borderRadius: radius.card,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-
-  heroKickerRow: {
+  ringValue: { fontSize: 24, fontWeight: "900", color: colors.text },
+  ringLabel: { fontSize: 12, fontWeight: "700", color: colors.textSub },
+  weekRight: { flex: 1, gap: 12 },
+  streakRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  flame: { fontSize: 30 },
+  streakTextCol: { flex: 1, minWidth: 0 },
+  streakValue: { fontSize: 20, fontWeight: "900", color: colors.text },
+  streakSub: { fontSize: 13, color: colors.textSub, fontWeight: "600", marginTop: 1 },
+  weekMetaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  metaPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    paddingHorizontal: 10,
+    minHeight: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
   },
+  metaPillText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  healthDot: { width: 8, height: 8, borderRadius: 4 },
 
-  infoIcon: {
-    fontSize: 13,
-    color: "#9CA3AF",
-  },
-
-  healthLine: {
-    marginTop: 6,
+  podCard: { marginTop: 16, borderRadius: radius.card, padding: 18 },
+  podKicker: { fontSize: 13, fontWeight: "800", color: colors.accent, textTransform: "uppercase", letterSpacing: 0.8 },
+  podTop: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 },
+  podName: { fontSize: 22, fontWeight: "900", color: colors.text },
+  podReason: { fontSize: 15, color: colors.text, marginTop: 4, lineHeight: 20 },
+  podActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  podPrimary: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
     flexDirection: "row",
-    alignItems: "flex-end",
-  },
-
-  healthNumber: {
-    fontSize: 36,
-    lineHeight: 42,
-    fontWeight: "700",
-    color: "#00B5AC",
-    letterSpacing: -1,
-  },
-
-  healthTotal: {
-    fontSize: 20,
-    lineHeight: 30,
-    color: "#9CA3AF",
-    fontWeight: "500",
-  },
-
-  heroDesc: {
-    marginTop: 4,
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 18,
-  },
-
-  progressCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 8,
-    borderColor: "#DDF5F3",
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  progressIcon: {
-    fontSize: 32,
-    color: "#00B5AC",
-  },
-
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#E5E7EB",
-    marginVertical: 14,
-  },
-
-  summaryRow: {
-    flexDirection: "row",
     gap: 8,
   },
-
-  miniStat: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-
-  miniValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-  },
-
-  miniLabel: {
-    marginTop: 3,
-    fontSize: 11,
-    color: "#6B7280",
-    lineHeight: 15,
-    fontWeight: "500",
-  },
-
-  // ── Focus card ──────────────────────────────────────────────────────────────
-  focusCard: {
-    marginTop: 12,
-    backgroundColor: "#F2FFFE",
-    borderWidth: 1,
-    borderColor: "#C4EAE8",
-    borderRadius: 18,
-    padding: 16,
-  },
-
-  focusTop: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-
-  focusLabel: {
-    fontSize: 11,
-    color: "#00A39B",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-
-  focusName: {
-    marginTop: 5,
-    fontSize: 18,
-    color: "#111827",
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-
-  focusDate: {
-    marginTop: 5,
-    fontSize: 12,
-    color: "#6B7280",
-    fontWeight: "400",
-  },
-
-  focusDateStrong: {
-    color: "#00A39B",
-    fontWeight: "600",
-  },
-
-  focusReason: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#4B5565",
-    lineHeight: 19,
-  },
-
-  focusAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
+  podPrimaryText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
+  podIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  focusAvatarText: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
+  sectionHeader: { marginTop: 24, marginBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
+  seeAll: { fontSize: 15, fontWeight: "700", color: colors.primary },
+  miniRingText: { fontSize: 13, fontWeight: "900", color: colors.accent },
 
-  focusActions: {
-    marginTop: 14,
-    flexDirection: "row",
-    gap: 10,
-  },
-
-  messageButton: {
-    flex: 1,
-    backgroundColor: "#00B5AC",
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  messageButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  secondaryButtonText: {
-    color: "#374151",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  // ── Daily card ──────────────────────────────────────────────────────────────
-  dailyCard: {
-    marginTop: 12,
+  list: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" },
+  sparkRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F5F3FF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-    padding: 14,
-  },
-
-  dailyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#EDE9FE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  dailyIconText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#7C3AED",
-  },
-
-  dailyLabel: {
-    fontSize: 11,
-    color: "#7C3AED",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-
-  dailyTitle: {
-    marginTop: 3,
-    fontSize: 14,
-    color: "#111827",
-    fontWeight: "600",
-  },
-
-  dailyMessage: {
-    marginTop: 4,
-    fontSize: 12,
-    color: "#4B5565",
-    lineHeight: 18,
-  },
-
-  dailyLinkText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7C3AED",
-  },
-
-  chevron: {
-    fontSize: 22,
-    color: "#9CA3AF",
-    fontWeight: "300",
-  },
-
-  // ── Section header ──────────────────────────────────────────────────────────
-  sectionHeader: {
-    marginTop: 20,
-    marginBottom: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 12,
-  },
-
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-    letterSpacing: -0.2,
-  },
-
-  sectionSub: {
-    marginTop: 2,
-    fontSize: 12,
-    color: "#6B7280",
-    lineHeight: 17,
-  },
-
-  seeAll: {
-    color: "#00A39B",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  // ── Contact list ────────────────────────────────────────────────────────────
-  compactList: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    overflow: "hidden",
-  },
-
-  contactRow: {
-    minHeight: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#FFFFFF",
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    minHeight: 62,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
   },
-
-  avatarSmall: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    borderWidth: 1,
+  sparkCheck: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
   },
+  sparkText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text, lineHeight: 20 },
+  sparkTextDone: { color: colors.textSub, textDecorationLine: "line-through" },
 
-  avatarTextSmall: {
-    fontSize: 14,
-    fontWeight: "700",
+  carouselWrap: { marginHorizontal: -20 },
+  carousel: { paddingHorizontal: 20, gap: 12 },
+  todayCard: {
+    width: 148,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    alignItems: "center",
   },
-
-  contactInfo: {
-    flex: 1,
-  },
-
-  contactName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-
-  contactDetail: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-
-  tag: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-
-  tagText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  rowChevron: {
-    fontSize: 20,
-    color: "#9CA3AF",
-    fontWeight: "300",
-  },
-
-  // ── Import banner ───────────────────────────────────────────────────────────
-  importBanner: {
+  todayTop: { alignItems: "center", gap: 6, width: "100%" },
+  todayName: { fontSize: 16, fontWeight: "800", color: colors.text, maxWidth: "100%" },
+  todayDays: { fontSize: 13, fontWeight: "700", color: colors.textSub },
+  doneBtn: {
+    marginTop: 10,
+    alignSelf: "stretch",
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#D0F0EE",
-    padding: 14,
+    justifyContent: "center",
+    gap: 6,
   },
-
-  importIcon: {
+  doneText: { color: colors.onFill, fontSize: 15, fontWeight: "800" },
+  todayActions: { flexDirection: "row", gap: 8, marginTop: 8 },
+  smallIconBtn: {
     width: 44,
     height: 44,
-    borderRadius: 13,
-    backgroundColor: "#E6FAF8",
-    borderWidth: 1,
-    borderColor: "#BDEDEA",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  importIconText: {
-    color: "#00B5AC",
-    fontSize: 22,
-    fontWeight: "400",
-  },
-
-  importBannerTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-
-  importBannerSub: {
-    marginTop: 2,
-    fontSize: 12,
-    color: "#6B7280",
-  },
-
-  importBannerArrow: {
-    fontSize: 22,
-    color: "#9CA3AF",
-    fontWeight: "300",
-  },
-
-  // ── Empty state ─────────────────────────────────────────────────────────────
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 14,
-    ...Platform.select({
-      ios: { shadowColor: "#64748B", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-      android: { elevation: 2 },
-    }),
-  },
-
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "#E6FAF8",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-
-  emptyIconText: {
-    fontSize: 26,
-    color: "#00B5AC",
-    fontWeight: "400",
-  },
-
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-    textAlign: "center",
-  },
-
-  emptyDesc: {
-    marginTop: 7,
-    fontSize: 13,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
-  primaryButton: {
-    marginTop: 16,
-    backgroundColor: "#00B5AC",
     borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 11,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  emptyMiniCard: {
+  memoryCard: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     padding: 14,
-    backgroundColor: "#FFFFFF",
+    borderRadius: radius.card,
+    backgroundColor: colors.warningSoft,
   },
+  memoryEmoji: { fontSize: 28 },
+  memoryKicker: { fontSize: 13, fontWeight: "800", color: colors.warning },
+  memoryText: { fontSize: 15, fontWeight: "600", color: colors.text, marginTop: 2 },
 
-  emptyMiniText: {
-    fontSize: 13,
-    color: "#6B7280",
-    textAlign: "center",
+  bdayChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingLeft: 8,
+    paddingRight: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.secondarySoft,
+    minHeight: 52,
   },
+  bdayName: { fontSize: 15, fontWeight: "700", color: colors.text, maxWidth: 110 },
+  bdayDays: { fontSize: 13, fontWeight: "600", color: colors.textSub },
+
+  importRow: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.primaryBorder,
+    backgroundColor: colors.primarySoft,
+  },
+  importText: { flex: 1, fontSize: 15, fontWeight: "700", color: colors.primary },
+
+  dailyCard: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: radius.card,
+    backgroundColor: colors.accentSoft,
+  },
+  dailyMessage: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.text },
+  tagline: { marginTop: 24, textAlign: "center", fontSize: 13, fontWeight: "700", color: colors.textSub, letterSpacing: 0.3 },
+
+  emptyCard: { alignItems: "center", padding: 24, borderRadius: radius.card, gap: 8 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text, marginTop: 4 },
+  emptyDesc: { fontSize: 15, color: colors.textSub },
+  primaryButton: {
+    marginTop: 8,
+    alignSelf: "stretch",
+    minHeight: 50,
+    borderRadius: radius.button,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  primaryButtonText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
+  secondaryButton: { alignSelf: "stretch", minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  secondaryButtonText: { color: colors.primary, fontSize: 15, fontWeight: "700" },
+
+  skeleton: { backgroundColor: colors.borderLight, borderRadius: radius.card },
 });

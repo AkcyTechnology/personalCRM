@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Connectly",
+    "NSContactsUsageDescription": "Connectly reads your contacts only to add the people you choose. Your address book never leaves your phone.",
+    "NSFaceIDUsageDescription": "Used so you can unlock the app with Face ID."
+  }
+}

@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../theme/colors";
+import { t } from "../i18n";
 
 const TEAL = colors.primary;
 
@@ -79,7 +80,7 @@ export default function OnboardingScreen({ navigation }: any) {
         hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
         style={[styles.skipCorner, { top: insets.top + 12 }]}
       >
-        <Text style={styles.skip}>Atla</Text>
+        <Text style={styles.skip}>{t("Atla")}</Text>
       </TouchableOpacity>
 
       {/* Horizontally centres the 430-px panel on wide screens */}
@@ -101,7 +102,10 @@ export default function OnboardingScreen({ navigation }: any) {
                 <TouchableOpacity
                   key={i}
                   onPress={() => i !== index && navigate(i)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("{current}. sayfa / {total}", { current: i + 1, total: SLIDES.length })}
+                  accessibilityState={{ selected: i === index }}
                 >
                   <View style={[styles.dot, i === index ? styles.dotActive : styles.dotInactive]} />
                 </TouchableOpacity>
@@ -109,21 +113,21 @@ export default function OnboardingScreen({ navigation }: any) {
             </View>
 
             {/* Title — 20 px below dots */}
-            <Text style={styles.title}>{slide.title}</Text>
+            <Text style={styles.title}>{t(slide.title)}</Text>
 
             {/* Description — 12 px below title */}
-            <Text style={styles.desc}>{slide.desc}</Text>
+            <Text style={styles.desc}>{t(slide.desc)}</Text>
 
             {/* Primary button — 40 px below description */}
             <View style={styles.btnShadow}>
               <TouchableOpacity onPress={handleNext} activeOpacity={0.85} style={styles.btnTouch}>
                 <LinearGradient
-                  colors={["#4DD9CF", TEAL]}
+                  colors={[colors.gradientFrom, TEAL]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.btn}
                 >
-                  <Text style={styles.btnText}>{slide.btn}</Text>
+                  <Text style={styles.btnText}>{t(slide.btn)}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -138,7 +142,7 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FAFEFE",
+    backgroundColor: colors.card,
     overflow: "hidden",
   },
 
@@ -223,7 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: {
-    color: "#FFF",
+    color: colors.onFill,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.2,

@@ -5,13 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tugceulucn.personalCRM",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSContactsUsageDescription": "Rehbere erişerek kişi bilgilerini hızlıca aktarabilmen için izin istiyoruz."
+        "NSContactsUsageDescription": "Connectly reads your contacts only to add the people you choose. Your address book never leaves your phone.",
+        "NSFaceIDUsageDescription": "Used so you can unlock the app with Face ID.",
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {
@@ -20,7 +22,15 @@
         "foregroundImage": "./assets/app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.tugceulucn.personalCRM"
+      "package": "com.tugceulucn.personalCRM",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,10 +45,53 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Rehbere erişerek kişi bilgilerini hızlıca aktarabilmen için izin istiyoruz."
+          "contactsPermission": "Connectly reads your contacts only to add the people you choose. Your address book never leaves your phone."
         }
       ],
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Used so you can unlock the app with Face ID."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#00B5AC"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-document-picker",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.tugceulucn.personalCRM.ExpoWidgetsTarget",
+          "groupIdentifier": "group.com.tugceulucn.personalCRM",
+          "widgets": [
+            {
+              "name": "ConnectlyWidget",
+              "displayName": "Connectly",
+              "description": "Your bond tree and who to say hi to today.",
+              "supportedFamilies": [
+                "systemSmall",
+                "systemMedium"
+              ],
+              "contentMarginsDisabled": false
+            }
+          ]
+        }
+      ]
+    ],
+    "locales": {
+      "en": "./locales/en.json",
+      "tr": "./locales/tr.json"
+    }
   }
 }

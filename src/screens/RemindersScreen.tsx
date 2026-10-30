@@ -5,12 +5,15 @@ import AppHeader from "../components/AppHeader";
 import EmptyState from "../components/EmptyState";
 import SnoozeModal from "../components/SnoozeModal";
 import MessageComposer from "../components/MessageComposer";
-import { loadContacts, saveContacts } from "../data/contacts";
+import { loadContacts, snoozeContact, updateContact } from "../data/contacts";
+import { logMoment } from "../app/momentActions";
+import LogInteractionModal from "../components/LogInteractionModal";
 import { loadSettings } from "../data/userSettings";
-import type { ContactForm } from "./AddContactScreen";
+import type { ContactForm, InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { isSnoozed, isDue, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
-import { showToast } from "../components/Toast";
+import { showToast, showUndoToast } from "../components/Toast";
+import { locale, t } from "../i18n";
 
 const PURPLE = colors.primary;
 const BG = colors.bg;
@@ -57,14 +60,12 @@ function nextBirthdayInfo(birthday?: string) {
   return {
     daysLeft,
     date: next,
-    label: daysLeft === 0 ? "Bugün" : `${daysLeft}g sonra`,
+    label: daysLeft === 0 ? t("Bugün") : t("{days} gün sonra", { days: daysLeft }),
   };
 }
 
-const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-
 function formatDate(d: Date) {
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.toLocaleDateString(locale(), { day: "numeric", month: "long" });
 }
 
 export default function RemindersScreen({ navigation }: any) {
@@ -106,18 +107,28 @@ export default function RemindersScreen({ navigation }: any) {
   const goToContact = (contact: ContactForm) => navigation.navigate("PersonDetail", { contact });
 
   const handleSnoozeConfirm = useCallback(async (date: string) => {
-    if (!snoozeTarget) return;
-    const all = await loadContacts();
-    const updated = all.map((c) => {
-      const sameId = snoozeTarget.id && c.id === snoozeTarget.id;
-      const samePerson = c.fullName === snoozeTarget.fullName && (c.email || "") === (snoozeTarget.email || "");
-      return sameId || samePerson ? { ...c, snoozedUntil: date } : c;
-    });
-    await saveContacts(updated);
-    setContacts(updated);
+    if (!snoozeTarget?.id) return;
+    const target = snoozeTarget;
+    try {
+      await snoozeContact(target.id!, date);
+      setContacts(await loadContacts());
+      showUndoToast(t("Hatırlatma ertelendi"), async () => {
+        await updateContact(target.id!, { snoozedUntil: target.snoozedUntil });
+        setContacts(await loadContacts());
+      });
+    } catch {
+      showToast(t("Ertelenemedi. Lütfen tekrar dene."));
+    }
     setSnoozeTarget(null);
-    showToast("Hatırlatma ertelendi");
   }, [snoozeTarget]);
+
+  const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
+
+  const handleLog = useCallback(async (type: InteractionType, note: string, date: string) => {
+    const target = logTarget;
+    setLogTarget(null);
+    if (target) await logMoment(target, type, note, date, () => loadContacts().then(setContacts));
+  }, [logTarget]);
 
   const isEmpty = priority.length === 0 && upcoming.length === 0;
 
@@ -125,24 +136,24 @@ export default function RemindersScreen({ navigation }: any) {
     <View style={styles.screen}>
       <AppHeader
         type="detail"
-        centerTitle="Hatırlatıcılar"
+        centerTitle={t("Hatırlatıcılar")}
         onBack={() => navigation.goBack()}
         rightActions={[{ label: "＋", onPress: () => navigation.navigate("AddContact") }]}
       />
 
       {isEmpty ? (
         <EmptyState
-          icon="🔔"
-          title="Henüz hatırlatıcın yok"
-          description="Ulaşmak istediğin kişiler için hatırlatıcı oluşturabilirsin."
-          buttonLabel="Hatırlatıcı oluştur"
+          icon="notifications-outline"
+          title={t("Her şey yolunda")}
+          description={t("Şu an hatırlatacak bir şey yok. Güzel bir gün geçir!")}
+          buttonLabel={t("Kişi ekle")}
           onPress={() => navigation.navigate("AddContact")}
         />
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {priority.length > 0 && (
             <>
-              <Text style={styles.sectionLabel}>Öncelikli</Text>
+              <Text style={styles.sectionLabel}>{t("Seni özleyenler")}</Text>
 
               {priority.map(({ contact, days }) => (
                 <TouchableOpacity
@@ -150,6 +161,8 @@ export default function RemindersScreen({ navigation }: any) {
                   style={[styles.priorityCard, { borderLeftColor: days >= effectiveIntervalDays(contact, threshold) * 1.3 ? RED : ORANGE }]}
                   onPress={() => goToContact(contact)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("{name}, {days} gündür görüşülmedi", { name: contact.fullName, days })}
                 >
                   <View style={[styles.iconCircle, { backgroundColor: PURPLE + "15" }]}>
                     <Text style={[styles.iconText, { color: PURPLE }]}>{initials(contact.fullName)}</Text>
@@ -157,23 +170,32 @@ export default function RemindersScreen({ navigation }: any) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{contact.fullName}</Text>
                     <Text style={styles.cardDesc} numberOfLines={1}>
-                      {days === 0 ? "Bugün" : days === 1 ? "Dün" : `${days} gündür iletişim yok`}
+                      {days === 0 ? t("Bugün") : days === 1 ? t("Dün") : t("{days} gündür görüşülmedi", { days })}
                     </Text>
                   </View>
                   <View style={styles.cardActionsCol}>
+                    <TouchableOpacity
+                      style={styles.messageBtn}
+                      onPress={() => setLogTarget(contact)}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
+                    >
+                      <Text style={styles.messageBtnText}>{t("Görüştüm ✓")}</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.rescheduleBtn}
                       onPress={() => setSnoozeTarget(contact)}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.rescheduleBtnText}>Yeniden planla</Text>
+                      <Text style={styles.rescheduleBtnText}>{t("Ertele")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.messageBtn}
+                      style={styles.rescheduleBtn}
                       onPress={() => setComposerTarget(contact)}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.messageBtnText}>Mesaj hazırla</Text>
+                      <Text style={styles.rescheduleBtnText}>{t("Mesaj hazırla")}</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -183,7 +205,7 @@ export default function RemindersScreen({ navigation }: any) {
 
           {upcoming.length > 0 && (
             <>
-              <Text style={styles.sectionLabel}>Yaklaşanlar</Text>
+              <Text style={styles.sectionLabel}>{t("Yaklaşanlar")}</Text>
 
               {upcoming.map(({ contact, birthday }) => (
                 <TouchableOpacity
@@ -197,7 +219,7 @@ export default function RemindersScreen({ navigation }: any) {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{contact.fullName}</Text>
-                    <Text style={styles.cardDesc}>Doğum günü</Text>
+                    <Text style={styles.cardDesc}>{t("Doğum günü")}</Text>
                   </View>
                   <View style={styles.dateArea}>
                     <Text style={styles.dateText}>{formatDate(birthday.date)}</Text>
@@ -215,6 +237,13 @@ export default function RemindersScreen({ navigation }: any) {
         contactName={snoozeTarget?.fullName ?? ""}
         onCancel={() => setSnoozeTarget(null)}
         onConfirm={handleSnoozeConfirm}
+      />
+
+      <LogInteractionModal
+        visible={!!logTarget}
+        contactName={logTarget?.fullName ?? ""}
+        onClose={() => setLogTarget(null)}
+        onSave={handleLog}
       />
 
       <MessageComposer
@@ -257,7 +286,7 @@ const styles = StyleSheet.create({
   messageBtn: {
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#FFF1E6",
+    backgroundColor: colors.warmSoft,
   },
   messageBtnText: { fontSize: 11, fontWeight: "800", color: ORANGE },
   upcomingCard: {
@@ -268,7 +297,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: "#FFF1D6", alignItems: "center", justifyContent: "center", marginRight: 14,
+    backgroundColor: colors.warmSoft, alignItems: "center", justifyContent: "center", marginRight: 14,
   },
   avatarText: { color: ORANGE, fontWeight: "900", fontSize: 13 },
   dateArea: { alignItems: "flex-end" },

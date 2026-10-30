@@ -14,19 +14,18 @@ import AppHeader from "../components/AppHeader";
 import EmptyState from "../components/EmptyState";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { showToast } from "../components/Toast";
-import { addContact, loadContacts } from "../data/contacts";
+import { addContacts, loadContacts } from "../data/contacts";
+import { ContactsPermissionError, ContactsUnavailableError, listDeviceContactsAsync, type DeviceContact } from "../utils/deviceContacts";
+import { todayISO } from "../utils/dates";
+import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { ContactForm } from "./AddContactScreen";
 import { isDuplicateContact } from "../utils/duplicateContact";
-import { colors } from "../theme/colors";
+import { categorical, colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
-
-type DeviceContact = {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-};
+import { t } from "../i18n";
+import { bucket, track } from "../utils/analytics";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 function initials(name: string) {
   return name
@@ -38,7 +37,7 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const palette = ["#00B5AC", "#7C3AED", "#0369A1", colors.success, colors.warning];
+  const palette = categorical();
   let h = 0;
   for (const c of name) h += c.charCodeAt(0);
   return palette[h % palette.length];
@@ -57,46 +56,25 @@ export default function ImportContactsScreen({ navigation }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [permissionModal, setPermissionModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const fetchDeviceContacts = useCallback(async () => {
     setLoadState("loading");
     try {
-      const Contacts = require("expo-contacts/legacy");
-
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== "granted") {
+      const [mapped, savedContacts] = await Promise.all([listDeviceContactsAsync(), loadContacts()]);
+      setExistingContacts(savedContacts);
+      setDeviceContacts(mapped);
+      setLoadState("ready");
+    } catch (error) {
+      if (error instanceof ContactsPermissionError) {
         setLoadState("denied");
         setPermissionModal(true);
         return;
       }
-
-      const [{ data }, savedContacts] = await Promise.all([
-        Contacts.getContactsAsync({
-          fields: [
-            Contacts.Fields.Name,
-            Contacts.Fields.PhoneNumbers,
-            Contacts.Fields.Emails,
-          ],
-          sort: Contacts.SortTypes.FirstName,
-        }),
-        loadContacts(),
-      ]);
-
-      const mapped: DeviceContact[] = (data || [])
-        .filter((c: any) => !!c.name)
-        .map((c: any, i: number) => ({
-          id: c.id ?? String(i),
-          name: c.name,
-          phone: c.phoneNumbers?.[0]?.number ?? "",
-          email: c.emails?.[0]?.email ?? "",
-        }));
-
-      setExistingContacts(savedContacts);
-      setDeviceContacts(mapped);
-      setLoadState("ready");
-    } catch {
+      setErrorMessage(
+        error instanceof ContactsUnavailableError ? error.message : t("Rehber okunamadı. Lütfen tekrar dene.")
+      );
       setLoadState("error");
-      showToast("Rehber okunamadı. Lütfen tekrar dene.");
     }
   }, []);
 
@@ -131,7 +109,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
+    setSelectedIds(() => {
       if (allSelectableSelected) return new Set();
       return new Set(selectableContacts.map((dc) => dc.id));
     });
@@ -142,12 +120,14 @@ export default function ImportContactsScreen({ navigation }: Props) {
     setSaving(true);
     try {
       const toAdd = deviceContacts.filter((dc) => selectedIds.has(dc.id));
-      for (const dc of toAdd) {
-        const newContact: ContactForm = {
+      track("contacts_imported", { count: bucket(toAdd.length) });
+      const today = todayISO();
+      await addContacts(
+        toAdd.map((dc): ContactForm => ({
           fullName: dc.name,
-          company: "",
-          jobTitle: "",
-          birthday: "",
+          company: dc.company,
+          jobTitle: dc.jobTitle,
+          birthday: /^\d{2}\/\d{2}\/\d{4}$/.test(dc.birthday) ? dc.birthday : "",
           relationship: "",
           metWhere: "",
           phone: dc.phone.replace(/\s+/g, " ").trim(),
@@ -155,21 +135,23 @@ export default function ImportContactsScreen({ navigation }: Props) {
           website: "",
           instagram: "",
           city: "",
-          socials: [{ platform: "LinkedIn", handle: "" }],
+          socials: [],
           tags: "",
           priority: "",
           notes: "",
           reminderFreq: "",
-          lastContactDate: new Date().toISOString().split("T")[0],
-        };
-        await addContact(newContact);
-      }
+          // Son görüşmeyi bilmiyoruz; hatırlatma aralığı bugünden başlar.
+          lastContactDate: "",
+          reminderIntervalStart: today,
+        }))
+      );
+      ensureNotificationPermissionAsync();
       showToast(
-        toAdd.length === 1 ? "1 kişi eklendi" : `${toAdd.length} kişi eklendi`
+        t("{count} kişi eklendi", { count: toAdd.length })
       );
       navigation.goBack();
     } catch {
-      showToast("Bir sorun oluştu. Lütfen tekrar dene.");
+      showToast(t("Bir sorun oluştu. Lütfen tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -179,7 +161,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
     <View style={styles.screen}>
       <AppHeader
         type="settings"
-        centerTitle="Rehberden Aktar"
+        centerTitle={t("Rehberden Aktar")}
         onBack={() => navigation.goBack()}
       />
 
@@ -189,24 +171,24 @@ export default function ImportContactsScreen({ navigation }: Props) {
         </View>
       ) : loadState === "ready" && deviceContacts.length === 0 ? (
         <EmptyState
-          icon="👤"
-          title="Rehber boş"
-          description="Cihazında kayıtlı kişi bulunamadı."
+          icon="person-outline"
+          title={t("Rehber boş")}
+          description={t("Cihazında kayıtlı kişi bulunamadı.")}
         />
       ) : loadState === "denied" ? (
         <EmptyState
-          icon="🔒"
-          title="Rehber izni gerekli"
-          description="Kişileri görebilmek için rehber erişimine izin vermelisin."
-          buttonLabel="İzni tekrar iste"
+          icon="lock-closed-outline"
+          title={t("Rehber izni gerekli")}
+          description={t("Kişileri görebilmek için rehber erişimine izin vermelisin.")}
+          buttonLabel={t("İzni tekrar iste")}
           onPress={fetchDeviceContacts}
         />
       ) : loadState === "error" ? (
         <EmptyState
-          icon="⚠️"
-          title="Bir sorun oluştu"
-          description="Rehber okunamadı. Lütfen tekrar dene."
-          buttonLabel="Tekrar dene"
+          icon="alert-circle-outline"
+          title={t("Bir sorun oluştu")}
+          description={errorMessage || t("Rehber okunamadı. Lütfen tekrar dene.")}
+          buttonLabel={t("Tekrar dene")}
           onPress={fetchDeviceContacts}
         />
       ) : (
@@ -214,13 +196,13 @@ export default function ImportContactsScreen({ navigation }: Props) {
           <View style={styles.toolbar}>
             <Text style={styles.toolbarCount}>
               {selectedIds.size > 0
-                ? `${selectedIds.size} kişi seçildi`
-                : `${deviceContacts.length} kişi bulundu`}
+                ? t("{count} kişi seçildi", { count: selectedIds.size })
+                : t("{count} kişi bulundu", { count: deviceContacts.length })}
             </Text>
             {selectableContacts.length > 0 ? (
-              <TouchableOpacity onPress={toggleSelectAll} activeOpacity={0.75}>
+              <TouchableOpacity onPress={toggleSelectAll} activeOpacity={0.75} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={styles.toolbarAction}>
-                  {allSelectableSelected ? "Tümünü kaldır" : "Tümünü seç"}
+                  {allSelectableSelected ? t("Tümünü kaldır") : t("Tümünü seç")}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -241,6 +223,9 @@ export default function ImportContactsScreen({ navigation }: Props) {
                   onPress={() => toggleSelect(item.id)}
                   activeOpacity={isDuplicate ? 1 : 0.7}
                   disabled={isDuplicate}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={[item.name, item.phone || item.email, isDuplicate ? t("zaten ekli") : ""].filter(Boolean).join(", ")}
+                  accessibilityState={{ checked: isSelected, disabled: isDuplicate }}
                 >
                   <View
                     style={[
@@ -256,17 +241,17 @@ export default function ImportContactsScreen({ navigation }: Props) {
                       {item.name}
                     </Text>
                     <Text style={styles.rowSub} numberOfLines={1}>
-                      {item.phone || item.email || "Detay yok"}
+                      {item.phone || item.email || t("Detay yok")}
                     </Text>
                   </View>
 
                   {isDuplicate ? (
                     <View style={styles.duplicateBadge}>
-                      <Text style={styles.duplicateBadgeText}>Zaten ekli</Text>
+                      <Text style={styles.duplicateBadgeText}>{t("Zaten ekli")}</Text>
                     </View>
                   ) : (
                     <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                      {isSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                      {isSelected ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : null}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -282,12 +267,12 @@ export default function ImportContactsScreen({ navigation }: Props) {
               disabled={selectedIds.size === 0 || saving}
             >
               {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.onFill} />
               ) : (
                 <Text style={styles.addBtnText}>
                   {selectedIds.size > 0
-                    ? `Seçilenleri Ekle (${selectedIds.size})`
-                    : "Kişi seç"}
+                    ? t("Seçilenleri ekle ({count})", { count: selectedIds.size })
+                    : t("Kişi seç")}
                 </Text>
               )}
             </TouchableOpacity>
@@ -297,8 +282,8 @@ export default function ImportContactsScreen({ navigation }: Props) {
 
       <PermissionDeniedModal
         visible={permissionModal}
-        title="Rehbere erişim izni gerekli"
-        description="Rehberindeki kişileri görebilmek için rehber erişimine izin vermelisin."
+        title={t("Rehbere erişim izni gerekli")}
+        description={t("Rehberindeki kişileri görebilmek için rehber erişimine izin vermelisin.")}
         onClose={() => setPermissionModal(false)}
       />
     </View>
@@ -366,7 +351,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxTick: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  checkboxTick: { color: colors.onFill, fontSize: 14, fontWeight: "800" },
 
   bottomBar: {
     position: "absolute",
@@ -387,5 +372,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addBtnOff: { backgroundColor: colors.primary + "55" },
-  addBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  addBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
 });

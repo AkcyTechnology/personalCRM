@@ -1,6 +1,7 @@
 import { Modal, Pressable, Text, TouchableOpacity, Linking, StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { t } from "../i18n";
 
 type Props = {
   visible: boolean;
@@ -21,10 +22,10 @@ export default function PermissionDeniedModal({ visible, title, description, onC
             onPress={() => { onClose(); Linking.openSettings(); }}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>Ayarları aç</Text>
+            <Text style={styles.primaryBtnText}>{t("Ayarları aç")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.secondaryBtnText}>Vazgeç</Text>
+            <Text style={styles.secondaryBtnText}>{t("Vazgeç")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -34,7 +35,7 @@ export default function PermissionDeniedModal({ visible, title, description, onC
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   box: {
@@ -48,7 +49,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  primaryBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   secondaryBtn: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,

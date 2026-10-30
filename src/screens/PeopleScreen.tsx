@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   Modal,
   Pressable,
   Platform,
@@ -16,11 +17,22 @@ import DraggableFlatList, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import type { ContactForm } from "./AddContactScreen";
-import { loadContacts, deleteContacts, reorderContacts } from "../data/contacts";
+import { loadContacts, deleteContacts, reorderContacts, addContacts, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
+import { loadSettings } from "../data/userSettings";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import Avatar from "../components/Avatar";
+import LogInteractionModal from "../components/LogInteractionModal";
+import SnoozeModal from "../components/SnoozeModal";
+import { showUndoToast } from "../components/Toast";
+import { daysSinceIntervalStart, effectiveIntervalDays, isDue } from "../utils/reminderInterval";
+import { healthScore, healthScoreColor } from "../utils/healthScore";
+import { logMoment } from "../app/momentActions";
+import type { InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
-import { showToast } from "../components/Toast";
 import EmptyState from "../components/EmptyState";
+import { t, tv } from "../i18n";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -29,9 +41,17 @@ const GRAY    = colors.textMuted;
 const TEXT    = colors.text;
 const TEXTSUB = colors.textSub;
 
-const FILTERS = ["Tümü", "Arkadaş", "İş arkadaşı", "Mentor", "Müşteri", "Aile", "Tanıdık"];
+type StatusFilter = "all" | "reachOut" | "upcoming" | "recent";
+
+const STATUS_FILTERS: { key: StatusFilter; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "all",      label: "Tümü",      icon: "people-outline" },
+  { key: "reachOut", label: "Yeniden bağlan", icon: "heart-outline" },
+  { key: "upcoming", label: "Yaklaşan",  icon: "hourglass-outline" },
+  { key: "recent",   label: "Son görüşülen", icon: "checkmark-done-outline" },
+];
 
 const SORT_OPTIONS = [
+  { key: "neglect",  label: "En uzun süredir görüşülmeyen" },
   { key: "manual",   label: "Manuel (özel sıra)" },
   { key: "az",       label: "A → Z" },
   { key: "za",       label: "Z → A" },
@@ -43,26 +63,29 @@ const PRIORITY_ORDER: Record<string, number> = { Yüksek: 0, Orta: 1, Normal: 2,
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function initials(name: string) {
-  return name.trim().split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
-}
-
-function avatarColor(name: string) {
-  const palette = [TEAL, "#2563EB", "#16A34A", "#D97706", "#DC2626", "#0891B2", "#7C3AED"];
-  let hash = 0;
-  for (const ch of name) hash += ch.charCodeAt(0);
-  return palette[hash % palette.length];
+function daysSinceDate(iso?: string): number | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-export default function PeopleScreen({ navigation }: { navigation: any }) {
+export default function PeopleScreen({ navigation, route }: { navigation: any; route?: any }) {
   const insets = useSafeAreaInsets();
+  const initialStatus: StatusFilter = route?.params?.filter ?? "all";
+  const isStackScreen = !!route;
 
   const [contacts, setContacts]     = useState<ContactForm[]>([]);
   const [search, setSearch]         = useState("");
   const [activeFilter, setFilter]   = useState("Tümü");
-  const [sortKey, setSortKey]       = useState("az");
+  const [sortKey, setSortKey]       = useState(initialStatus === "reachOut" ? "neglect" : "az");
+  const [status, setStatus]         = useState<StatusFilter>(initialStatus);
+  const [threshold, setThreshold]   = useState(14);
+  const [loaded, setLoaded]         = useState(false);
+  const [logTarget, setLogTarget]   = useState<ContactForm | null>(null);
+  const [snoozeTarget, setSnoozeTarget] = useState<ContactForm | null>(null);
   const [sortOpen, setSortOpen]     = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -71,24 +94,46 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useFocusEffect(
-    useCallback(() => { loadContacts().then(setContacts); }, [])
+    useCallback(() => {
+      Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
+        setContacts(c);
+        setThreshold(s.reachOutThresholdDays || 14);
+        setLoaded(true);
+      });
+      return subscribeContacts(setContacts);
+    }, [])
+  );
+
+  // İlişki filtreleri: kişilerde gerçekten kullanılan türler (özel türler dahil)
+  const relationshipFilters = useMemo(
+    () => ["Tümü", ...Array.from(new Set(contacts.map(c => c.relationship).filter(Boolean))).sort((a, b) => a.localeCompare(b, "tr"))],
+    [contacts]
   );
 
   const manualMode = sortKey === "manual";
 
   const list = useMemo(() => {
     const q = search.toLowerCase();
-    let result = contacts.filter(c => {
-      const matchSearch =
-        !q ||
-        c.fullName.toLowerCase().includes(q) ||
-        c.company.toLowerCase().includes(q) ||
-        (typeof c.tags === "string" ? c.tags.toLowerCase().includes(q) : false);
+    const q2 = q.toLocaleLowerCase("tr-TR");
+    const result = contacts.filter(c => {
+      const hay = [c.fullName, c.company, c.city, c.jobTitle, typeof c.tags === "string" ? c.tags : ""]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      const matchSearch = !q2 || hay.includes(q2);
       const matchFilter = activeFilter === "Tümü" || c.relationship === activeFilter;
-      return matchSearch && matchFilter;
+      const d = daysSinceIntervalStart(c);
+      const interval = effectiveIntervalDays(c, threshold);
+      const matchStatus =
+        status === "all" ||
+        (status === "reachOut" && isDue(c, threshold)) ||
+        (status === "upcoming" && c.reminderEnabled !== false && d >= Math.floor(interval * 0.6) && d < interval) ||
+        (status === "recent" && !!c.lastContactDate);
+      return matchSearch && matchFilter && matchStatus;
     });
 
     return [...result].sort((a, b) => {
+      if (status === "recent")    return (b.lastContactDate || "").localeCompare(a.lastContactDate || "");
+      if (sortKey === "neglect")  return daysSinceIntervalStart(b) / effectiveIntervalDays(b, threshold) - daysSinceIntervalStart(a) / effectiveIntervalDays(a, threshold);
       if (sortKey === "manual")   return (a.order ?? 0) - (b.order ?? 0);
       if (sortKey === "az")       return a.fullName.localeCompare(b.fullName, "tr");
       if (sortKey === "za")       return b.fullName.localeCompare(a.fullName, "tr");
@@ -96,10 +141,10 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
       if (sortKey === "relation") return a.relationship.localeCompare(b.relationship, "tr");
       return 0;
     });
-  }, [contacts, search, activeFilter, sortKey]);
+  }, [contacts, search, activeFilter, sortKey, status, threshold]);
 
   // Manuel sıralama yalnızca arama/filtre olmadan, ham listede anlamlı.
-  const canDrag = manualMode && !search && activeFilter === "Tümü";
+  const canDrag = manualMode && !search && activeFilter === "Tümü" && status === "all";
 
   const exitSelectMode = () => {
     setSelectMode(false);
@@ -136,10 +181,32 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
   const handleDeleteSelected = async () => {
     setDeleteConfirmOpen(false);
     const ids = Array.from(selectedIds);
+    const removed = contacts.filter(c => c.id && selectedIds.has(c.id));
     const updated = await deleteContacts(ids);
     setContacts(updated);
-    showToast(ids.length === 1 ? "Kişi silindi" : `${ids.length} kişi silindi`);
+    showUndoToast(t("{count} kişi silindi", { count: ids.length }), async () => {
+      setContacts(await addContacts(removed));
+    });
     exitSelectMode();
+  };
+
+  const handleLog = async (type: InteractionType, note: string, date: string) => {
+    const target = logTarget;
+    setLogTarget(null);
+    if (target) await logMoment(target, type, note, date, () => loadContacts().then(setContacts));
+  };
+
+  const handleSnooze = async (date: string) => {
+    const target = snoozeTarget;
+    setSnoozeTarget(null);
+    if (!target?.id) return;
+    const previous = target.snoozedUntil;
+    await snoozeContact(target.id, date);
+    setContacts(await loadContacts());
+    showUndoToast(t("Hatırlatma ertelendi"), async () => {
+      await updateContact(target.id!, { snoozedUntil: previous });
+      setContacts(await loadContacts());
+    });
   };
 
   const handleDragEnd = useCallback(async ({ data }: { data: ContactForm[] }) => {
@@ -163,29 +230,43 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
         {selectMode ? (
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.headerTitle}>{selectedIds.size} seçildi</Text>
-              <Text style={styles.headerSub}>Silmek için seç, ya da vazgeç.</Text>
+              <Text style={styles.headerTitle}>{t("{count} seçildi", { count: selectedIds.size })}</Text>
+              <Text style={styles.headerSub}>{t("Silmek için seç, ya da vazgeç.")}</Text>
             </View>
             <TouchableOpacity
               style={styles.cancelSelectBtn}
               onPress={exitSelectMode}
               activeOpacity={0.75}
             >
-              <Text style={styles.cancelSelectBtnText}>Vazgeç</Text>
+              <Text style={styles.cancelSelectBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.headerTitle}>Kişiler</Text>
-              <Text style={styles.headerSub}>{contacts.length} kişi</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {isStackScreen ? (
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Geri")}
+                >
+                  <Ionicons name="chevron-back" size={26} color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
+              <View>
+                <Text style={styles.headerTitle} accessibilityRole="header">{t("Kişiler")}</Text>
+                <Text style={styles.headerSub}>{t("{count} kişi", { count: contacts.length })}</Text>
+              </View>
             </View>
             <TouchableOpacity
               style={styles.addBtn}
               onPress={() => navigation.navigate("AddContact")}
               activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel={t("Yeni kişi ekle")}
             >
-              <Text style={styles.addBtnText}>+</Text>
+              <Ionicons name="add" size={24} color={colors.onFill} />
             </TouchableOpacity>
           </View>
         )}
@@ -195,13 +276,11 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
           <View style={styles.toolbar}>
             <View style={styles.searchBox}>
               {/* Search icon — simple inline lines */}
-              <View style={styles.searchIconWrap}>
-                <View style={[styles.searchCircle]} />
-                <View style={[styles.searchHandle]} />
-              </View>
+              <Ionicons name="search" size={18} color={GRAY} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="İsim, şirket veya etiket ara..."
+                placeholder={t("İsim, şirket, şehir, etiket")}
+                accessibilityLabel={t("Kişi ara")}
                 placeholderTextColor={GRAY}
                 value={search}
                 onChangeText={setSearch}
@@ -210,9 +289,11 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
               {!!search && (
                 <TouchableOpacity
                   onPress={() => setSearch("")}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("Aramayı temizle")}
                 >
-                  <Text style={styles.searchClear}>✕</Text>
+                  <Ionicons name="close-circle" size={20} color={GRAY} />
                 </TouchableOpacity>
               )}
             </View>
@@ -221,30 +302,57 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
               style={[styles.toolBtn, activeFilter !== "Tümü" && styles.toolBtnActive]}
               onPress={() => setFilterOpen(true)}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={activeFilter !== "Tümü" ? t("İlişki filtresi: {name}", { name: tv(activeFilter) }) : t("İlişki türüne göre filtrele")}
             >
-              <FilterIcon active={activeFilter !== "Tümü"} />
+              <Ionicons name="funnel-outline" size={20} color={activeFilter !== "Tümü" ? TEAL : TEXTSUB} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.toolBtn}
               onPress={() => setSortOpen(true)}
               activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={t("Sırala")}
             >
-              <SortIcon />
+              <Ionicons name="swap-vertical" size={20} color={TEXTSUB} />
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Status chips */}
+        {!selectMode && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusRow} style={styles.statusWrap}>
+            {STATUS_FILTERS.map(f => {
+              const active = status === f.key;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.statusChip, active && styles.statusChipActive]}
+                  onPress={() => setStatus(f.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Ionicons name={f.icon} size={15} color={active ? colors.onFill : colors.textSub} />
+                  <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>{t(f.label)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         )}
 
         {/* Active filter pill */}
         {!selectMode && activeFilter !== "Tümü" && (
           <View style={styles.filterPillRow}>
             <View style={styles.filterPill}>
-              <Text style={styles.filterPillText}>{activeFilter}</Text>
+              <Text style={styles.filterPillText}>{tv(activeFilter)}</Text>
               <TouchableOpacity
                 onPress={() => setFilter("Tümü")}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t("{name} filtresini kaldır", { name: tv(activeFilter) })}
               >
-                <Text style={styles.filterPillClear}>✕</Text>
+                <Ionicons name="close" size={14} color={TEAL} />
               </TouchableOpacity>
             </View>
           </View>
@@ -255,28 +363,37 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
           <View style={styles.manualHintRow}>
             <Text style={styles.manualHintText}>
               {canDrag
-                ? "Bir kişiyi basılı tutup sürükleyerek sırasını değiştirebilirsin."
-                : "Sürükleme için aramayı ve filtreyi temizle."}
+                ? t("Bir kişiyi basılı tutup sürükleyerek sırasını değiştirebilirsin.") : t("Sürükleme için aramayı ve filtreyi temizle.")}
             </Text>
           </View>
         )}
       </View>
 
       {/* ── List / Empty ── */}
-      {list.length === 0 ? (
+      {!loaded ? (
+        <View style={{ padding: 20, gap: 12 }} accessibilityLabel={t("Yükleniyor")} accessibilityRole="progressbar">
+          {[0, 1, 2, 3].map(i => <View key={i} style={styles.skeletonRow} />)}
+        </View>
+      ) : list.length === 0 ? (
         contacts.length === 0 ? (
           <EmptyState
-            icon="👥"
-            title="Henüz kişi eklemedin"
-            description="İlk bağlantını ekleyerek ilişkilerini takip etmeye başlayabilirsin."
-            buttonLabel="Kişi ekle"
+            icon="people-outline"
+            title={t("Henüz kişi yok")}
+            description={t("İlk bağlantını ekle.")}
+            buttonLabel={t("Kişi ekle")}
             onPress={() => navigation.navigate("AddContact")}
+            secondaryLabel={t("Rehberden aktar")}
+            onSecondaryPress={() => navigation.navigate("ImportContacts")}
           />
+        ) : status === "reachOut" && !search && activeFilter === "Tümü" ? (
+          <EmptyState icon="checkmark-circle-outline" title={t("Herkesle bağın taze ✨")} description={t("Harika gidiyorsun!")} />
         ) : (
           <EmptyState
-            icon="🔍"
-            title="Kişi bulunamadı"
-            description="Arama veya filtre kriterlerini değiştir."
+            icon="search-outline"
+            title={t("Sonuç yok")}
+            description={t("Aramayı veya filtreyi değiştir.")}
+            buttonLabel={t("Filtreleri temizle")}
+            onPress={() => { setSearch(""); setFilter("Tümü"); setStatus("all"); }}
           />
         )
       ) : canDrag ? (
@@ -304,15 +421,52 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => (
-            <PersonCard
-              item={item}
-              selectMode={selectMode}
-              selected={!!item.id && selectedIds.has(item.id)}
-              onPress={() => handlePressCard(item)}
-              onLongPress={() => handleLongPressCard(item)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const card = (
+              <PersonCard
+                item={item}
+                selectMode={selectMode}
+                selected={!!item.id && selectedIds.has(item.id)}
+                ring={item.reminderEnabled === false ? undefined : healthScoreColor(healthScore(item, threshold))}
+                days={daysSinceDate(item.lastContactDate)}
+                due={isDue(item, threshold)}
+                onPress={() => handlePressCard(item)}
+                onLongPress={() => handleLongPressCard(item)}
+              />
+            );
+            if (selectMode) return card;
+            return (
+              <ReanimatedSwipeable
+                friction={2}
+                rightThreshold={40}
+                overshootRight={false}
+                renderRightActions={(_p, _t, methods) => (
+                  <View style={styles.swipeActions}>
+                    <TouchableOpacity
+                      style={[styles.swipeBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => { methods.close(); setLogTarget(item); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("{name} ile görüştüm", { name: item.fullName })}
+                    >
+                      <Ionicons name="checkmark-circle" size={22} color={colors.onFill} />
+                      <Text style={styles.swipeText}>{t("Görüştüm")}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.swipeBtn, { backgroundColor: colors.warning }]}
+                      onPress={() => { methods.close(); setSnoozeTarget(item); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("{name} hatırlatmasını ertele", { name: item.fullName })}
+                    >
+                      <Ionicons name="alarm" size={22} color={colors.onFill} />
+                      <Text style={styles.swipeText}>{t("Ertele")}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              >
+                {card}
+              </ReanimatedSwipeable>
+            );
+          }}
         />
       )}
 
@@ -326,16 +480,16 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
             disabled={selectedIds.size === 0}
           >
             <Text style={styles.deleteBtnText}>
-              {selectedIds.size > 0 ? `Sil (${selectedIds.size})` : "Kişi seç"}
+              {selectedIds.size > 0 ? t("Sil ({count})", { count: selectedIds.size }) : t("Kişi seç")}
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* ── Filter bottom sheet ── */}
-      <BottomSheet visible={filterOpen} title="Filtrele" onClose={() => setFilterOpen(false)}>
+      <BottomSheet visible={filterOpen} title={t("Filtrele")} onClose={() => setFilterOpen(false)}>
         <View style={styles.sheetChipGrid}>
-          {FILTERS.map(f => (
+          {relationshipFilters.map(f => (
             <TouchableOpacity
               key={f}
               style={[styles.sheetChip, activeFilter === f && styles.sheetChipActive]}
@@ -343,7 +497,7 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
               activeOpacity={0.75}
             >
               <Text style={[styles.sheetChipText, activeFilter === f && styles.sheetChipTextActive]}>
-                {f}
+                {tv(f)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -351,7 +505,7 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
       </BottomSheet>
 
       {/* ── Sort bottom sheet ── */}
-      <BottomSheet visible={sortOpen} title="Sırala" onClose={() => setSortOpen(false)}>
+      <BottomSheet visible={sortOpen} title={t("Sırala")} onClose={() => setSortOpen(false)}>
         {SORT_OPTIONS.map(opt => (
           <TouchableOpacity
             key={opt.key}
@@ -362,34 +516,48 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
             <Text style={[styles.sheetRowText, sortKey === opt.key && styles.sheetRowTextActive]}>
               {opt.label}
             </Text>
-            {sortKey === opt.key && <Text style={styles.sheetCheck}>✓</Text>}
+            {sortKey === opt.key && <Ionicons name="checkmark" size={20} color={colors.primary} />}
           </TouchableOpacity>
         ))}
       </BottomSheet>
+
+      <LogInteractionModal
+        visible={!!logTarget}
+        contactName={logTarget?.fullName ?? ""}
+        onClose={() => setLogTarget(null)}
+        onSave={handleLog}
+      />
+
+      <SnoozeModal
+        visible={!!snoozeTarget}
+        contactName={snoozeTarget?.fullName ?? ""}
+        onCancel={() => setSnoozeTarget(null)}
+        onConfirm={handleSnooze}
+      />
 
       {/* ── Delete confirm modal ── */}
       <Modal visible={deleteConfirmOpen} transparent animationType="fade">
         <Pressable style={styles.overlay} onPress={() => setDeleteConfirmOpen(false)}>
           <Pressable style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>
-              {selectedIds.size === 1 ? "Kişi silinsin mi?" : `${selectedIds.size} kişi silinsin mi?`}
+              {t("{count} kişi silinsin mi?", { count: selectedIds.size })}
             </Text>
             <Text style={styles.confirmDesc}>
-              Bu işlem geri alınamaz.
+              {t("Notlar ve görüşme geçmişi de silinir. Hemen ardından “Geri al” diyebilirsin.")}
             </Text>
             <TouchableOpacity
               style={styles.confirmDeleteBtn}
               onPress={handleDeleteSelected}
               activeOpacity={0.85}
             >
-              <Text style={styles.confirmDeleteBtnText}>Sil</Text>
+              <Text style={styles.confirmDeleteBtnText}>{t("Sil")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.confirmCancelBtn}
               onPress={() => setDeleteConfirmOpen(false)}
               activeOpacity={0.75}
             >
-              <Text style={styles.confirmCancelBtnText}>Vazgeç</Text>
+              <Text style={styles.confirmCancelBtnText}>{t("Vazgeç")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -401,17 +569,21 @@ export default function PeopleScreen({ navigation }: { navigation: any }) {
 // ── PersonCard ────────────────────────────────────────────────────────────────
 
 function PersonCard({
-  item, selectMode, selected, dragActive, onPress, onLongPress,
+  item, selectMode, selected, dragActive, ring, days, due, onPress, onLongPress,
 }: {
   item: ContactForm;
   selectMode: boolean;
   selected: boolean;
   dragActive?: boolean;
+  ring?: string;
+  days?: number;
+  due?: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const color = avatarColor(item.fullName);
   const tags  = typeof item.tags === "string" ? item.tags : "";
+  const subtitle = [item.jobTitle, item.company].filter(Boolean).join(" · ") || tv(item.relationship) || "";
+  const daysText = days === undefined || days >= 9999 ? "" : days === 0 ? t("Bugün") : t("{days}g", { days });
 
   return (
     <TouchableOpacity
@@ -420,24 +592,26 @@ function PersonCard({
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={280}
+      accessibilityRole="button"
+      accessibilityLabel={[item.fullName, subtitle, daysText && t("son görüşme {days}", { days: daysText }), due && t("seni özlemiş olabilir")].filter(Boolean).join(", ")}
+      accessibilityState={selectMode ? { selected } : undefined}
+      accessibilityHint={selectMode ? undefined : t("Seçmek için basılı tut, işlemler için sola kaydır")}
     >
       {/* Selection checkbox */}
       {selectMode && (
         <View style={[styles.checkbox, selected && styles.checkboxOn]}>
-          {selected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+          {selected ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : null}
         </View>
       )}
 
       {/* Avatar */}
-      <View style={[styles.avatar, { backgroundColor: color + "18", borderColor: color + "35" }]}>
-        <Text style={[styles.avatarText, { color }]}>{initials(item.fullName)}</Text>
-      </View>
+      <Avatar name={item.fullName} size={48} ringColor={ring} />
 
       {/* Info */}
       <View style={styles.cardInfo}>
         <Text style={styles.personName} numberOfLines={1}>{item.fullName}</Text>
         <Text style={styles.personSub} numberOfLines={1}>
-          {[item.jobTitle, item.company].filter(Boolean).join(" · ") || item.relationship || "—"}
+          {subtitle || "—"}
         </Text>
         {!!tags && (
           <View style={styles.tagRow}>
@@ -453,12 +627,13 @@ function PersonCard({
       {/* Right */}
       {!selectMode && (
         <View style={styles.cardRight}>
-          {!!item.relationship && (
-            <View style={[styles.relBadge, { backgroundColor: color + "14" }]}>
-              <Text style={[styles.relText, { color }]} numberOfLines={1}>{item.relationship}</Text>
+          {!!daysText && (
+            <View style={[styles.relBadge, { backgroundColor: (due ? colors.danger : colors.textSub) + "14" }]}>
+              <Ionicons name="time-outline" size={12} color={due ? colors.danger : colors.textSub} />
+              <Text style={[styles.relText, { color: due ? colors.danger : colors.textSub }]} numberOfLines={1}>{daysText}</Text>
             </View>
           )}
-          <Text style={styles.chevron}>›</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </View>
       )}
     </TouchableOpacity>
@@ -481,7 +656,7 @@ function BottomSheet({
           <Text style={styles.sheetTitle}>{title}</Text>
           {children}
           <TouchableOpacity style={styles.sheetCloseBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.sheetCloseTxt}>Kapat</Text>
+            <Text style={styles.sheetCloseTxt}>{t("Kapat")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -489,49 +664,35 @@ function BottomSheet({
   );
 }
 
-// ── Inline icons (no SVG) ─────────────────────────────────────────────────────
-
-function FilterIcon({ active }: { active: boolean }) {
-  const color = active ? TEAL : TEXTSUB;
-  return (
-    <View style={{ gap: 3.5, alignItems: "center" }}>
-      <View style={{ width: 14, height: 1.8, backgroundColor: color, borderRadius: 1 }} />
-      <View style={{ width: 10, height: 1.8, backgroundColor: color, borderRadius: 1 }} />
-      <View style={{ width: 6,  height: 1.8, backgroundColor: color, borderRadius: 1 }} />
-    </View>
-  );
-}
-
-function SortIcon() {
-  return (
-    <View style={{ gap: 3, alignItems: "center" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-        <View style={{ width: 10, height: 1.8, backgroundColor: TEXTSUB, borderRadius: 1 }} />
-        <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: TEXTSUB }} />
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-        <View style={{ width: 10, height: 1.8, backgroundColor: TEXTSUB, borderRadius: 1 }} />
-        <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderBottomWidth: 5, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: TEXTSUB }} />
-      </View>
-    </View>
-  );
-}
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#FFFFFF" },
+  statusWrap: { marginHorizontal: -20, marginTop: 12 },
+  statusRow: { paddingHorizontal: 20, gap: 8 },
+  statusChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, minHeight: 38, borderRadius: 999,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg,
+  },
+  statusChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  statusChipText: { fontSize: 14, fontWeight: "700", color: colors.textSub },
+  statusChipTextActive: { color: colors.onFill },
+  swipeActions: { flexDirection: "row" },
+  swipeBtn: { width: 92, alignItems: "center", justifyContent: "center", gap: 4 },
+  swipeText: { color: colors.onFill, fontSize: 13, fontWeight: "800" },
+  skeletonRow: { height: 72, borderRadius: 16, backgroundColor: colors.borderLight },
+  root: { flex: 1, backgroundColor: colors.surface },
 
   // ── Header ──
   header: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     paddingHorizontal: 20,
     paddingBottom: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F0EFF8",
+    borderBottomColor: colors.borderLight,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -576,20 +737,13 @@ const styles = StyleSheet.create({
       android: { elevation: 4 },
     }),
   },
-  addBtnText: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "300",
-    lineHeight: 27,
-    marginTop: -1,
-  },
   cancelSelectBtn: {
     paddingHorizontal: 14,
     height: 40,
     borderRadius: 14,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 2,
@@ -606,30 +760,14 @@ const styles = StyleSheet.create({
   searchBox: {
     flex: 1,
     height: 44,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
     gap: 8,
-  },
-  searchIconWrap: {
-    width: 16,
-    height: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchCircle: {
-    position: "absolute",
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    borderWidth: 1.6,
-    borderColor: GRAY,
-    top: 0,
-    left: 0,
   },
   searchHandle: {
     position: "absolute",
@@ -643,19 +781,19 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    minWidth: 0,
+    fontSize: 16,
     color: TEXT,
     paddingVertical: 0,
   },
-  searchClear: { fontSize: 11, color: GRAY },
 
   toolBtn: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -681,7 +819,6 @@ const styles = StyleSheet.create({
     borderColor: TEAL + "40",
   },
   filterPillText: { fontSize: 12, fontWeight: "700", color: TEAL },
-  filterPillClear: { fontSize: 10, color: TEAL, fontWeight: "700" },
 
   // Manual sort hint
   manualHintRow: {
@@ -701,7 +838,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: "#F3F0FF",
+    backgroundColor: colors.accentSoft,
     marginLeft: 72,
   },
 
@@ -709,32 +846,22 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     paddingHorizontal: 4,
     paddingVertical: 13,
     gap: 13,
   },
   cardDragging: {
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderRadius: 14,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
       android: { elevation: 6 },
     }),
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  avatarText: { fontSize: 16, fontWeight: "800" },
   cardInfo: { flex: 1, minWidth: 0 },
-  personName: { fontSize: 15, fontWeight: "700", color: TEXT },
-  personSub: { fontSize: 12, color: GRAY, marginTop: 2 },
+  personName: { fontSize: 16, fontWeight: "700", color: TEXT },
+  personSub: { fontSize: 14, color: TEXTSUB, marginTop: 2 },
   tagRow: { flexDirection: "row", gap: 4, marginTop: 6 },
   tag: {
     backgroundColor: TEAL + "14",
@@ -742,16 +869,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  tagText: { fontSize: 10, color: TEAL, fontWeight: "600" },
+  tagText: { fontSize: 11, color: TEAL, fontWeight: "600" },
   cardRight: { alignItems: "flex-end", gap: 5, flexShrink: 0 },
   relBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     maxWidth: 90,
   },
-  relText: { fontSize: 11, fontWeight: "700" },
-  chevron: { fontSize: 22, color: GRAY, lineHeight: 24 },
+  relText: { fontSize: 13, fontWeight: "700" },
 
   // ── Selection checkbox ──
   checkbox: {
@@ -765,7 +894,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   checkboxOn: { backgroundColor: TEAL, borderColor: TEAL },
-  checkboxTick: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
 
   // ── Select-mode bottom bar ──
   selectBar: {
@@ -775,9 +903,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#EEECF8",
+    borderTopColor: colors.borderLight,
   },
   deleteBtn: {
     height: 50,
@@ -787,7 +915,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   deleteBtnOff: { backgroundColor: colors.danger + "55" },
-  deleteBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  deleteBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
 
   // ── Delete confirm modal ──
   confirmBox: {
@@ -804,7 +932,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.danger, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  confirmDeleteBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  confirmDeleteBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   confirmCancelBtn: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
@@ -815,11 +943,11 @@ const styles = StyleSheet.create({
   // ── Bottom sheet ──
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(10,8,30,0.38)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -829,7 +957,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.border,
     alignSelf: "center",
     marginBottom: 18,
   },
@@ -849,13 +977,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
   },
   sheetChipActive: { backgroundColor: TEAL, borderColor: TEAL },
   sheetChipText: { fontSize: 13, fontWeight: "600", color: TEXTSUB },
-  sheetChipTextActive: { color: "#fff" },
+  sheetChipTextActive: { color: colors.onFill },
   sheetRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -864,21 +992,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     marginBottom: 6,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
   },
   sheetRowActive: { backgroundColor: TEAL + "12", borderColor: TEAL + "50" },
   sheetRowText: { fontSize: 14, fontWeight: "600", color: TEXTSUB },
   sheetRowTextActive: { color: TEAL, fontWeight: "800" },
-  sheetCheck: { fontSize: 15, color: TEAL, fontWeight: "700" },
   sheetCloseBtn: {
     marginTop: 10,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#F8F8FC",
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "#EEECF8",
+    borderColor: colors.borderLight,
     alignItems: "center",
     justifyContent: "center",
   },
