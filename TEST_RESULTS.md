@@ -21,8 +21,8 @@ Aşağıdaki sonuçların hepsi gerçekten çalıştırılan komutların çıkt�
 Komut: `npx jest --ci`
 
 ```
-Test Suites: 10 passed, 10 total
-Tests:       57 passed, 57 total
+Test Suites: 12 passed, 12 total
+Tests:       67 passed, 67 total
 ```
 
 | Dosya | Kapsam |
@@ -36,6 +36,8 @@ Tests:       57 passed, 57 total
 | `__tests__/dates.test.ts` | Yerel tarih (UTC kayması olmadan), doğum günü ayrıştırma, bir sonraki doğum günü |
 | `__tests__/duplicateContact.test.ts` | Telefon, e-posta ve isim normalleştirmesiyle mükerrer tespiti |
 | `__tests__/engagement.test.ts` | Haftalık seri ve dondurma hakkı, bu haftaki kişiler, Günün kişisi (gün içinde sabit), Bugünün kıvılcımları, "Bugün X yıl önce", aylık hikâye, ilişki yolculuğu |
+| `__tests__/analytics.test.ts` | Sayıların yuvarlanması; gönderilen paketin kişisiz ve GeoIP'siz olması, olay özelliklerinin bu bayrakları ezememesi; anahtar ya da izin yokken hiçbir istek atılmaması |
+| `__tests__/performance.test.ts` | 2.000 kişi × 20 an (~4 MB): Ana sayfa hesapları ~320 ms (önce ~900 ms; önbellek eklendi), aylık hikâye ~10 ms, hatırlatma planı ~85 ms, şifreleme ~0.6 sn, çözme ~1 sn (Node, jest). Hermes'te ölçülmedi |
 | `__tests__/i18n.test.ts` | Kaynaktaki her `t("…")` metninin ve kayıtlı sabit değerlerin (ilişki türü, tanışma yeri vb.) İngilizce karşılığı var; `{yer tutucu}` adları korunuyor; çoğul ve parametre işleme |
 
 **Performans ölçümü:** 1000 kişi, ~1 MB veri. Şifreleme 93.6 ms, çözme 41.6 ms (Node V8 JIT, 5 ölçüm ortalaması). Cihazdaki Hermes motorunda **ÖLÇÜLMEDİ**.
@@ -49,7 +51,7 @@ python3 -m http.server 8765 -d <dir>
 CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/web-smoke.js
 ```
 
-**Sonuç:** ✅ **44/44 adım geçti** (Türkçe `tr-TR` ve İngilizce `en-US` tarayıcı dilleriyle), çalışma anında hata yok, çıkış kodu 0.
+**Sonuç:** ✅ **48/48 adım geçti** (Türkçe `tr-TR`, İngilizce `en-US` ve koyu tema), çalışma anında hata yok, çıkış kodu 0.
 
 | # | Adım | Sonuç |
 |---|---|---|
@@ -65,6 +67,8 @@ CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/web-smoke.js
 | 26–31 | Evren: bağ haritası ve İçgörüler sekmesi; Aylık hikâye isimler kapalıyken kişi adı göstermiyor; Ana sayfadan Karıştır ekranı açılıp kapanıyor | PASS |
 | 32–34 | Gizlilik ekranı; gizlilik politikası; tüm verileri silme (localStorage'da `crm_contacts` kalmıyor, Onboarding açılıyor) | PASS |
 | 35–43 | İngilizce: onboarding, kayıt, profil, hedefler, boş ana sayfa, kişi ekleme, sıcak ana sayfa metni, "Universe" sekmesi | PASS |
+| 45–47 | Bağ ağacı kartı ve "nasıl büyür" penceresi; Profil'de Görünüm ve Titreşim ayarları; İngilizce "Your bond tree" | PASS |
+| 48 | Koyu tema: telefon koyu moddayken uygulama arka planı koyu | PASS |
 | 44 | iPhone SE (320 px) genişliğinde yatay taşma yok | PASS |
 
 **Bu testin yakaladığı ve düzeltilen hatalar:**

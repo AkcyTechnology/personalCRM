@@ -65,6 +65,11 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("home: dynamic due count", () => text("Görüşmek isteyebileceğin biri var").waitFor({ timeout: 4000 }));
     await step("home: bell badge label", () => label_("Hatırlatıcılar, 1 kişi").waitFor({ timeout: 3000 }));
     await shot("03-home-due");
+    await step("home: bond tree card and how-it-grows sheet", async () => {
+      await click(vis(page.getByLabel(/^Bağ ağacın: /)));
+      await text("Bağ ağacın nasıl büyür?").waitFor({ timeout: 3000 });
+      await click(text("Tamam"));
+    });
 
     await step("log: Görüştüm from Today card", async () => {
       await click(label_("Ahmet Yılmaz ile görüştüm"));
@@ -130,6 +135,13 @@ fs.mkdirSync(OUT, { recursive: true });
     await shot("11-shuffle");
     await step("shuffle: close", () => click(label_("Kapat")));
 
+    await step("profile: appearance and haptics settings", async () => {
+      await click(label_("Profil"));
+      await text("Görünüm").waitFor({ timeout: 3000 });
+      await label_("Titreşim").waitFor({ timeout: 3000 });
+      await click(label_("Ana Sayfa"));
+    });
+
     await step("privacy: open", async () => { await click(label_("Profil")); await click(text("Gizlilik ve Güvenlik")); await text("Tüm verileri sil").waitFor({ timeout: 3000 }); });
     await shot("08-privacy");
     await step("privacy: policy page", async () => { await click(text("Gizlilik Politikası")); await text("Rehber erişimi").waitFor({ timeout: 3000 }); await click(text("Geri")); });
@@ -174,10 +186,33 @@ fs.mkdirSync(OUT, { recursive: true });
       await click(text("Save person"));
     });
     await step("warm home copy", () => text("There's someone you might love catching up with").waitFor({ timeout: 4000 }));
+    await step("bond tree in English", () => text("Your bond tree").waitFor({ timeout: 4000 }));
     await page.screenshot({ path: path.join(OUT, "en-02-home-due.png") });
     await step("universe tab label", async () => { await click(vis(page.getByLabel("Universe", { exact: true }))); await text("Connection map").waitFor({ timeout: 4000 }); });
     await page.screenshot({ path: path.join(OUT, "en-03-universe.png") });
     await context.close();
+  }
+
+  // Dark mode: the phone's dark setting gives a dark app.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "tr-TR", colorScheme: "dark" });
+    const page = await ctx.newPage();
+    page.on("pageerror", (e) => errors.push(`[dark] pageerror: ${e.message}`));
+    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.waitForTimeout(1500);
+    const bg = await page.evaluate(() => {
+      let el = document.elementFromPoint(195, 760);
+      while (el) {
+        const c = getComputedStyle(el).backgroundColor;
+        if (c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") return c;
+        el = el.parentElement;
+      }
+      return "none";
+    });
+    const rgb = (bg.match(/\d+/g) || []).slice(0, 3).map(Number);
+    results.push({ name: `[dark] app background is dark (${bg})`, ok: rgb.length === 3 && rgb.reduce((a, b) => a + b, 0) < 150 });
+    await page.screenshot({ path: path.join(OUT, "dark-01-first.png") });
+    await ctx.close();
   }
 
   // Small-screen layout check (iPhone SE 1st gen size): home must render without errors.

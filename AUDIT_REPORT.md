@@ -51,7 +51,7 @@ Backend olmadığı için ön yüzde görünen her işlem yerel veri katmanına 
 
 | Faz | Durum |
 |---|---|
-| 2. Ön yüz işlev testi | Web derlemesinde Playwright ile uçtan uca test: **44/44 adım geçti** (Türkçe + İngilizce). Gerçek cihaz/emülatör yok → **NOT TESTED** |
+| 2. Ön yüz işlev testi | Web derlemesinde Playwright ile uçtan uca test: **48/48 adım geçti** (Türkçe + İngilizce + koyu tema). Gerçek cihaz/emülatör yok → **NOT TESTED** |
 | 3. UI tasarım denetimi | Ayrıntılar [UI_UX_REVIEW.md](UI_UX_REVIEW.md) dosyasında |
 | 4. UX kullanılabilirlik denetimi | Ayrıntılar [UI_UX_REVIEW.md](UI_UX_REVIEW.md) dosyasında |
 | 5. Backend ve veritabanı | **N/A:** backend, API, veritabanı, RLS ve rol yapısı yok. Kullanıcılar arası izolasyon testi uygulanamaz (tek yerel kullanıcı) |

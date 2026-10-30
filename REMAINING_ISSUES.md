@@ -1,37 +1,57 @@
 # Açık Kalan Sorunlar
 
-Önem sırasıyla listelendi. Her maddede neden kapatılamadığı ve önerilen çözüm yazıyor.
+Önem sırasıyla listelendi. Kapatılanlar en altta.
 
-## Yüksek
+## Yüksek (yayından önce senin yapman gerekenler)
 
 | ID | Sorun | Neden açık | Öneri |
 |---|---|---|---|
-| R-01 | Uygulama gerçek iOS/Android cihazda hiç test edilmedi: bildirimler, Face ID, Keychain, rehber, kaydırma, haptik | Bu ortamda emülatör ya da cihaz yok | Development build al (`eas build --profile development`), `.maestro/core-journey.yaml` akışını çalıştır ve RELEASE_CHECKLIST'teki cihaz adımlarını uygula |
-| R-02 | `npm audit`: Expo/Metro/jest araç zincirinde 27 high + 13 moderate açık (SEC-11) | Düzeltmeler büyük sürüm yükseltmesi ya da geriye dönük kırılma istiyor. Bu paketler uygulama paketine girmiyor | Dependabot PR'larını takip et; Expo SDK güncellemelerini uygula |
-| R-03 | Marka turkuazı erişilebilirlik için koyulaştırıldı (#00B5AC → #00857E) | Ürün sahibinin onayı gerekiyor | Onaylanmazsa: turkuazı yalnızca dekoratif öğelerde kullan, metin ve butonlarda koyu tonu koru |
+| R-01 | Uygulama gerçek iOS/Android cihazda hiç test edilmedi: bildirimler, Face ID, Keychain, rehber, kaydırma, titreşim, widget, paylaşım | Bu ortamda emülatör ya da cihaz yok | `eas build --profile development --platform all`, sonra RELEASE_CHECKLIST'teki cihaz adımları ve `.maestro/core-journey.yaml` |
+| R-02 | Yeni native modüller var (`expo-widgets`, `@expo/ui`, `expo-system-ui`, `react-native-svg`, `react-native-view-shot`, `expo-localization`); eski build ile uygulama açılmaz | Native derleme gerekiyor | Yeni development ve production build al |
+| R-03 | Gizlilik politikası ve kullanım şartları hukukçu onayı bekliyor | Hukuki inceleme gerekiyor | Metinler uygulamada ve `docs/privacy.html`, `docs/terms.html` içinde hazır; GitHub Pages ile yayınla, URL'yi mağazalara gir |
+| R-04 | `npm audit`: geliştirme araçlarında yüksek seviyeli açıklar (SEC-11) | Expo SDK yükseltmesi gerekiyor. Bu paketler uygulama paketine girmiyor | Dependabot ve Expo SDK güncellemeleri |
 
 ## Orta
 
 | ID | Sorun | Öneri |
 |---|---|---|
-| R-04 | Karanlık mod yok (`userInterfaceStyle: light`) | `useColorScheme` ile açık ve koyu token setleri. Renkler artık tek yerde olduğu için geçiş kolaylaştı |
-| R-05 | Her yazmada tüm veri yeniden şifreleniyor (Node'da 1 MB için 94 ms; Hermes'te daha yavaş olabilir) | Kişi başına anahtar/değer ya da SQLite + SQLCipher (`expo-sqlite`) |
-| R-06 | Gizlilik politikası ve kullanım şartları birer taslak | Hukukçu incelemesi; metni hem uygulamada hem herkese açık bir URL'de yayınla (mağazalar URL istiyor) |
-| R-07 | ~~Çok dil desteği yok~~ **Kapatıldı:** Türkçe + İngilizce, telefon diline göre otomatik; Profil'den değiştirilebilir. İngilizce metinler anadil konuşanı tarafından gözden geçirilmeli | — |
-| R-08 | Ekran dosyaları hâlâ büyük (BusinessCard ~1100, Insights ~1280, AddContact ~1275 satır) | Ortak `Button`, `Card`, `Input` bileşenleri çıkararak bölmek |
-| R-09 | Kod tarafındaki erişilebilirlik eksikleri kapatıldı (Onboarding noktaları, bildirim anahtarları, kartvizit ve QR, içe aktarma kutuları, ⓘ butonları, grafikler, çipler, ton seçimi, form etiketleri, modal butonları). **Açık kalan:** VoiceOver/TalkBack ile cihazda gezinme ve en büyük yazı boyutu testi | Cihazda ekran okuyucu testi |
-| R-10 | Backend yok. Cihaz değişince veri yalnızca manuel yedekle taşınabiliyor | İhtiyaç olursa Supabase (Auth + RLS) ile isteğe bağlı eşitleme. **O zaman güvenlik denetimi yeniden yapılmalı** |
+| R-05 | Her yazmada tüm veri yeniden şifreleniyor. Node'da 4 MB (2.000 kişi × 20 an) için şifreleme ~0.6 sn, çözme ~1 sn. Hermes'te ölçülmedi | Normal kullanımda (≤300 kişi) sorun beklenmez. Büyürse kişi başına anahtar/değer ya da SQLite + SQLCipher |
+| R-06 | Görünüm (açık/koyu) değişikliği uygulama yeniden açılınca uygulanıyor | Tüm ekranları dinamik stile çevirmek gerekir; bilinçli bir tercih, ayarda yazıyor |
+| R-07 | Ana ekran widget'ı yalnızca iOS'ta; cihazda denenmedi | `expo-widgets` Android desteği deneysel. Önce iOS cihazda dene, sonra `enableAndroid` |
+| R-08 | Anonim istatistik için PostHog anahtarı ve proje ayarı yapılmadı | MARKETING.md §6: EU bölgesi, "Discard client IP data", `EXPO_PUBLIC_POSTHOG_KEY` |
+| R-09 | VoiceOver/TalkBack ile cihazda gezinme ve en büyük yazı boyutu testi yapılmadı | Cihazda ekran okuyucu testi |
+| R-10 | İngilizce metinleri anadili İngilizce olan biri gözden geçirmedi | Bir kez okutmak yeterli; `src/i18n/en.ts` |
+| R-11 | Ekran dosyaları büyük (Kişi ekleme, İçgörüler, Kartvizit ~1100–1300 satır) | Ortak `Button`, `Card`, `Input` bileşenleri çıkararak bölmek |
+| R-12 | Sunucu yok; telefon değişince veri yalnızca elle alınan yedekle taşınıyor | İhtiyaç olursa isteğe bağlı eşitleme. **O zaman güvenlik denetimi yeniden yapılmalı** |
+| R-13 | Mağaza ekran görüntüleri web derlemesinden üretildi | Cihazdan çekilmiş görüntülerle karşılaştır; `e2e/store-screenshots.js` aynı çerçeveyi kullanabilir |
 
 ## Düşük
 
 | ID | Sorun | Öneri |
 |---|---|---|
-| R-11 | Onboarding PNG'leri toplam 2.6 MB | WebP'ye çevir veya pngquant ile sıkıştır |
-| R-12 | Yedek `.json` dosyası şifresiz | İsteğe bağlı parolalı yedek (scrypt + XChaCha) |
-| R-13 | Web sürümünde veri şifresiz | Web'i yalnızca demo olarak konumlandır veya WebCrypto + parola kullan |
-| R-14 | Eski bazı çipler 40 px yüksekliğinde (önerilen 44 px) | Tasarım token'ı: `minTouch = 44` |
-| R-15 | Onboarding gradyanı (#00A39B üzerinde beyaz ≈ 3.1:1) | Koyu ton gradyan veya düz `primary` |
-| R-16 | "Geri al" balonu 5 sn sonra kayboluyor | Ekran okuyucu açıkken süreyi uzat |
-| R-17 | Abonelik ekranı yalnızca bilgi veriyor; ödeme altyapısı yok | Ücretli plan gerekirse RevenueCat + sunucuda doğrulama |
-| R-18 | Semgrep ve MobSF taramaları çalıştırılamadı | CI'a `semgrep ci` ekle; release APK için MobSF |
-| R-19 | Sesli an kaydı, yapay zekâ koçu, ana ekran widget'ı ve dünya haritası eklenmedi | Ses/AI bir sunucu ve LLM gerektiriyor (gizlilik açısından ayrıca tasarlanmalı); widget native WidgetKit/AppWidget kodu istiyor; harita konum ve geocoding istiyor |
+| R-14 | Yedek `.json` dosyası şifresiz (kullanıcı uyarılıyor) | İsteğe bağlı parolalı yedek (scrypt + XChaCha) |
+| R-15 | Web sürümünde veri şifresiz | Web yalnızca görmek için derleniyor, yayınlanmayacak; sorun değil |
+| R-16 | Bazı eski çipler 40 px yüksekliğinde (önerilen 44 px) | `minTouch = 44` token'ı |
+| R-17 | Abonelik ekranı yalnızca bilgi veriyor | Ücretli plan gerekirse RevenueCat + sunucuda doğrulama |
+| R-18 | MobSF taraması yapılmadı (APK gerekiyor) | Production APK üzerinde MobSF |
+| R-19 | Sesli an kaydı, yapay zekâ koçu ve dünya haritası yok | Ses ve AI sunucu ile LLM gerektiriyor, gizlilik ayrıca tasarlanmalı; harita konum ve geocoding istiyor |
+| R-20 | Uygulama içinde değerlendirme isteği yok | Ağaç ilk büyüdüğünde `expo-store-review` |
+
+## Kapatılanlar (bu sürüm)
+
+| Eski ID | Ne yapıldı |
+|---|---|
+| Karanlık mod yok | Sistem / Açık / Koyu; tüm renkler token'dan |
+| Çok dil yok | Türkçe + İngilizce; iOS izin metinleri de iki dilde (`locales/`) |
+| Renk dağınıklığı, palet dışı renkler | Mavi kaldırıldı, sıcak mercan vurgu eklendi, tüm renkler `colors.ts`'den |
+| Form ipucu kontrastı (2.5:1) | 4.8:1 |
+| Onboarding gradyanı kontrastı (3.1:1) | Beyaz yazı tüm gradyanda ≥ 4.5:1 |
+| "Geri al" balonu ekran okuyucuda çok kısa | Ekran okuyucu açıkken 3 kat uzun |
+| Titreşim kapatılamıyor | Profil → Titreşim |
+| Kullanıcı davranışı ölçülmüyor | İzinli, anonim istatistik (PostHog EU) |
+| Büyüyen bir canlı / ödül yok | Bağ ağacı, aşama kutlaması, değişen ödül mesajları |
+| Ana ekran widget'ı yok | iOS widget (cihazda test bekliyor, R-07) |
+| Semgrep çalıştırılamadı | 432 kural, 94 dosya: gerçek güvenlik bulgusu yok (SECURITY_REPORT) |
+| Gizlilik metni için herkese açık URL yok | `docs/privacy.html`, `docs/terms.html` (`npm run legal`) |
+| Mağaza formları ve görselleri | `STORE_LISTING.md`, `store/screenshots/` |
+| Çok kişiyle hız ölçülmedi | `__tests__/performance.test.ts`: 2.000 kişi; Ana sayfa hesapları 900 → 320 ms |

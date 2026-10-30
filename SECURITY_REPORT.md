@@ -32,7 +32,7 @@ Bu rapor iki referansa göre hazırlandı:
 | ESLint + eslint-plugin-security | `npx eslint .` | **0 sorun.** 2 ReDoS uyarısı inceledim: sınırlı tekrar içeren düzenli ifadeler, gerçek bir risk değil (gerekçesi kodda yazılı) |
 | npm audit | `npm audit --omit=dev` | 40 bulgu (13 moderate, 27 high, **0 critical**). Kritik olan `shell-quote` açığı `npm audit fix` ile giderildi |
 | Android manifest | `expo prebuild --platform android` sonrası `AndroidManifest.xml` | Aşağıda |
-| Semgrep | `semgrep --config p/react …` | **ÇALIŞTIRILAMADI.** semgrep.dev bu ortamın ağ politikasınca engelli |
+| Semgrep 1.x | `semgrep scan --metrics=off --config semgrep-rules/{javascript,typescript,generic/secrets}` (kurallar GitHub'daki açık `semgrep/semgrep-rules` deposundan, çevrimdışı) | ✅ 432 kural, 94 dosya, 880 eşleşme. **Gerçek güvenlik bulgusu yok.** 824 eşleşme i18next anahtar biçimi kuralı (bizim anahtar biçimimize uymuyor), 22 isteğe bağlı native modüllerin bilinçli `require()` kullanımı, kalanlar geliştirme betiklerinde (`e2e/`, `scripts/`) ve yanlış alarm (`{name}` yer tutucuları, `panHandlers` yayma) |
 | MobSF / APK statik analizi | — | **NOT TESTED.** APK/IPA derlenemedi (Android SDK yok, EAS erişimi yok) |
 
 ### Android manifest (prebuild çıktısı, düzeltme sonrası)
@@ -68,6 +68,8 @@ Bu rapor iki referansa göre hazırlandı:
 | SEC-14 | Low | Web derlemesi | Web'de anahtarlık olmadığı için veri şifresiz | — | Uygulama içinde açıkça belirtiliyor | ❌ Kabul edildi |
 | SEC-15 | Low | Yedek dosyası | `.json` yedek şifresiz | — | Kullanıcı uyarılıyor | ❌ Öneri: parolalı yedek |
 | SEC-16 | Info | Push bildirimleri | Uzak push token'ı kullanılıyor mu? | — | Kaldırıldı; yalnızca yerel bildirim var | ✅ |
+| SEC-18 | Medium | Anonim istatistik | Veri ilk kez cihaz dışına çıkıyor | Kod incelemesi + `__tests__/analytics.test.ts` | Yalnızca açık "Evet" ile (varsayılan kapalı); olay adı + yuvarlanmış sayılar + rastgele kurulum kimliği; `$process_person_profile: false`, `$geoip_disable: true` ve olay özellikleri bu bayrakları ezemiyor. Kişi adı, not, telefon, tarih gönderilmiyor. Anahtar yoksa hiçbir şey gönderilmiyor. "Tüm verileri sil" kimliği siliyor | ✅ unit. PostHog'da "Discard client IP data" açılmalı |
+| SEC-19 | Low | iOS widget | Ana ekranda kişi adı görünebilir | Kod incelemesi | Yalnızca ilk ad; uygulama kilidi açıksa hiç isim yok | ✅ manual |
 | SEC-17 | Info | CI | Sır yönetimi | `.github/workflows/ci.yml` | CI hiç sır kullanmıyor; izin seviyesi `contents: read` | ✅ |
 
 ## Üretim öncesi zorunlu güvenlik kontrolleri
