@@ -28,9 +28,10 @@ import LogInteractionModal from "../components/LogInteractionModal";
 import InsightsScreen from "./InsightsScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { consumeGlow } from "../app/glow";
 import { t, tv } from "../i18n";
 
-const CLUSTER_COLORS = [colors.primary, colors.accent, "#2563EB", colors.secondary, colors.warning, "#0E7490", colors.success, "#9333EA"];
+const CLUSTER_COLORS = [colors.primary, colors.warm, colors.accent, colors.secondary, colors.warning, colors.success, colors.primaryDark, colors.warmStrong];
 const MAX_CLUSTERS = 7;
 const OTHER = "Diğer";
 
@@ -91,7 +92,7 @@ export default function UniverseScreen({ navigation }: { navigation: any }) {
           accessibilityRole="button"
           accessibilityLabel={t("Bu ayın hikâyesi")}
         >
-          <Ionicons name="sparkles" size={16} color={colors.white} />
+          <Ionicons name="sparkles" size={16} color={colors.onFill} />
           <Text style={styles.storyBtnText}>{t("Bu ayın hikâyesi")}</Text>
         </TouchableOpacity>
       </View>
@@ -106,7 +107,7 @@ export default function UniverseScreen({ navigation }: { navigation: any }) {
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Ionicons name={key === "universe" ? "planet-outline" : "stats-chart-outline"} size={16} color={active ? colors.white : colors.textSub} />
+              <Ionicons name={key === "universe" ? "planet-outline" : "stats-chart-outline"} size={16} color={active ? colors.onFill : colors.textSub} />
               <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
                 {key === "universe" ? t("Bağ haritası") : t("İçgörüler")}
               </Text>
@@ -127,6 +128,7 @@ function UniverseMap({ navigation }: { navigation: any }) {
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [focusCluster, setFocusCluster] = useState<number | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [glowId, setGlowId] = useState<string | null>(null);
   const float = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
@@ -134,8 +136,13 @@ function UniverseMap({ navigation }: { navigation: any }) {
       Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
         setContacts(c);
         setThreshold(s.reachOutThresholdDays || 14);
+        setGlowId(consumeGlow());
       });
-      return subscribeContacts(setContacts);
+      return subscribeContacts((c) => {
+        setContacts(c);
+        const g = consumeGlow();
+        if (g) setGlowId(g);
+      });
     }, [])
   );
 
@@ -236,7 +243,10 @@ function UniverseMap({ navigation }: { navigation: any }) {
                 { left: n.x - n.size / 2, top: n.y - n.size / 2, opacity: dim ? 0.2 : faded ? 0.55 : 1, transform: [{ translateY: dy as any }] },
               ]}
             >
-              {n.due && !reduceMotion ? <Pulse size={n.size} color={colors.danger} /> : null}
+              {n.due && !reduceMotion ? <Pulse size={n.size} color={colors.warm} /> : null}
+              {glowId && glowId === n.contact.id && !reduceMotion ? (
+                <Glow key={glowId} size={n.size} onDone={() => setGlowId(null)} />
+              ) : null}
               <TouchableOpacity
                 onPress={() => setSelected(n.contact)}
                 activeOpacity={0.8}
@@ -257,7 +267,7 @@ function UniverseMap({ navigation }: { navigation: any }) {
                       height: n.size,
                       borderRadius: n.size / 2,
                       borderColor: healthScoreColor(n.score),
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.surface,
                     },
                   ]}
                 >
@@ -284,8 +294,8 @@ function UniverseMap({ navigation }: { navigation: any }) {
               accessibilityState={{ selected: active }}
               accessibilityLabel={t("{circle}: {count} kişi", { circle: tv(hub.label), count: hub.count })}
             >
-              <View style={[styles.legendDot, { backgroundColor: active ? colors.white : hub.color }]} />
-              <Text style={[styles.legendText, active && { color: colors.white }]}>{tv(hub.label)} · {hub.count}</Text>
+              <View style={[styles.legendDot, { backgroundColor: active ? colors.onFill : hub.color }]} />
+              <Text style={[styles.legendText, active && { color: colors.onFill }]}>{tv(hub.label)} · {hub.count}</Text>
             </TouchableOpacity>
           );
         })}
@@ -315,6 +325,33 @@ function UniverseMap({ navigation }: { navigation: any }) {
         }}
       />
     </ScrollView>
+  );
+}
+
+/** A one-off warm glow around the star of someone you just connected with. */
+function Glow({ size, onDone }: { size: number; onDone: () => void }) {
+  const v = useRef(new Animated.Value(0)).current;
+  const done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(v, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 2, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]).start(() => done.current());
+  }, [v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: colors.warm,
+        opacity: v.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0.6, 0] }),
+        transform: [{ scale: v.interpolate({ inputRange: [0, 1, 2], outputRange: [1, 1.6, 2.4] }) }],
+      }}
+    />
   );
 }
 
@@ -370,7 +407,7 @@ function PersonPreview({
             </View>
           </View>
           <TouchableOpacity style={styles.sheetPrimary} onPress={() => onLog(contact)} accessibilityRole="button">
-            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.onFill} />
             <Text style={styles.sheetPrimaryText}>{t("Görüştüm")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.sheetSecondary} onPress={() => onOpen(contact)} accessibilityRole="button">
@@ -396,30 +433,30 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.accent,
   },
-  storyBtnText: { color: colors.white, fontWeight: "800", fontSize: 14 },
+  storyBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 14 },
   segment: { flexDirection: "row", marginHorizontal: 20, padding: 4, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   segmentBtn: { flex: 1, minHeight: 40, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   segmentBtnActive: { backgroundColor: colors.primary },
   segmentText: { fontSize: 14, fontWeight: "700", color: colors.textSub },
-  segmentTextActive: { color: colors.white },
+  segmentTextActive: { color: colors.onFill },
   me: {
     position: "absolute",
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.text,
+    backgroundColor: colors.inverse,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 4,
     borderColor: colors.primarySoft,
   },
-  meText: { color: colors.white, fontWeight: "900", fontSize: 15 },
+  meText: { color: colors.onInverse, fontWeight: "900", fontSize: 15 },
   nodeWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
   node: {
     borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -459,7 +496,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  sheetPrimaryText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  sheetPrimaryText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
   sheetSecondary: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   sheetSecondaryText: { color: colors.primary, fontSize: 15, fontWeight: "700" },
 });

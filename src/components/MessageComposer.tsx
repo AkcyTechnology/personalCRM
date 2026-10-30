@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
   },
   btnDisabled: { backgroundColor: colors.primary + "45" },
-  primaryBtnText: { fontSize: 13, fontWeight: "700", color: colors.white },
+  primaryBtnText: { fontSize: 13, fontWeight: "700", color: colors.onFill },
 
   secondaryBtn: {
     marginTop: 10, height: 46, borderRadius: radius.button,

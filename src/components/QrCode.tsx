@@ -1,7 +1,6 @@
 import { View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import qrcode from "qrcode-generator";
-import { colors } from "../theme/colors";
 
 type Props = {
   value: string;
@@ -12,7 +11,7 @@ type Props = {
 };
 
 /** QR code drawn as a single SVG path (one native view instead of one per module). */
-export default function QrCode({ value, size = 96, color = colors.text, backgroundColor = colors.white, accessibilityLabel }: Props) {
+export default function QrCode({ value, size = 96, color = "#111827", backgroundColor = "#FFFFFF", accessibilityLabel }: Props) {
   const qr = qrcode(0, "M");
   qr.addData(value || " ");
   qr.make();

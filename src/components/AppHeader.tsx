@@ -111,7 +111,7 @@ function IconButton({ label, onPress }: { label: string; color?: string; onPress
       accessibilityRole="button"
       accessibilityLabel={label === "+" || label === "＋" ? t("Ekle") : label}
     >
-      <Text style={{ fontSize: 22, color: colors.white, fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
+      <Text style={{ fontSize: 22, color: colors.onFill, fontWeight: "300", lineHeight: 26, marginTop: -1 }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -134,10 +134,10 @@ function TextButton({ label, color, onPress }: { label: string; color?: string; 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderLight,
-    shadowColor: "#000",
+    shadowColor: colors.shadow,
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },

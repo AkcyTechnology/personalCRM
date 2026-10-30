@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { color: colors.white, fontSize: 30, fontWeight: "700" },
+  avatarText: { color: colors.onFill, fontSize: 30, fontWeight: "700" },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-  saveBtnText: { color: colors.white, fontSize: 15, fontWeight: "700" },
+  saveBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
   linkRow: {
     backgroundColor: colors.card,
     borderRadius: radius.card,

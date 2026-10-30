@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   promiseGroup: { width: "100%", gap: 10, marginTop: 24 },
   promiseRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
+    backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
     paddingHorizontal: 16, paddingVertical: 14,
   },
   promiseLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.38, shadowRadius: 16, elevation: 10,
   },
   guestBtn: { height: 56, alignItems: "center", justifyContent: "center" },
-  guestBtnText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  guestBtnText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
   guestNote: { textAlign: "center", marginTop: 10, fontSize: 12, color: colors.textMuted },
 
   footer: { marginTop: 20, fontSize: 11, color: colors.textMuted, textAlign: "center", lineHeight: 18 },

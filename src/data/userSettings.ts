@@ -22,6 +22,14 @@ export type UserSettings = {
   acceptedTermsAt?: string;
   /** Distinct people to connect with per week (weekly ring). */
   weeklyGoal: number;
+  /** "system" follows the phone; applied on the next launch. */
+  theme: "system" | "light" | "dark";
+  /** Light vibration feedback on key actions. */
+  haptics: boolean;
+  /** Anonymous usage statistics (no contact data). Opt-in. */
+  analytics: boolean;
+  /** The analytics question was shown once (yes or no). */
+  analyticsAsked: boolean;
 };
 
 const DEFAULTS: UserSettings = {
@@ -37,6 +45,10 @@ const DEFAULTS: UserSettings = {
   notif_smartNudge: true,
   appLockEnabled: false,
   weeklyGoal: 3,
+  theme: "system",
+  haptics: true,
+  analytics: false,
+  analyticsAsked: false,
 };
 
 type Listener = (settings: UserSettings) => void;
@@ -54,6 +66,7 @@ export async function loadSettings(): Promise<UserSettings> {
     const parsed = { ...DEFAULTS, ...JSON.parse(raw) } as UserSettings;
     // Eski sürümlerde dil seçimi işlevsizdi (es/de); sistem diline dön.
     if (!["system", "tr", "en"].includes(parsed.language)) parsed.language = "system";
+    if (!["system", "light", "dark"].includes(parsed.theme)) parsed.theme = "system";
     return parsed;
   } catch {
     return DEFAULTS;

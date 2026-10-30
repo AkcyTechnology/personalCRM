@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    backgroundColor: colors.text,
+    backgroundColor: colors.inverse,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: radius.pill,
@@ -105,12 +105,12 @@ const styles = StyleSheet.create({
   },
   text: {
     flexShrink: 1,
-    color: colors.white,
+    color: colors.onInverse,
     fontSize: 14,
     fontWeight: "600",
   },
   action: {
-    color: "#5EEAD4",
+    color: colors.inverseAccent,
     fontSize: 14,
     fontWeight: "800",
   },

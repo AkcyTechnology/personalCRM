@@ -10,6 +10,7 @@ import { loadContacts } from "../data/contacts";
 import { monthlyStory } from "../utils/engagement";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
+import { track } from "../utils/analytics";
 import { locale, t, tv } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Story">;
@@ -42,6 +43,7 @@ export default function StoryScreen({ navigation }: Props) {
       : t("Bu ay {count} kişiyle bağ kurdun", { count: story.people });
 
   const share = async () => {
+    track("story_shared", { names: showNames });
     const text = `${monthLabel(month)} — ${headline}. ${t("Life happens between people.")} #Connectly`;
     try {
       if (Platform.OS !== "web" && cardRef.current) {
@@ -96,7 +98,7 @@ export default function StoryScreen({ navigation }: Props) {
       </View>
 
       <View ref={cardRef} collapsable={false} style={styles.cardWrap}>
-        <LinearGradient colors={["#0F766E", "#5B21B6", "#DB2777"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+        <LinearGradient colors={["#0F766E", "#5B21B6", "#E8604A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
           <Text style={styles.kicker}>{t("Bağlantı hikâyen")}</Text>
           <Text style={styles.headline} accessibilityRole="header">{headline}</Text>
 

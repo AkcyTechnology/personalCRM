@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,8 +20,11 @@ import {
   personOfTheDay,
   reasonFor,
   todaysSparks,
+  treeState,
   weeklyStreak,
+  TREE_STAGES,
   type Spark,
+  type TreeState,
 } from "../utils/engagement";
 import { logMoment } from "../app/momentActions";
 import SnoozeModal from "../components/SnoozeModal";
@@ -29,9 +32,14 @@ import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
 import LogInteractionModal from "../components/LogInteractionModal";
 import ProgressRing from "../components/ProgressRing";
+import BondTree from "../components/BondTree";
+import Appear from "../components/Appear";
+import AnalyticsConsent from "../components/AnalyticsConsent";
+import CountUp from "../components/CountUp";
 import Avatar from "../components/Avatar";
 import { showToast, showUndoToast } from "../components/Toast";
 import { reasonText } from "./ShuffleScreen";
+import { track } from "../utils/analytics";
 import { t } from "../i18n";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -57,6 +65,7 @@ export default function HomeScreen({ navigation }: any) {
   const [composerTarget, setComposerTarget] = useState<ContactForm | null>(null);
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
+  const [treeInfoOpen, setTreeInfoOpen] = useState(false);
 
   const reload = useCallback(() => loadContacts().then(setContacts), []);
 
@@ -97,6 +106,7 @@ export default function HomeScreen({ navigation }: any) {
       memories: onThisDay(contacts, now),
       streak: weeklyStreak(contacts, now),
       thisWeek: peopleThisWeek(contacts, now),
+      tree: treeState(contacts, now),
       health: averageHealthScore(contacts, threshold),
     };
   }, [contacts, threshold]);
@@ -135,6 +145,7 @@ export default function HomeScreen({ navigation }: any) {
   const sparksDone = data.sparks.filter((s) => s.done).length;
 
   const onSpark = (s: Spark) => {
+    track("spark_opened", { kind: s.kind });
     if (s.kind === "meetUp") navigation.navigate("Shuffle");
     else if (s.kind === "birthday" || s.kind === "reconnect") setComposerTarget(s.contact);
     else goToContact(s.contact);
@@ -172,7 +183,7 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.emptyTitle}>{t("İlk kişini ekle")}</Text>
             <Text style={styles.emptyDesc}>{t("Kimi unutmak istemiyorsun?")}</Text>
             <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate("AddContact")} accessibilityRole="button">
-              <Ionicons name="add" size={20} color={colors.white} />
+              <Ionicons name="add" size={20} color={colors.onFill} />
               <Text style={styles.primaryButtonText}>{t("Kişi ekle")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate("ImportContacts")} accessibilityRole="button">
@@ -184,7 +195,13 @@ export default function HomeScreen({ navigation }: any) {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* ── Bond tree ── */}
+          <Appear index={0}>
+            <TreeCard tree={data.tree} onPress={() => setTreeInfoOpen(true)} />
+          </Appear>
+
           {/* ── This week: goal ring · streak · connection ── */}
+          <Appear index={1}>
           <View style={styles.weekCard}>
             <ProgressRing
               size={104}
@@ -193,7 +210,7 @@ export default function HomeScreen({ navigation }: any) {
               color={colors.primary}
               accessibilityLabel={t("Bu hafta {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
             >
-              <Text style={styles.ringValue}>{data.thisWeek}/{weeklyGoal}</Text>
+              <CountUp value={data.thisWeek} style={styles.ringValue} format={(n) => `${n}/${weeklyGoal}`} />
               <Text style={styles.ringLabel}>{t("bu hafta")}</Text>
             </ProgressRing>
 
@@ -228,9 +245,11 @@ export default function HomeScreen({ navigation }: any) {
               </View>
             </View>
           </View>
+          </Appear>
 
           {/* ── Person of the day ── */}
           {data.pod ? (
+            <Appear index={2}>
             <LinearGradient colors={[colors.primarySoft, colors.accentSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.podCard}>
               <Text style={styles.podKicker}>{t("Günün kişisi")}</Text>
               <TouchableOpacity
@@ -247,7 +266,7 @@ export default function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
               <View style={styles.podActions}>
                 <TouchableOpacity style={styles.podPrimary} onPress={() => setComposerTarget(data.pod)} accessibilityRole="button">
-                  <Ionicons name="chatbubble-ellipses" size={18} color={colors.white} />
+                  <Ionicons name="chatbubble-ellipses" size={18} color={colors.onFill} />
                   <Text style={styles.podPrimaryText}>{t("Merhaba de")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -268,11 +287,12 @@ export default function HomeScreen({ navigation }: any) {
                 </TouchableOpacity>
               </View>
             </LinearGradient>
+            </Appear>
           ) : null}
 
           {/* ── Today's sparks ── */}
           {data.sparks.length > 0 ? (
-            <>
+            <Appear index={3}>
               <View style={styles.sectionHeader}>
                 <View style={styles.rowCenter}>
                   <Text style={styles.sectionTitle} accessibilityRole="header">{t("Bugünün kıvılcımları")}</Text>
@@ -292,12 +312,12 @@ export default function HomeScreen({ navigation }: any) {
                   <SparkRow key={s.id} spark={s} onPress={() => onSpark(s)} />
                 ))}
               </View>
-            </>
+            </Appear>
           ) : null}
 
           {/* ── People to reconnect with ── */}
           {dueCount > 0 ? (
-            <>
+            <Appear index={4}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle} accessibilityRole="header">{t("Yeniden bağlan")}</Text>
                 <TouchableOpacity
@@ -323,7 +343,7 @@ export default function HomeScreen({ navigation }: any) {
                   />
                 ))}
               </ScrollView>
-            </>
+            </Appear>
           ) : null}
 
           {/* ── On this day ── */}
@@ -404,6 +424,8 @@ export default function HomeScreen({ navigation }: any) {
         onConfirm={handleSnoozeConfirm}
       />
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
+      <TreeInfoModal visible={treeInfoOpen} tree={data.tree} onClose={() => setTreeInfoOpen(false)} />
+      <AnalyticsConsent ready={loaded && contacts.length > 0} />
       <LogInteractionModal
         visible={!!logTarget}
         contactName={logTarget?.fullName ?? ""}
@@ -475,7 +497,7 @@ function SparkRow({ spark, onPress }: { spark: Spark; onPress: () => void }) {
       accessibilityState={{ checked: spark.done }}
     >
       <View style={[styles.sparkCheck, spark.done && { backgroundColor: colors.success, borderColor: colors.success }]}>
-        {spark.done ? <Ionicons name="checkmark" size={16} color={colors.white} /> : <Ionicons name={c.icon} size={16} color={c.color} />}
+        {spark.done ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : <Ionicons name={c.icon} size={16} color={c.color} />}
       </View>
       <Text style={[styles.sparkText, spark.done && styles.sparkTextDone]} numberOfLines={2}>{c.text}</Text>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -517,7 +539,7 @@ function TodayCard({
         accessibilityRole="button"
         accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
       >
-        <Ionicons name="checkmark" size={16} color={colors.white} />
+        <Ionicons name="checkmark" size={16} color={colors.onFill} />
         <Text style={styles.doneText}>{t("Görüştüm")}</Text>
       </TouchableOpacity>
       <View style={styles.todayActions}>
@@ -576,6 +598,73 @@ function HomeSkeleton() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
+// ── Bond tree ─────────────────────────────────────────────────────────────────
+
+function vitalityText(tree: TreeState): string {
+  if (tree.stage === 0) return t("İlk anını kaydet, tohum filizlensin 🌱");
+  if (tree.vitality === "resting") return t("Ağacın dinleniyor. Bir an onu uyandırır 🌙");
+  if (tree.vitality === "thriving") return t("Ağacın ışıl ışıl ✨");
+  return t("Ağacın büyüyor 🌿");
+}
+
+function TreeCard({ tree, onPress }: { tree: TreeState; onPress: () => void }) {
+  const stageName = t(TREE_STAGES[tree.stage].name);
+  return (
+    <TouchableOpacity
+      style={styles.treeCard}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={t("Bağ ağacın: {stage}. {moments} an. {status}", { stage: stageName, moments: tree.moments, status: vitalityText(tree) })}
+      accessibilityHint={t("Ağacın nasıl büyüdüğünü gösterir")}
+    >
+      <BondTree tree={tree} size={120} />
+      <View style={styles.treeInfo}>
+        <Text style={styles.treeKicker}>{t("Bağ ağacın")}</Text>
+        <Text style={styles.treeStage}>{stageName}</Text>
+        <Text style={styles.treeStatus}>{vitalityText(tree)}</Text>
+        <View style={styles.treeBarTrack}>
+          <View style={[styles.treeBarFill, { width: `${Math.round(tree.progress * 100)}%` }]} />
+        </View>
+        <Text style={styles.treeNext}>
+          {tree.toNext > 0 ? t("{count} an daha ve ağacın büyüyecek", { count: tree.toNext }) : t("Ağacın en güzel halinde 🌸")}
+        </Text>
+        {tree.blossoms > 0 ? (
+          <Text style={styles.treeBlossoms}>{t("Bu hafta {count} çiçek açtı", { count: tree.blossoms })}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function TreeInfoModal({ visible, tree, onClose }: { visible: boolean; tree: TreeState; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.treeBackdrop} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel={t("Kapat")}>
+        <View style={styles.treeSheet} onStartShouldSetResponder={() => true}>
+          <Text style={styles.treeSheetTitle} accessibilityRole="header">{t("Bağ ağacın nasıl büyür?")}</Text>
+          <Text style={styles.treeSheetBody}>
+            {t("Kaydettiğin her an ağacına bir yaprak ekler. Bu hafta konuştuğun her kişi bir çiçek açtırır. Ağacın asla solmaz; sen uzaktayken sadece dinlenir.")}
+          </Text>
+          {TREE_STAGES.map((st, i) => {
+            const reached = tree.stage >= i;
+            return (
+              <View key={st.name} style={styles.treeStageRow} accessible accessibilityLabel={`${t(st.name)}, ${t("{count} an", { count: st.at })}${reached ? `, ${t("ulaşıldı")}` : ""}`}>
+                <Ionicons name={reached ? "checkmark-circle" : "ellipse-outline"} size={20} color={reached ? colors.success : colors.textMuted} />
+                <Text style={[styles.treeStageName, reached && { color: colors.text }]}>{t(st.name)}</Text>
+                <Text style={styles.treeStageAt}>{t("{count} an", { count: st.at })}</Text>
+              </View>
+            );
+          })}
+          <TouchableOpacity style={styles.treeSheetBtn} onPress={onClose} accessibilityRole="button">
+            <Text style={styles.treeSheetBtnText}>{t("Tamam")}</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   rowCenter: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -617,9 +706,38 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bg,
   },
-  badgeText: { color: colors.white, fontSize: 11, fontWeight: "800" },
+  badgeText: { color: colors.onFill, fontSize: 11, fontWeight: "800" },
 
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 140 },
+
+  treeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderRadius: radius.card,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  treeInfo: { flex: 1, minWidth: 0 },
+  treeKicker: { fontSize: 13, fontWeight: "800", color: colors.warmStrong, textTransform: "uppercase", letterSpacing: 0.8 },
+  treeStage: { fontSize: 20, fontWeight: "900", color: colors.text, marginTop: 2 },
+  treeStatus: { fontSize: 14, fontWeight: "600", color: colors.textSub, marginTop: 2 },
+  treeBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.borderLight, marginTop: 10, overflow: "hidden" },
+  treeBarFill: { height: 8, borderRadius: 4, backgroundColor: colors.success },
+  treeNext: { fontSize: 13, fontWeight: "600", color: colors.textMuted, marginTop: 6 },
+  treeBlossoms: { fontSize: 13, fontWeight: "700", color: colors.warmStrong, marginTop: 4 },
+  treeBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: 20 },
+  treeSheet: { backgroundColor: colors.surface, borderRadius: 24, padding: 22 },
+  treeSheetTitle: { fontSize: 20, fontWeight: "900", color: colors.text },
+  treeSheetBody: { fontSize: 15, lineHeight: 22, color: colors.textSub, marginTop: 8, marginBottom: 12 },
+  treeStageRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  treeStageName: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textSub },
+  treeStageAt: { fontSize: 14, fontWeight: "600", color: colors.textMuted },
+  treeSheetBtn: { marginTop: 14, minHeight: 50, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  treeSheetBtnText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
 
   weekCard: {
     flexDirection: "row",
@@ -668,12 +786,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  podPrimaryText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  podPrimaryText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
   podIcon: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -731,7 +849,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  doneText: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  doneText: { color: colors.onFill, fontSize: 15, fontWeight: "800" },
   todayActions: { flexDirection: "row", gap: 8, marginTop: 8 },
   smallIconBtn: {
     width: 44,
@@ -799,7 +917,7 @@ const styles = StyleSheet.create({
   tagline: { marginTop: 24, textAlign: "center", fontSize: 13, fontWeight: "700", color: colors.textSub, letterSpacing: 0.3 },
 
   emptyCard: { alignItems: "center", padding: 24, borderRadius: radius.card, gap: 8 },
-  emptyIcon: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text, marginTop: 4 },
   emptyDesc: { fontSize: 15, color: colors.textSub },
   primaryButton: {
@@ -813,7 +931,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  primaryButtonText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  primaryButtonText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
   secondaryButton: { alignSelf: "stretch", minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   secondaryButtonText: { color: colors.primary, fontSize: 15, fontWeight: "700" },
 

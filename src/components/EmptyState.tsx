@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.button,
   },
-  addBtnText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  addBtnText: { color: colors.onFill, fontWeight: "700", fontSize: 15 },
   secondaryBtn: { minHeight: 44, justifyContent: "center", paddingHorizontal: 16 },
   secondaryText: { color: colors.primary, fontWeight: "700", fontSize: 15 },
 });

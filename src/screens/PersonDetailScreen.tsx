@@ -21,7 +21,7 @@ import { openEmail, openPhoneCall, openWhatsApp as openWhatsAppLink, openWebUrl,
 import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm, InteractionType } from "./AddContactScreen";
-import { colors } from "../theme/colors";
+import { categorical, colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { effectiveIntervalDays, intervalLabel, INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { healthScore as centralHealthScore, healthScoreColor } from "../utils/healthScore";
@@ -71,7 +71,7 @@ function initials(name?: string) {
 }
 
 function avatarColor(name?: string) {
-  const p = [colors.primary, "#2563EB", colors.success, colors.warning, "#0891B2", colors.secondary];
+  const p = categorical();
   let h = 0;
   for (const c of name || "") h += c.charCodeAt(0);
   return p[h % p.length];
@@ -434,7 +434,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t("{name} ile görüştüm", { name: contact.fullName })}
           >
-            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.onFill} />
             <Text style={styles.contactedText}>{t("Görüştüm")}</Text>
           </TouchableOpacity>
         </View>
@@ -463,7 +463,7 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
                 >
                   <View style={styles.timelineRail}>
                     <View style={[styles.timelineDot, { backgroundColor: item.color }]}>
-                      <Ionicons name={item.icon} size={14} color={colors.white} />
+                      <Ionicons name={item.icon} size={14} color={colors.onFill} />
                     </View>
                     {index < timeline.length - 1 ? <View style={styles.timelineLine} /> : null}
                   </View>
@@ -829,7 +829,7 @@ const styles = StyleSheet.create({
     width: "100%", marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14,
   },
-  contactedText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  contactedText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
   actionLabel: { marginTop: 7, fontSize: 11.5, color: MUTED, fontWeight: "800", textAlign: "center" },
 
   tabsWrap: {
@@ -887,7 +887,7 @@ const styles = StyleSheet.create({
   },
   inputMulti: { minHeight: 94, textAlignVertical: "top" },
 
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(25,24,38,0.38)", alignItems: "center", justifyContent: "center", padding: 22 },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: "center", justifyContent: "center", padding: 22 },
   confirmCard: { width: "100%", backgroundColor: CARD, borderRadius: 24, padding: 20, alignItems: "center" },
   warningIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: RED + "15", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   warningText: { color: RED, fontSize: 24, fontWeight: "900" },

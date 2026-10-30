@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Connectly",
+    "NSContactsUsageDescription": "Seçtiğin kişileri Connectly'ye eklemek için rehberine erişiyoruz. Rehberin cihazından dışarı gönderilmez.",
+    "NSFaceIDUsageDescription": "Uygulama kilidini Face ID ile açabilmen için kullanılır."
+  }
+}

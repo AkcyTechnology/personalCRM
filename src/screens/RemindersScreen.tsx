@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   messageBtn: {
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#FFF1E6",
+    backgroundColor: colors.warmSoft,
   },
   messageBtnText: { fontSize: 11, fontWeight: "800", color: ORANGE },
   upcomingCard: {
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: "#FFF1D6", alignItems: "center", justifyContent: "center", marginRight: 14,
+    backgroundColor: colors.warmSoft, alignItems: "center", justifyContent: "center", marginRight: 14,
   },
   avatarText: { color: ORANGE, fontWeight: "900", fontSize: 13 },
   dateArea: { alignItems: "flex-end" },

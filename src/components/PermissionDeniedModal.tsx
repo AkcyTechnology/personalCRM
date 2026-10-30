@@ -35,7 +35,7 @@ export default function PermissionDeniedModal({ visible, title, description, onC
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   box: {
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  primaryBtnText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  primaryBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   secondaryBtn: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,

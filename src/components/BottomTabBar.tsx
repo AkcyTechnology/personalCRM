@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { hapticImpact, hapticTap } from "../utils/haptics";
 import { t } from "../i18n";
 
 const TEAL   = colors.primary;
@@ -19,7 +20,7 @@ function TabItem({ label, icon, active, onPress }: {
   return (
     <TouchableOpacity
       style={styles.tabItem}
-      onPress={onPress}
+      onPress={() => { if (!active) hapticTap(); onPress(); }}
       activeOpacity={0.7}
       accessibilityRole="tab"
       accessibilityLabel={label}
@@ -55,13 +56,13 @@ export default function BottomTabBar({ activeTab, onTabPress, onAddPress }: Prop
         {/* Centre action button */}
         <View style={styles.addSlot}>
           <TouchableOpacity
-            onPress={onAddPress}
+            onPress={() => { hapticImpact(); onAddPress(); }}
             activeOpacity={0.82}
             style={styles.addBtn}
             accessibilityRole="button"
             accessibilityLabel={t("Yeni kişi ekle")}
           >
-            <Ionicons name="add" size={34} color={colors.white} />
+            <Ionicons name="add" size={34} color={colors.onFill} />
           </TouchableOpacity>
         </View>
 
@@ -76,13 +77,13 @@ export default function BottomTabBar({ activeTab, onTabPress, onAddPress }: Prop
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: radius.bottomBar,
     borderTopRightRadius: radius.bottomBar,
     paddingTop: 8,
     ...Platform.select({
       ios: {
-        shadowColor: "#000000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: -3 },
         shadowOpacity: 0.06,
         shadowRadius: 12,

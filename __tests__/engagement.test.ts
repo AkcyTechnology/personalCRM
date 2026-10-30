@@ -116,3 +116,33 @@ describe("memories and story", () => {
     expect(j).toMatchObject({ since: "2026-01-01", moments: 2, longestGapDays: 60, averageGapDays: 60 });
   });
 });
+
+describe("treeState", () => {
+  const { treeState } = require("../src/utils/engagement") as typeof import("../src/utils/engagement");
+  const now = new Date(2026, 9, 15);
+  const withMoments = (dates: string[]) => [{ id: "a", fullName: "A", interactions: dates.map((date) => ({ id: date, type: "call", date })) }] as never;
+
+  it("starts as a resting seed", () => {
+    expect(treeState([], now)).toMatchObject({ stage: 0, moments: 0, toNext: 1, leaves: 0, vitality: "resting" });
+  });
+
+  it("sprouts on the first moment and counts towards the next stage", () => {
+    const s = treeState(withMoments(["2026-10-14"]), now);
+    expect(s).toMatchObject({ stage: 1, toNext: 2, blossoms: 1, vitality: "growing" });
+  });
+
+  it("never shrinks when the user is away — it only rests", () => {
+    const old = Array.from({ length: 12 }, (_, i) => `2025-01-${String(i + 1).padStart(2, "0")}`);
+    const s = treeState(withMoments(old), now);
+    expect(s.stage).toBe(3);
+    expect(s.vitality).toBe("resting");
+    expect(s.blossoms).toBe(0);
+  });
+
+  it("thrives with three recent moments and caps at the last stage", () => {
+    const many = Array.from({ length: 60 }, (_, i) => `2026-${String(1 + Math.floor(i / 28)).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}`);
+    many.push("2026-10-10", "2026-10-12", "2026-10-14");
+    const s = treeState(withMoments(many), now);
+    expect(s).toMatchObject({ stage: 5, toNext: 0, progress: 1, vitality: "thriving" });
+  });
+});

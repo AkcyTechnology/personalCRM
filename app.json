@@ -5,14 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tugceulucn.personalCRM",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSContactsUsageDescription": "Seçtiğin kişileri Connectly'ye eklemek için rehberine erişiyoruz. Rehberin cihazından dışarı gönderilmez.",
-        "NSFaceIDUsageDescription": "Uygulama kilidini Face ID ile açabilmen için kullanılır."
+        "NSContactsUsageDescription": "Connectly reads your contacts only to add the people you choose. Your address book never leaves your phone.",
+        "NSFaceIDUsageDescription": "Used so you can unlock the app with Face ID.",
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {
@@ -44,7 +45,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Seçtiğin kişileri Connectly'ye eklemek için rehberine erişiyoruz. Rehberin cihazından dışarı gönderilmez."
+          "contactsPermission": "Connectly reads your contacts only to add the people you choose. Your address book never leaves your phone."
         }
       ],
       "expo-status-bar",
@@ -57,7 +58,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Uygulama kilidini Face ID ile açabilmen için kullanılır."
+          "faceIDPermission": "Used so you can unlock the app with Face ID."
         }
       ],
       [
@@ -67,7 +68,30 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-document-picker"
-    ]
+      "expo-document-picker",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.tugceulucn.personalCRM.ExpoWidgetsTarget",
+          "groupIdentifier": "group.com.tugceulucn.personalCRM",
+          "widgets": [
+            {
+              "name": "ConnectlyWidget",
+              "displayName": "Connectly",
+              "description": "Your bond tree and who to say hi to today.",
+              "supportedFamilies": [
+                "systemSmall",
+                "systemMedium"
+              ],
+              "contentMarginsDisabled": false
+            }
+          ]
+        }
+      ]
+    ],
+    "locales": {
+      "en": "./locales/en.json",
+      "tr": "./locales/tr.json"
+    }
   }
 }

@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
   },
-  upgradeBtnText: { color: colors.white, fontSize: 14, fontWeight: "900" },
+  upgradeBtnText: { color: colors.onFill, fontSize: 14, fontWeight: "900" },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "800",

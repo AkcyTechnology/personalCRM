@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "800", color: colors.text },
   sub: { fontSize: 15, color: colors.textSub, marginTop: 6, textAlign: "center" },
   btn: { marginTop: 28, backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
-  btnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
+  btnText: { color: colors.onFill, fontSize: 16, fontWeight: "700" },
 });

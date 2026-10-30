@@ -29,6 +29,7 @@ import { showToast } from "../components/Toast";
 import { hapticTap } from "../utils/haptics";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { track } from "../utils/analytics";
 import { t, tv } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Shuffle">;
@@ -61,6 +62,8 @@ export default function ShuffleScreen({ navigation }: Props) {
   const [logTarget, setLogTarget] = useState<{ contact: ContactForm; type: InteractionType } | null>(null);
   const pending = useRef<{ contact: ContactForm; type: InteractionType } | null>(null);
   const pan = useRef(new Animated.ValueXY()).current;
+  const crossed = useRef(false);
+  const move = useMemo(() => Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }), [pan]);
 
   useEffect(() => {
     Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
@@ -91,6 +94,7 @@ export default function ShuffleScreen({ navigation }: Props) {
   const flyOut = useCallback(
     (dir: "left" | "right" | "up", after: () => void) => {
       hapticTap();
+      track("shuffle_swipe", { dir });
       const to = dir === "left" ? { x: -width * 1.4, y: 0 } : dir === "right" ? { x: width * 1.4, y: 0 } : { x: 0, y: -900 };
       Animated.timing(pan, { toValue: to, duration: 220, useNativeDriver: true }).start(() => {
         after();
@@ -121,7 +125,16 @@ export default function ShuffleScreen({ navigation }: Props) {
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
-        onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+        onPanResponderGrant: () => { crossed.current = false; },
+        onPanResponderMove: (e, g) => {
+          // One tick when the card crosses the decision threshold, so the user feels it "lock in".
+          const over = Math.abs(g.dx) > 110 || g.dy < -110;
+          if (over !== crossed.current) {
+            crossed.current = over;
+            if (over) hapticTap();
+          }
+          move(e, g);
+        },
         onPanResponderRelease: (_, g) => {
           if (g.dx > 110) reachOut();
           else if (g.dx < -110) skip();
@@ -129,7 +142,7 @@ export default function ShuffleScreen({ navigation }: Props) {
           else Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }).start();
         },
       }),
-    [pan, reachOut, remindLater, skip]
+    [move, pan, reachOut, remindLater, skip]
   );
 
   const rotate = pan.x.interpolate({ inputRange: [-200, 0, 200], outputRange: ["-12deg", "0deg", "12deg"] });
@@ -189,7 +202,7 @@ export default function ShuffleScreen({ navigation }: Props) {
           <View style={[styles.actions, { paddingBottom: insets.bottom + 16 }]}>
             <RoundButton icon="close" color={colors.textSub} label={t("Şimdilik geç")} onPress={skip} />
             <RoundButton icon="alarm-outline" color={colors.warning} label={t("Bu hafta hatırlat")} onPress={remindLater} />
-            <RoundButton icon="chatbubble-ellipses" color={colors.white} bg={colors.primary} big label={t("Ulaş")} onPress={reachOut} />
+            <RoundButton icon="chatbubble-ellipses" color={colors.onFill} bg={colors.primary} big label={t("Ulaş")} onPress={reachOut} />
           </View>
         </>
       )}
@@ -235,7 +248,7 @@ function CardBody({ contact }: { contact: ContactForm }) {
   const reason = reasonFor(contact);
   const lastNote = [...(contact.interactions ?? [])].filter((i) => i.note).sort((a, b) => b.date.localeCompare(a.date))[0];
   return (
-    <LinearGradient colors={[colors.primarySoft, colors.white]} style={styles.cardInner}>
+    <LinearGradient colors={[colors.primarySoft, colors.surface]} style={styles.cardInner}>
       <Avatar name={contact.fullName} size={120} ringColor={colors.brand} />
       <Text style={styles.name} numberOfLines={1}>{contact.fullName}</Text>
       {contact.relationship ? <Text style={styles.relation}>{tv(contact.relationship)}</Text> : null}
@@ -268,7 +281,7 @@ function RoundButton({
     <View style={styles.roundWrap}>
       <TouchableOpacity
         onPress={onPress}
-        style={[styles.round, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg ?? colors.white }]}
+        style={[styles.round, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg ?? colors.surface }]}
         accessibilityRole="button"
         accessibilityLabel={label}
         activeOpacity={0.8}
@@ -292,8 +305,8 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     aspectRatio: 0.72,
     borderRadius: 28,
-    backgroundColor: colors.white,
-    shadowColor: "#000",
+    backgroundColor: colors.surface,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
@@ -329,7 +342,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: "#000",
+    shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },

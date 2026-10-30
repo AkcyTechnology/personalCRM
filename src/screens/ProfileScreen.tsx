@@ -9,6 +9,7 @@ import {
   Pressable,
   Platform,
   StatusBar,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -22,7 +23,9 @@ import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
-import { colors } from "../theme/colors";
+import { colors, colorScheme } from "../theme/colors";
+import { showToast } from "../components/Toast";
+import { hapticTap } from "../utils/haptics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TEAL      = colors.primary;
@@ -33,8 +36,8 @@ const TEXTSUB   = colors.textSub;
 const TEXTMUTED = colors.textMuted;
 const BORDER    = colors.border;
 const BORDER_SOFT = colors.borderLight;
-const BG        = colors.white;
-const CARD      = colors.white;
+const BG        = colors.bg;
+const CARD      = colors.surface;
 const DANGER    = colors.danger;
 
 const THRESHOLD_OPTIONS = [7, 14, 21, 30];
@@ -64,6 +67,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [languageOpen,   setLanguageOpen]   = useState(false);
   const [weeklyGoal,     setWeeklyGoal]     = useState(3);
   const [language,       setLanguage]       = useState<"system" | "tr" | "en">("system");
+  const [themeOpen,      setThemeOpen]      = useState(false);
+  const [theme,          setTheme]          = useState<"system" | "light" | "dark">("system");
+  const [haptics,        setHaptics]        = useState(true);
   const [goals,          setGoals]          = useState<string[]>([]);
   const [userName,       setUserName]       = useState("");
   const [email,          setEmail]          = useState("");
@@ -83,6 +89,8 @@ export default function ProfileScreen({ navigation }: any) {
         setGoals(s.goals || []);
         setWeeklyGoal(s.weeklyGoal || 3);
         setLanguage(s.language || "system");
+        setTheme(s.theme || "system");
+        setHaptics(s.haptics !== false);
         setContactsList(contacts);
         setTotalContacts(contacts.length);
         setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
@@ -268,6 +276,43 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setThemeOpen(true)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Görünüm: {theme}", { theme: themeLabel(theme) })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
+              <Ionicons name="contrast-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Görünüm")}</Text>
+              <Text style={styles.rowSub}>{themeLabel(theme)}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.rowItem, styles.rowBorder]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.warmSoft }]}>
+              <Ionicons name="pulse-outline" size={20} color={colors.warmStrong} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Titreşim")}</Text>
+              <Text style={styles.rowSub}>{t("Önemli anlarda hafif titreşim")}</Text>
+            </View>
+            <Switch
+              value={haptics}
+              onValueChange={async (v) => {
+                setHaptics(v);
+                await updateSettings({ haptics: v });
+                if (v) hapticTap();
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.white}
+              accessibilityLabel={t("Titreşim")}
+            />
+          </View>
 
           <TouchableOpacity
             style={[styles.rowItem, styles.rowBorder]}
@@ -306,7 +351,7 @@ export default function ProfileScreen({ navigation }: any) {
             activeOpacity={0.75}
             accessibilityRole="button"
           >
-            <View style={[styles.iconWrap, { backgroundColor: "#F0FDF4" }]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.successSoft }]}>
               <DownloadIcon />
             </View>
             <View style={styles.rowInfo}>
@@ -422,9 +467,37 @@ export default function ProfileScreen({ navigation }: any) {
         ))}
       </PickerModal>
 
+      <PickerModal
+        visible={themeOpen}
+        title={t("Görünüm")}
+        desc={t("Değişiklik uygulamayı yeniden açtığında uygulanır")}
+        onClose={() => setThemeOpen(false)}
+      >
+        {(["system", "light", "dark"] as const).map(code => (
+          <PickerOption
+            key={code}
+            label={themeLabel(code)}
+            active={theme === code}
+            onPress={async () => {
+              setThemeOpen(false);
+              setTheme(code);
+              await updateSettings({ theme: code });
+              const wanted = code === "system" ? null : code;
+              if (wanted && wanted !== colorScheme()) showToast(t("Uygulamayı yeniden açtığında uygulanacak"));
+            }}
+          />
+        ))}
+      </PickerModal>
+
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
+}
+
+function themeLabel(code: "system" | "light" | "dark") {
+  if (code === "light") return t("Açık");
+  if (code === "dark") return t("Koyu");
+  return t("Telefonun ayarı");
 }
 
 function languageLabel(code: "system" | "tr" | "en") {
@@ -605,7 +678,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderLight,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
       android: { elevation: 2 },
     }),
   },
@@ -636,7 +709,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 12, paddingVertical: 12,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
   statValue: { fontSize: 22, fontWeight: "700", color: TEXT },
@@ -649,7 +722,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, padding: 14,
     marginBottom: 4,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
   healthLeft: { flex: 1, marginRight: 16 },
@@ -675,7 +748,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 16,
     borderWidth: 1, borderColor: BORDER, overflow: "hidden",
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.03, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
     }),
   },
 
@@ -713,14 +786,14 @@ const styles = StyleSheet.create({
 
   // Modal
   overlay: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.28)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalBox: {
     width: "100%", maxWidth: 380,
     backgroundColor: CARD, borderRadius: 18, padding: 22,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
       android: { elevation: 12 },
     }),
   },

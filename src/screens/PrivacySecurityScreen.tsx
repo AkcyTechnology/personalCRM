@@ -11,6 +11,7 @@ import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { infoDialog } from "../utils/confirm";
 import { t } from "../i18n";
+import { analyticsAvailable } from "../utils/analytics";
 
 const BG = colors.bg;
 const CARD = colors.card;
@@ -24,10 +25,14 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export default function PrivacySecurityScreen({ navigation }: any) {
   const [appLock, setAppLock] = useState(false);
   const [lockSupported, setLockSupported] = useState(true);
+  const [analytics, setAnalytics] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      loadSettings().then((s) => setAppLock(s.appLockEnabled));
+      loadSettings().then((s) => {
+        setAppLock(s.appLockEnabled);
+        setAnalytics(s.analytics === true);
+      });
       canUseAppLockAsync().then(setLockSupported);
     }, [])
   );
@@ -82,6 +87,33 @@ export default function PrivacySecurityScreen({ navigation }: any) {
             />
           </View>
         </View>
+
+        {analyticsAvailable() ? (
+          <>
+            <Text style={styles.sectionLabel}>{t("GELİŞTİRMEYE YARDIM")}</Text>
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <Ionicons name="analytics-outline" size={20} color={colors.primary} style={styles.rowIcon} />
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowLabel}>{t("Anonim kullanım istatistikleri")}</Text>
+                  <Text style={styles.rowDesc}>
+                    {t("Hangi özelliklerin kullanıldığını sayar. Kişilerin ve notların asla gönderilmez.")}
+                  </Text>
+                </View>
+                <Switch
+                  value={analytics}
+                  onValueChange={async (v) => {
+                    setAnalytics(v);
+                    await updateSettings({ analytics: v, analyticsAsked: true });
+                  }}
+                  trackColor={{ false: BORDER, true: colors.primary }}
+                  thumbColor={colors.white}
+                  accessibilityLabel={t("Anonim kullanım istatistikleri")}
+                />
+              </View>
+            </View>
+          </>
+        ) : null}
 
         <Text style={styles.sectionLabel}>{t("VERİLERİM")}</Text>
         <View style={styles.card}>

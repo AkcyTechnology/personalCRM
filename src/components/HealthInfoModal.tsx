@@ -28,7 +28,7 @@ export default function HealthInfoModal({ visible, onClose }: Props) {
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.4)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   box: {
@@ -41,5 +41,5 @@ const styles = StyleSheet.create({
     height: 48, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
   },
-  closeBtnText: { fontSize: 14, fontWeight: "700", color: colors.white },
+  closeBtnText: { fontSize: 14, fontWeight: "700", color: colors.onFill },
 });

@@ -634,14 +634,14 @@ const SOFT = colors.card;
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
 
   appBar: {
     paddingTop: TOP_SAFE,
     paddingHorizontal: 18,
     paddingBottom: 14,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
     flexDirection: "row",
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
   },
 
   cardPreview: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
 
   cardLineLabel: {
     fontSize: 11.5,
-    color: "#8A93A5",
+    color: colors.textMuted,
     fontWeight: "600",
   },
 
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     padding: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -852,12 +852,12 @@ const styles = StyleSheet.create({
   },
 
   qrModalOverlay: {
-    flex: 1, backgroundColor: "rgba(10,8,30,0.5)",
+    flex: 1, backgroundColor: colors.overlay,
     alignItems: "center", justifyContent: "center", padding: 24,
   },
   qrModalBox: {
     width: "100%", maxWidth: 340,
-    backgroundColor: colors.white, borderRadius: 24, padding: 24,
+    backgroundColor: colors.surface, borderRadius: 24, padding: 24,
     alignItems: "center",
   },
   qrModalTitle: { fontSize: 17, fontWeight: "700", color: TEXT, textAlign: "center" },
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
   qrModalCodeWrap: {
     marginTop: 20, padding: 16,
     borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
   qrModalClose: {
     marginTop: 20, width: "100%", height: 48,
@@ -890,13 +890,13 @@ const styles = StyleSheet.create({
   },
 
   actionButtonLight: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: BORDER,
   },
 
   actionButtonText: {
-    color: colors.white,
+    color: colors.onFill,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     fontSize: 14,
     color: TEXT,
@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     padding: 16,
   },
 
@@ -1134,7 +1134,7 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
-    color: colors.white,
+    color: colors.onFill,
     fontSize: 15,
     fontWeight: "700",
   },

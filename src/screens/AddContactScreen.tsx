@@ -36,13 +36,14 @@ import {
   addCustomRelationship,
   removeCustomRelationship,
 } from "../data/relationshipTypes";
-import { colors } from "../theme/colors";
+import { colors, colorScheme } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { radius } from "../theme/radius";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { showToast } from "../components/Toast";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { confirmDialog, infoDialog } from "../utils/confirm";
+import { track } from "../utils/analytics";
 import { t, tv } from "../i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -272,6 +273,7 @@ export default function AddContactScreen({ navigation }: Props) {
         ...(form.instagram.trim() ? [{ platform: "Instagram", handle: form.instagram.trim() }] : []),
         ...form.socials.filter((x) => x.handle.trim()),
       ];
+      track("contact_added", { source: "manual" });
       await addContact({
         ...form,
         fullName: form.fullName.trim(),
@@ -322,7 +324,7 @@ export default function AddContactScreen({ navigation }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      <StatusBar barStyle={colorScheme() === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
 
       {/* App bar */}
       <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
@@ -1082,7 +1084,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 4,
@@ -1171,7 +1173,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderLight,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -1190,7 +1192,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   saveBtnOff: { backgroundColor: colors.primary + "55" },
-  saveBtnText: { fontSize: 15, fontWeight: "800", color: colors.white, letterSpacing: 0.2 },
+  saveBtnText: { fontSize: 15, fontWeight: "800", color: colors.onFill, letterSpacing: 0.2 },
 
   // Modal
   overlay: {
@@ -1203,7 +1205,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.14,
         shadowRadius: 20,
@@ -1217,7 +1219,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  modalPrimaryText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  modalPrimaryText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   modalSecondary: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.dangerSoft, borderWidth: 1, borderColor: colors.danger + "50",
@@ -1241,7 +1243,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   manageAddBtnOff: { backgroundColor: colors.primary + "55" },
-  manageAddBtnText: { color: colors.white, fontSize: 14, fontWeight: "700" },
+  manageAddBtnText: { color: colors.onFill, fontSize: 14, fontWeight: "700" },
   manageList: { width: "100%", marginBottom: 14 },
   manageListRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -1261,7 +1263,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg, borderRadius: radius.modal, padding: 20,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.14,
         shadowRadius: 20,

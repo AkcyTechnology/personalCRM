@@ -14,7 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { loadContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm } from "./AddContactScreen";
-import { colors } from "../theme/colors";
+import { categorical, colors } from "../theme/colors";
 import { isDue, isSnoozed, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
 import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
 import HealthInfoModal from "../components/HealthInfoModal";
@@ -26,7 +26,7 @@ const TEXT = colors.text;
 const SUB = colors.textSub;
 const MUTED = colors.textMuted;
 const BORDER = colors.borderLight;
-const WHITE = colors.white;
+const WHITE = colors.surface;
 
 type InsightTone = "teal" | "green" | "amber" | "red" | "blue" | "purple";
 
@@ -54,7 +54,7 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const palette = [TEAL, colors.accent, "#0369A1", colors.success, colors.warning];
+  const palette = categorical();
 
   let h = 0;
   for (const c of name) h += c.charCodeAt(0);
@@ -122,7 +122,7 @@ function toneColor(tone: InsightTone) {
     green: colors.success,
     amber: colors.warning,
     red: colors.danger,
-    blue: "#0369A1",
+    blue: colors.warm,
     purple: colors.accent,
   };
 
@@ -400,7 +400,7 @@ export default function InsightsScreen({ navigation, embedded }: any) {
                   label={label}
                   count={count}
                   total={contacts.length}
-                  color={[TEAL, "#0369A1", colors.success, colors.warning, colors.accent][i % 5]}
+                  color={categorical()[i % 6]}
                   last={i === data.relationshipMix.length - 1}
                 />
               ))}
@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     borderRadius: 39,
     backgroundColor: colors.primarySoft,
     borderWidth: 8,
-    borderColor: "#D9F3F1",
+    borderColor: colors.primaryBorder,
     alignItems: "center",
     justifyContent: "center",
   },

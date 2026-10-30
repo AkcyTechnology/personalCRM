@@ -266,7 +266,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               accessibilityRole="button"
               accessibilityLabel={t("Yeni kişi ekle")}
             >
-              <Ionicons name="add" size={24} color={colors.white} />
+              <Ionicons name="add" size={24} color={colors.onFill} />
             </TouchableOpacity>
           </View>
         )}
@@ -333,7 +333,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                 >
-                  <Ionicons name={f.icon} size={15} color={active ? colors.white : colors.textSub} />
+                  <Ionicons name={f.icon} size={15} color={active ? colors.onFill : colors.textSub} />
                   <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>{t(f.label)}</Text>
                 </TouchableOpacity>
               );
@@ -448,7 +448,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                       accessibilityRole="button"
                       accessibilityLabel={t("{name} ile görüştüm", { name: item.fullName })}
                     >
-                      <Ionicons name="checkmark-circle" size={22} color={colors.white} />
+                      <Ionicons name="checkmark-circle" size={22} color={colors.onFill} />
                       <Text style={styles.swipeText}>{t("Görüştüm")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -457,7 +457,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                       accessibilityRole="button"
                       accessibilityLabel={t("{name} hatırlatmasını ertele", { name: item.fullName })}
                     >
-                      <Ionicons name="alarm" size={22} color={colors.white} />
+                      <Ionicons name="alarm" size={22} color={colors.onFill} />
                       <Text style={styles.swipeText}>{t("Ertele")}</Text>
                     </TouchableOpacity>
                   </View>
@@ -600,7 +600,7 @@ function PersonCard({
       {/* Selection checkbox */}
       {selectMode && (
         <View style={[styles.checkbox, selected && styles.checkboxOn]}>
-          {selected ? <Ionicons name="checkmark" size={16} color={colors.white} /> : null}
+          {selected ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : null}
         </View>
       )}
 
@@ -676,23 +676,23 @@ const styles = StyleSheet.create({
   },
   statusChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   statusChipText: { fontSize: 14, fontWeight: "700", color: colors.textSub },
-  statusChipTextActive: { color: colors.white },
+  statusChipTextActive: { color: colors.onFill },
   swipeActions: { flexDirection: "row" },
   swipeBtn: { width: 92, alignItems: "center", justifyContent: "center", gap: 4 },
-  swipeText: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  swipeText: { color: colors.onFill, fontSize: 13, fontWeight: "800" },
   skeletonRow: { height: 72, borderRadius: 16, backgroundColor: colors.borderLight },
-  root: { flex: 1, backgroundColor: colors.white },
+  root: { flex: 1, backgroundColor: colors.surface },
 
   // ── Header ──
   header: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     paddingHorizontal: 20,
     paddingBottom: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderLight,
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     paddingHorizontal: 4,
     paddingVertical: 13,
     gap: 13,
@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 14,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+      ios: { shadowColor: colors.shadow, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
       android: { elevation: 6 },
     }),
   },
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderLight,
   },
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   deleteBtnOff: { backgroundColor: colors.danger + "55" },
-  deleteBtnText: { color: colors.white, fontSize: 15, fontWeight: "700" },
+  deleteBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
 
   // ── Delete confirm modal ──
   confirmBox: {
@@ -932,7 +932,7 @@ const styles = StyleSheet.create({
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.danger, alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  confirmDeleteBtnText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  confirmDeleteBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 15 },
   confirmCancelBtn: {
     width: "100%", height: 50, borderRadius: radius.button,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
@@ -943,11 +943,11 @@ const styles = StyleSheet.create({
   // ── Bottom sheet ──
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(10,8,30,0.38)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
   },
   sheetChipActive: { backgroundColor: TEAL, borderColor: TEAL },
   sheetChipText: { fontSize: 13, fontWeight: "600", color: TEXTSUB },
-  sheetChipTextActive: { color: colors.white },
+  sheetChipTextActive: { color: colors.onFill },
   sheetRow: {
     flexDirection: "row",
     alignItems: "center",

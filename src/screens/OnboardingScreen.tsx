@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: {
-    color: colors.white,
+    color: colors.onFill,
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.2,

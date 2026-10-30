@@ -17,11 +17,12 @@ import { loadSettings, saveSettings } from "../data/userSettings";
 import { GOALS } from "../data/goals";
 import { colors } from "../theme/colors";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
+import { track } from "../utils/analytics";
 import { t } from "../i18n";
 
 const PURPLE = colors.primary;
 const BG     = colors.card;
-const CARD   = colors.white;
+const CARD   = colors.surface;
 const BORDER = colors.border;
 const TEXT   = colors.text;
 const MUTED  = colors.textSub;
@@ -129,6 +130,7 @@ export default function OnboardingFlowScreen({ navigation }: any) {
       defaultContactIntervalDays: intervalDays ?? undefined,
       onboardingComplete: true,
     });
+    track("onboarding_completed", { goals: purposes.length });
     navigation.replace("MainTabs");
   };
 
@@ -388,7 +390,7 @@ const s = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.45 },
   btn: { height: 56, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  btnText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  btnText: { color: colors.onFill, fontSize: 16, fontWeight: "800" },
 
   // Goals / purpose list
   goalsList: { width: "100%", gap: 10, marginBottom: 16, marginTop: 4 },
@@ -400,7 +402,7 @@ const s = StyleSheet.create({
   goalRowActive: { borderColor: PURPLE, backgroundColor: colors.primarySoft },
   goalIcon: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: "#F0EDF9", alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center",
   },
   goalIconActive: { backgroundColor: colors.primarySoft },
   goalEmoji: { fontSize: 20 },
@@ -412,7 +414,7 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   goalCheckActive: { backgroundColor: PURPLE, borderColor: PURPLE },
-  goalCheckMark: { color: colors.white, fontSize: 12, fontWeight: "900" },
+  goalCheckMark: { color: colors.onFill, fontSize: 12, fontWeight: "900" },
 
   // Field labels
   fieldWrap: { width: "100%", marginBottom: 16 },

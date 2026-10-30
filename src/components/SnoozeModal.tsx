@@ -161,5 +161,5 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   confirmBtnOff: { backgroundColor: colors.primary + "55" },
-  confirmBtnText: { fontSize: 14, fontWeight: "700", color: colors.white },
+  confirmBtnText: { fontSize: 14, fontWeight: "700", color: colors.onFill },
 });

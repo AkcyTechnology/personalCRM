@@ -10,9 +10,9 @@ import { setLanguage, t } from "../src/i18n";
 const CONSTS = new Set([
   "DEFAULT_RELATIONSHIPS", "MET_WHERE", "PRIORITIES", "LAST_CONTACT_OPTIONS", "SUGGESTED_TAGS",
   "CUSTOM_INTERVAL", "INTERVAL_PRESETS", "PRESETS", "CUSTOM", "INTERACTION_TYPES", "STATUS_FILTERS",
-  "SORT_OPTIONS", "GOALS", "TONE_LABELS", "PRIVACY", "TERMS", "SLIDES", "BETA_FEATURES", "LATER", "OTHER",
+  "SORT_OPTIONS", "GOALS", "TONE_LABELS", "PRIVACY", "TERMS", "SLIDES", "BETA_FEATURES", "LATER", "OTHER", "TREE_STAGES",
 ]);
-const DISPLAY_PROPS = new Set(["label", "short", "title", "desc", "btn", "body"]);
+const DISPLAY_PROPS = new Set(["label", "short", "title", "desc", "btn", "body", "name"]);
 
 function collectKeys(): Set<string> {
   const keys = new Set<string>(["Tümü", "Diğer", "İyi", "Dikkat", "Zayıf"]);

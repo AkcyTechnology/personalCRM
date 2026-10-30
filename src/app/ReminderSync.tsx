@@ -12,6 +12,7 @@ import {
 import { navigationRef } from "../navigation/navigationRef";
 import { addDays, toISODate } from "../utils/dates";
 import { showToast } from "../components/Toast";
+import { track } from "../utils/analytics";
 import { t } from "../i18n";
 
 async function resyncNow() {
@@ -56,6 +57,7 @@ export default function ReminderSync() {
     const handle = async (response: import("expo-notifications").NotificationResponse) => {
       const data = response.notification.request.content.data as { contactId?: string } | undefined;
       const contactId = data?.contactId;
+      track("reminder_opened", { action: response.actionIdentifier === ACTION_CONTACTED ? "contacted" : response.actionIdentifier === ACTION_SNOOZE ? "snooze" : "open" });
       if (response.actionIdentifier === ACTION_CONTACTED && contactId) {
         await markContacted(contactId, "other");
         showToast(t("Görüşme kaydedildi"));

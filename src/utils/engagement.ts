@@ -270,3 +270,52 @@ export function relationshipJourney(c: ContactForm): Journey {
   };
 }
 
+
+// ── Bond tree ─────────────────────────────────────────────────────────────────
+
+/** Stage thresholds in total moments. Early stages come fast so the first week feels alive. */
+export const TREE_STAGES = [
+  { at: 0, name: "Tohum" },
+  { at: 1, name: "Filiz" },
+  { at: 3, name: "Fidan" },
+  { at: 10, name: "Genç ağaç" },
+  { at: 25, name: "Ağaç" },
+  { at: 50, name: "Çiçek açan ağaç" },
+] as const;
+
+export type TreeVitality = "resting" | "growing" | "thriving";
+
+export type TreeState = {
+  /** 0…5, index into TREE_STAGES. Never goes down: the tree can rest but not die. */
+  stage: number;
+  moments: number;
+  /** Moments still needed for the next stage (0 at the last stage). */
+  toNext: number;
+  /** 0…1 progress inside the current stage. */
+  progress: number;
+  /** One leaf per moment, capped so the drawing stays readable. */
+  leaves: number;
+  /** One blossom per person you connected with this week. */
+  blossoms: number;
+  vitality: TreeVitality;
+};
+
+export function treeState(contacts: ContactForm[], now: Date = new Date()): TreeState {
+  const moments = allMoments(contacts);
+  const total = moments.length;
+  let stage = 0;
+  TREE_STAGES.forEach((s, i) => { if (total >= s.at) stage = i; });
+  const cur = TREE_STAGES[stage].at;
+  const next = TREE_STAGES[stage + 1]?.at;
+  const since = toISODate(addDays(now, -14));
+  const recent = moments.filter((m) => m.date >= since && m.date <= toISODate(now)).length;
+  return {
+    stage,
+    moments: total,
+    toNext: next === undefined ? 0 : next - total,
+    progress: next === undefined ? 1 : (total - cur) / (next - cur),
+    leaves: Math.min(total, 60),
+    blossoms: Math.min(peopleThisWeek(contacts, now), 7),
+    vitality: recent === 0 ? "resting" : recent >= 3 ? "thriving" : "growing",
+  };
+}

@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
-import { colors } from "../theme/colors";
+import { categorical } from "../theme/colors";
 
-const PALETTE = [colors.primary, "#2563EB", colors.success, colors.warning, "#0E7490", colors.accent];
+const PALETTE = categorical();
 
 export function initials(name?: string) {
   return (

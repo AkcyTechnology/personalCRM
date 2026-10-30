@@ -7,6 +7,7 @@ import { wipeSecureStorage } from "../storage/secureStorage";
 import { cancelAllRemindersAsync } from "../utils/notifications";
 import { isDuplicateContact } from "../utils/duplicateContact";
 import { todayISO } from "../utils/dates";
+import { resetAnalytics } from "../utils/analytics";
 import { t } from "../i18n";
 
 const FORMAT = "connectly-backup";
@@ -179,6 +180,7 @@ export async function restoreBackupAsync(backup: BackupFile, mode: "merge" | "re
 export async function wipeAllDataAsync(): Promise<void> {
   await cancelAllRemindersAsync();
   await wipeSecureStorage();
+  resetAnalytics();
   // Açık ekranlar ve uygulama kilidi sıfırlanan ayarları duysun
   await updateSettings({ appLockEnabled: false });
 }

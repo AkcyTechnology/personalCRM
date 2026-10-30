@@ -93,7 +93,7 @@ export default function LogInteractionModal({ visible, contactName, initialType 
               accessibilityRole="button"
               accessibilityLabel={t("Görüşmeyi kaydet")}
             >
-              <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.onFill} />
               <Text style={styles.saveText}>{t("Kaydet")}</Text>
             </TouchableOpacity>
           </Pressable>
@@ -104,7 +104,7 @@ export default function LogInteractionModal({ visible, contactName, initialType 
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(17,24,39,0.45)", justifyContent: "flex-end" },
+  backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34 },
   handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 14 },
   title: { fontSize: 19, fontWeight: "800", color: colors.text },
@@ -126,5 +126,5 @@ const styles = StyleSheet.create({
     marginTop: 16, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
     backgroundColor: colors.primary, paddingVertical: 15, borderRadius: 14,
   },
-  saveText: { color: colors.white, fontSize: 16, fontWeight: "700" },
+  saveText: { color: colors.onFill, fontSize: 16, fontWeight: "700" },
 });

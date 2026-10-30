@@ -780,4 +780,54 @@ export const en: Record<string, string | [string, string]> = {
   "Değişiklikler ve uygulanacak hukuk": "Changes and governing law",
   "Bu şartlar güncellenebilir; güncel sürüm her zaman uygulama içinde yer alır. Şartlar Türkiye Cumhuriyeti hukukuna tabidir.":
     "These terms may be updated; the current version is always available in the app. The terms are governed by the laws of the Republic of Türkiye.",
+
+  // ── Bond tree, rewards ──
+  "Bağ ağacın": "Your bond tree",
+  "Tohum": "Seed",
+  "Filiz": "Sprout",
+  "Fidan": "Sapling",
+  "Genç ağaç": "Young tree",
+  "Ağaç": "Tree",
+  "Çiçek açan ağaç": "Blossoming tree",
+  "İlk anını kaydet, tohum filizlensin 🌱": "Log your first moment and the seed will sprout 🌱",
+  "Ağacın dinleniyor. Bir an onu uyandırır 🌙": "Your tree is resting. One moment wakes it up 🌙",
+  "Ağacın ışıl ışıl ✨": "Your tree is glowing ✨",
+  "Ağacın büyüyor 🌿": "Your tree is growing 🌿",
+  "Bağ ağacın: {stage}. {moments} an. {status}": "Your bond tree: {stage}. {moments} moments. {status}",
+  "Ağacın nasıl büyüdüğünü gösterir": "Shows how your tree grows",
+  "{count} an daha ve ağacın büyüyecek": ["{count} more moment and your tree will grow", "{count} more moments and your tree will grow"],
+  "Ağacın en güzel halinde 🌸": "Your tree is in full bloom 🌸",
+  "Bu hafta {count} çiçek açtı": ["{count} blossom opened this week", "{count} blossoms opened this week"],
+  "Bağ ağacın nasıl büyür?": "How does your bond tree grow?",
+  "Kaydettiğin her an ağacına bir yaprak ekler. Bu hafta konuştuğun her kişi bir çiçek açtırır. Ağacın asla solmaz; sen uzaktayken sadece dinlenir.":
+    "Every moment you log adds a leaf. Everyone you talk to this week makes a flower bloom. Your tree never wilts; while you're away it just rests.",
+  "{count} an": ["{count} moment", "{count} moments"],
+  "ulaşıldı": "reached",
+  "Ağacın büyüdü: {stage} 🌳": "Your tree grew: {stage} 🌳",
+  "Ağacına yeni bir yaprak eklendi 🍃": "A new leaf on your tree 🍃",
+  "Bu hafta {count} kişiyle bağ kurdun": ["You connected with {count} person this week", "You connected with {count} people this week"],
+  "Bugün birinin gününü güzelleştirdin ☀️": "You made someone's day today ☀️",
+  "Küçük anlar, büyük bağlar 💛": "Small moments, big bonds 💛",
+
+  // ── Analytics consent ──
+  "Connectly'yi birlikte geliştirelim mi?": "Help us make Connectly better?",
+  "Hangi özelliklerin işe yaradığını anlamak için anonim kullanım istatistikleri toplamak istiyoruz. Kişilerin, notların ve telefon numaraları asla gönderilmez. İstediğin zaman Gizlilik'ten kapatabilirsin.":
+    "We'd like to collect anonymous usage statistics to learn which features help. Your contacts, notes and phone numbers are never sent. You can turn this off any time in Privacy.",
+  "Evet, yardım edeyim": "Yes, happy to help",
+  "Hayır, teşekkürler": "No, thanks",
+  "GELİŞTİRMEYE YARDIM": "HELP IMPROVE",
+  "Anonim kullanım istatistikleri": "Anonymous usage statistics",
+  "Hangi özelliklerin kullanıldığını sayar. Kişilerin ve notların asla gönderilmez.": "Counts which features are used. Your contacts and notes are never sent.",
+
+  // ── Appearance, haptics ──
+  "Görünüm": "Appearance",
+  "Görünüm: {theme}": "Appearance: {theme}",
+  "Açık": "Light",
+  "Koyu": "Dark",
+  "Telefonun ayarı": "Phone setting",
+  "Değişiklik uygulamayı yeniden açtığında uygulanır": "Takes effect the next time you open the app",
+  "Uygulamayı yeniden açtığında uygulanacak": "Will apply when you reopen the app",
+  "Titreşim": "Haptics",
+  "Önemli anlarda hafif titreşim": "Gentle vibration at key moments",
+  "Bugün kime merhaba diyeceksin?": "Who will you say hi to today?",
 };

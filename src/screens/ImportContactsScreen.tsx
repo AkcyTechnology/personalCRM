@@ -20,10 +20,11 @@ import { todayISO } from "../utils/dates";
 import { ensureNotificationPermissionAsync } from "../utils/notifications";
 import type { ContactForm } from "./AddContactScreen";
 import { isDuplicateContact } from "../utils/duplicateContact";
-import { colors } from "../theme/colors";
+import { categorical, colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
 import { t } from "../i18n";
+import { bucket, track } from "../utils/analytics";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 function initials(name: string) {
@@ -36,7 +37,7 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const palette = [colors.primary, colors.accent, "#0369A1", colors.success, colors.warning];
+  const palette = categorical();
   let h = 0;
   for (const c of name) h += c.charCodeAt(0);
   return palette[h % palette.length];
@@ -119,6 +120,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
     setSaving(true);
     try {
       const toAdd = deviceContacts.filter((dc) => selectedIds.has(dc.id));
+      track("contacts_imported", { count: bucket(toAdd.length) });
       const today = todayISO();
       await addContacts(
         toAdd.map((dc): ContactForm => ({
@@ -249,7 +251,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
                     </View>
                   ) : (
                     <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                      {isSelected ? <Ionicons name="checkmark" size={16} color={colors.white} /> : null}
+                      {isSelected ? <Ionicons name="checkmark" size={16} color={colors.onFill} /> : null}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -265,7 +267,7 @@ export default function ImportContactsScreen({ navigation }: Props) {
               disabled={selectedIds.size === 0 || saving}
             >
               {saving ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color={colors.onFill} />
               ) : (
                 <Text style={styles.addBtnText}>
                   {selectedIds.size > 0
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkboxTick: { color: colors.white, fontSize: 14, fontWeight: "800" },
+  checkboxTick: { color: colors.onFill, fontSize: 14, fontWeight: "800" },
 
   bottomBar: {
     position: "absolute",
@@ -370,5 +372,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addBtnOff: { backgroundColor: colors.primary + "55" },
-  addBtnText: { color: colors.white, fontSize: 15, fontWeight: "700" },
+  addBtnText: { color: colors.onFill, fontSize: 15, fontWeight: "700" },
 });
