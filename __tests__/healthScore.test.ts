@@ -22,9 +22,13 @@ describe("healthScore", () => {
     expect(healthScore(c({ lastContactDate: daysAgo(60), snoozedUntil: "2999-01-01" }), 14)).toBe(100);
   });
 
-  it("ignores contacts without any date and does not start new users at 0", () => {
-    expect(averageHealthScore([], 14)).toBe(100);
-    expect(averageHealthScore([c({}), c({ lastContactDate: daysAgo(0) })], 14)).toBe(100);
+  it("returns no score instead of a flattering 100 when there is not enough data", () => {
+    expect(averageHealthScore([], 14)).toBeNull();
+    // An imported contact has only a reminder start date — not a recorded contact.
+    const imported = c({ reminderIntervalStart: daysAgo(0) });
+    expect(healthScore(imported, 14)).toBeNull();
+    expect(averageHealthScore([imported, imported, imported, c({ lastContactDate: daysAgo(0) })], 14)).toBeNull();
+    expect(averageHealthScore([1, 2, 3].map((d) => c({ lastContactDate: daysAgo(d) })), 14)).not.toBeNull();
   });
 
   it("one overdue contact among healthy ones is not a failing score", () => {

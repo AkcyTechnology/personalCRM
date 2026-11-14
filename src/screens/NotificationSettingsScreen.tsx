@@ -5,7 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
+  TouchableOpacity,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
@@ -21,6 +23,11 @@ export default function NotificationSettingsScreen({ navigation }: any) {
   const [followUp, setFollowUp] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [smartNudge, setSmartNudge] = useState(true);
+  const [dailySummary, setDailySummary] = useState(false);
+  const [hour, setHour] = useState(10);
+  const [quiet, setQuiet] = useState(true);
+  const [quietStart, setQuietStart] = useState(22);
+  const [quietEnd, setQuietEnd] = useState(8);
   const [loaded, setLoaded] = useState(false);
   const [permissionModalOpen, setPermissionModalOpen] = useState(false);
 
@@ -31,12 +38,17 @@ export default function NotificationSettingsScreen({ navigation }: any) {
         setFollowUp(s.notif_followUp);
         setWeeklySummary(s.notif_weeklySummary);
         setSmartNudge(s.notif_smartNudge);
+        setDailySummary(s.notif_dailySummary);
+        setHour(s.notifyHour);
+        setQuiet(s.quietHoursEnabled);
+        setQuietStart(s.quietStart);
+        setQuietEnd(s.quietEnd);
         setLoaded(true);
       });
     }, [])
   );
 
-  const save = async (key: string, val: boolean) => {
+  const save = async (key: string, val: boolean | number) => {
     const current = await loadSettings();
     await saveSettings({ ...current, [key]: val });
   };
@@ -70,6 +82,13 @@ export default function NotificationSettingsScreen({ navigation }: any) {
   const handleFollowUp = (v: boolean) => toggleWithPermission(v, setFollowUp, "notif_followUp");
   const handleWeeklySummary = (v: boolean) => toggleWithPermission(v, setWeeklySummary, "notif_weeklySummary");
   const handleSmartNudge = (v: boolean) => toggleWithPermission(v, setSmartNudge, "notif_smartNudge");
+  const handleDailySummary = (v: boolean) => toggleWithPermission(v, setDailySummary, "notif_dailySummary");
+  const wrap = (h: number) => (h + 24) % 24;
+  const stepHour = (setter: (v: number) => void, key: string, current: number, delta: number) => {
+    const next = wrap(current + delta);
+    setter(next);
+    save(key, next);
+  };
 
   if (!loaded) return <View style={styles.screen}><AppHeader type="settings" centerTitle={t("Bildirim Ayarları")} onBack={() => navigation.goBack()} /></View>;
 
@@ -88,8 +107,8 @@ export default function NotificationSettingsScreen({ navigation }: any) {
 
         <View style={styles.card}>
           <SwitchRow
-            label={t("Doğum günü hatırlatıcısı")}
-            desc={t("Kişilerin doğum günlerinden 1 gün önce bildirim al")}
+            label={t("Doğum günü ve özel günler")}
+            desc={t("Doğum gününden bir gün önce ve o gün; kaydettiğin özel günlerde de")}
             value={birthday}
             onChange={handleBirthday}
           />
@@ -109,19 +128,50 @@ export default function NotificationSettingsScreen({ navigation }: any) {
           />
         </View>
 
+        <Text style={styles.sectionLabel}>{t("ZAMANLAMA")}</Text>
+
+        <View style={styles.card}>
+          <HourRow
+            label={t("Bildirim saati")}
+            desc={t("Otomatik hatırlatmalar bu saatte gelir")}
+            hour={hour}
+            onStep={(d) => stepHour(setHour, "notifyHour", hour, d)}
+          />
+          <SwitchRow
+            label={t("Sessiz saatler")}
+            desc={t("Bu aralıkta otomatik bildirim gönderilmez; senin saatini seçtiğin hatırlatıcılar etkilenmez")}
+            value={quiet}
+            onChange={(v) => { setQuiet(v); save("quietHoursEnabled", v); }}
+            border
+          />
+          {quiet ? (
+            <>
+              <HourRow label={t("Başlangıç")} hour={quietStart} onStep={(d) => stepHour(setQuietStart, "quietStart", quietStart, d)} border />
+              <HourRow label={t("Bitiş")} hour={quietEnd} onStep={(d) => stepHour(setQuietEnd, "quietEnd", quietEnd, d)} border />
+            </>
+          ) : null}
+        </View>
+
         <Text style={styles.sectionLabel}>{t("ÖZET")}</Text>
 
         <View style={styles.card}>
           <SwitchRow
+            label={t("Günlük özet")}
+            desc={t("Her gün bildirim saatinde kısa bir hatırlatma")}
+            value={dailySummary}
+            onChange={handleDailySummary}
+          />
+          <SwitchRow
             label={t("Haftalık özet")}
-            desc={t("Her pazartesi ilişki sağlığı özetini al")}
+            desc={t("Her pazartesi sabahı haftaya kısa bir bakış")}
             value={weeklySummary}
             onChange={handleWeeklySummary}
+            border
           />
         </View>
 
         <Text style={styles.hint}>
-          {t("Bildirimler için cihaz izinleri gerekir. Ayarlar › Bildirimler bölümünden yönetebilirsin.")}
+          {t("Bildirimler için cihaz izni gerekir. Bildirimlerin tam dakikasında gelmesi telefonun pil ve odak ayarlarına bağlıdır. İzin vermesen de hatırlatmalar uygulama içinde görünür.")}
         </Text>
       </ScrollView>
 
@@ -131,6 +181,30 @@ export default function NotificationSettingsScreen({ navigation }: any) {
         description={t("Hatırlatıcılar için bildirim gönderebilmemiz için bildirim iznine izin vermelisin.")}
         onClose={() => setPermissionModalOpen(false)}
       />
+    </View>
+  );
+}
+
+function HourRow({ label, desc, hour, onStep, border }: { label: string; desc?: string; hour: number; onStep: (delta: number) => void; border?: boolean }) {
+  const text = `${String(hour).padStart(2, "0")}:00`;
+  return (
+    <View style={[styles.switchRow, border && styles.borderTop]} accessible accessibilityRole="adjustable" accessibilityLabel={`${label}, ${text}`}
+      accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+      onAccessibilityAction={(e) => onStep(e.nativeEvent.actionName === "increment" ? 1 : -1)}
+    >
+      <View style={styles.switchInfo}>
+        <Text style={styles.switchLabel}>{label}</Text>
+        {desc ? <Text style={styles.switchDesc}>{desc}</Text> : null}
+      </View>
+      <View style={styles.stepper}>
+        <TouchableOpacity style={styles.stepBtn} onPress={() => onStep(-1)} accessibilityLabel={t("Bir saat erken")} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Ionicons name="remove" size={18} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={styles.stepValue}>{text}</Text>
+        <TouchableOpacity style={styles.stepBtn} onPress={() => onStep(1)} accessibilityLabel={t("Bir saat geç")} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Ionicons name="add" size={18} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -199,6 +273,9 @@ const styles = StyleSheet.create({
   switchInfo: { flex: 1 },
   switchLabel: { fontSize: 14, fontWeight: "500", color: colors.text },
   switchDesc: { marginTop: 2, fontSize: 12, color: colors.textSub, lineHeight: 17 },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stepBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+  stepValue: { minWidth: 52, textAlign: "center", fontSize: 15, fontWeight: "700", color: colors.text, fontVariant: ["tabular-nums"] },
   hint: {
     fontSize: 12,
     color: colors.textMuted,

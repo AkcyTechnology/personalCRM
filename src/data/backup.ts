@@ -9,6 +9,7 @@ import { isDuplicateContact } from "../utils/duplicateContact";
 import { todayISO } from "../utils/dates";
 import { resetAnalytics } from "../utils/analytics";
 import { t } from "../i18n";
+import { isKnownAvatar } from "./avatars";
 import { decryptBackupText, encryptBackupText, isEncryptedBackup, WrongPasswordError } from "./backupCrypto";
 
 const FORMAT = "connectly-backup";
@@ -83,6 +84,23 @@ export function parseBackup(text: string): BackupFile {
       reminderFreq: str(c.reminderFreq, 50),
       notes: str(c.notes, 20_000),
       reminderIntervalDays: typeof c.reminderIntervalDays === "number" && c.reminderIntervalDays > 0 ? Math.round(c.reminderIntervalDays) : undefined,
+      avatarId: isKnownAvatar(c.avatarId) ? c.avatarId : undefined,
+      deviceContactId: typeof c.deviceContactId === "string" ? c.deviceContactId.slice(0, 200) : undefined,
+      extraPhones: Array.isArray(c.extraPhones) ? c.extraPhones.filter((p) => typeof p === "string").map((p) => p.slice(0, 40)).slice(0, 10) : undefined,
+      reminders: Array.isArray(c.reminders)
+        ? c.reminders
+            .filter((r) => r && typeof r.id === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) && /^\d{2}:\d{2}$/.test(String(r.time)))
+            .map((r) => ({ id: r.id, date: r.date, time: r.time, note: str(r.note, 500), done: r.done === true }))
+            .slice(0, 200)
+        : undefined,
+      specialDays: Array.isArray(c.specialDays)
+        ? c.specialDays
+            // Fixed-length groups, no nesting: linear time, not a ReDoS risk.
+            // eslint-disable-next-line security/detect-unsafe-regex
+            .filter((d) => d && typeof d.id === "string" && /^\d{2}\/\d{2}(\/\d{4})?$/.test(String(d.date)))
+            .map((d) => ({ id: d.id, label: str(d.label, 80), date: d.date }))
+            .slice(0, 50)
+        : undefined,
       interactions: Array.isArray(c.interactions)
         ? c.interactions
             .filter((i) => i && typeof i.id === "string" && typeof i.date === "string" && typeof i.type === "string")

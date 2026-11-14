@@ -14,6 +14,8 @@ import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
+import Avatar from "../components/Avatar";
+import AvatarPicker from "../components/AvatarPicker";
 import { t } from "../i18n";
 
 export default function ProfileSettingsScreen({ navigation }: any) {
@@ -21,6 +23,8 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
+  const [avatarId, setAvatarId] = useState<string | undefined>(undefined);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useFocusEffect(
@@ -30,6 +34,7 @@ export default function ProfileSettingsScreen({ navigation }: any) {
         setEmail(s.email || "");
         setPhone(s.phone || "");
         setCity(s.city || "");
+        setAvatarId(s.userAvatarId);
       });
     }, [])
   );
@@ -43,6 +48,7 @@ export default function ProfileSettingsScreen({ navigation }: any) {
       email: email.trim(),
       phone: phone.trim(),
       city: city.trim(),
+      userAvatarId: avatarId,
     });
     setSaving(false);
     showToast(t("Profil bilgilerin güncellendi"));
@@ -52,13 +58,23 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <AppHeader type="settings" centerTitle={t("Profil Ayarları")} onBack={() => navigation.goBack()} />
+      <AvatarPicker
+        visible={avatarOpen}
+        value={avatarId}
+        onClose={() => setAvatarOpen(false)}
+        onSelect={(id) => { setAvatarOpen(false); setAvatarId(id); }}
+      />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(name || "?")[0].toUpperCase()}</Text>
-          </View>
-        </View>
+        <TouchableOpacity
+          style={styles.avatarWrap}
+          onPress={() => setAvatarOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={avatarId ? t("Avatarı değiştir") : t("Avatar seç")}
+        >
+          <Avatar name={name} avatarId={avatarId} size={88} />
+          <Text style={styles.avatarLink}>{avatarId ? t("Avatarı değiştir") : t("Avatar seç")}</Text>
+        </TouchableOpacity>
 
         <Text style={styles.sectionLabel}>{t("KİŞİSEL BİLGİLER")}</Text>
 
@@ -138,7 +154,8 @@ export default function ProfileSettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: spacing.xl, paddingTop: spacing.xxl, paddingBottom: 60 },
-  avatarWrap: { alignItems: "center", marginBottom: spacing.xxl },
+  avatarWrap: { alignItems: "center", marginBottom: spacing.xxl, gap: 8 },
+  avatarLink: { fontSize: 14, fontWeight: "700", color: colors.primary },
   avatar: {
     width: 80,
     height: 80,

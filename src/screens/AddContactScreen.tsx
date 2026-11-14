@@ -24,11 +24,11 @@ import {
 import DateField from "../components/DateField";
 import { toISODate } from "../utils/dates";
 import { toSafeWebUrl } from "../utils/links";
-import { ensureNotificationPermissionAsync } from "../utils/notifications";
+import { askNotificationPermissionWithContext } from "../utils/notifications";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { addContact, loadContacts } from "../data/contacts";
-import { isDuplicateContact } from "../utils/duplicateContact";
+import { findSameName, isDuplicateContact } from "../utils/duplicateContact";
 import { loadSettings } from "../data/userSettings";
 import {
   DEFAULT_RELATIONSHIPS,
@@ -44,6 +44,9 @@ import { showToast } from "../components/Toast";
 import PermissionDeniedModal from "../components/PermissionDeniedModal";
 import { confirmDialog, infoDialog } from "../utils/confirm";
 import { track } from "../utils/analytics";
+import Avatar from "../components/Avatar";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import AvatarPicker from "../components/AvatarPicker";
 import { t, tv } from "../i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -58,6 +61,23 @@ export type Interaction = {
   date:  string;
   type:  InteractionType;
   note?: string;
+};
+
+export type DatedReminder = {
+  id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM, local time. */
+  time: string;
+  note: string;
+  done?: boolean;
+};
+
+export type SpecialDay = {
+  id: string;
+  label: string;
+  /** DD/MM or DD/MM/YYYY, like birthdays. */
+  date: string;
 };
 
 export type ContactForm = {
@@ -89,6 +109,16 @@ export type ContactForm = {
   updatedAt?:             string;
   order?:                 number;
   interactions?:          Interaction[];
+  /** Chosen illustrated avatar id (data/avatars.ts); unset → neutral icon. */
+  avatarId?:              string;
+  /** Address-book id this person was imported from, to spot re-imports. */
+  deviceContactId?:       string;
+  /** More numbers from the address book, beyond `phone`. */
+  extraPhones?:           string[];
+  /** One-off reminders the user created ("call about the flat on the 12th"). */
+  reminders?:             DatedReminder[];
+  /** Days that matter besides the birthday (anniversary, name day…). */
+  specialDays?:           SpecialDay[];
 };
 
 const EMPTY: ContactForm = {
@@ -140,6 +170,7 @@ export default function AddContactScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   const [form, setForm]             = useState<ContactForm>(EMPTY);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const [errors, setErrors]         = useState<Partial<Record<keyof ContactForm, string>>>({});
   const [discardModal, setDiscard]  = useState(false);
   const [importedName, setImported] = useState("");
@@ -213,7 +244,7 @@ export default function AddContactScreen({ navigation }: Props) {
     }
     // Sistem seçicisi yoksa uygulama içi listeye düş
     try {
-      const data = await listDeviceContactsAsync();
+      const { contacts: data } = await listDeviceContactsAsync();
       if (!data.length) {
         infoDialog(t("Rehber boş"), t("Cihazında kayıtlı kişi bulunamadı."));
         return;
@@ -294,7 +325,7 @@ export default function AddContactScreen({ navigation }: Props) {
     navigation.goBack();
     showToast(t("Kişi kaydedildi"));
     // Hatırlatıcının işe yaraması için izni tam bu anda iste
-    if (form.reminderEnabled !== false) ensureNotificationPermissionAsync();
+    if (form.reminderEnabled !== false) askNotificationPermissionWithContext();
   };
 
   const handleSave = async () => {
@@ -304,7 +335,7 @@ export default function AddContactScreen({ navigation }: Props) {
       return;
     }
     const existing = await loadContacts();
-    if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing)) {
+    if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing) || findSameName(form.fullName, existing)) {
       confirmDialog(t("Bu kişi zaten kayıtlı olabilir"), t("Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?"),
         [
           { text: t("Vazgeç"), style: "cancel" },
@@ -366,12 +397,18 @@ export default function AddContactScreen({ navigation }: Props) {
             </View>
             <ChevronRight />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bulkLink}
+            onPress={() => navigation.navigate("ImportContacts")}
+            accessibilityRole="button"
+          >
+            <Ionicons name="people-outline" size={16} color={colors.primary} />
+            <Text style={styles.bulkLinkText}>{t("Birden fazla kişi mi? Rehberden toplu ekle")}</Text>
+          </TouchableOpacity>
 
           {importedName ? (
             <View style={styles.importedPreview}>
-              <View style={styles.importedAvatar}>
-                <Text style={styles.importedAvatarText}>{initials(importedName)}</Text>
-              </View>
+              <Avatar name={importedName} avatarId={form.avatarId} size={44} />
               <View>
                 <Text style={styles.importedName}>{importedName}</Text>
                 {form.phone ? <Text style={styles.importedPhone}>{form.phone}</Text> : null}
@@ -384,6 +421,20 @@ export default function AddContactScreen({ navigation }: Props) {
 
           {/* ── Essentials ── */}
           <Text style={styles.requiredLegend}>{t("* zorunlu alan")}</Text>
+
+          <TouchableOpacity
+            style={styles.avatarRow}
+            onPress={() => setAvatarOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={form.avatarId ? t("Avatarı değiştir") : t("Avatar seç")}
+          >
+            <Avatar name={form.fullName} avatarId={form.avatarId} size={56} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.avatarRowTitle}>{form.avatarId ? t("Avatarı değiştir") : t("Avatar seç")}</Text>
+              <Text style={styles.avatarRowSub}>{t("İsteğe bağlı · fotoğraf yerine görünür")}</Text>
+            </View>
+            <ChevronRight />
+          </TouchableOpacity>
 
           <FieldGroup>
             <Field
@@ -711,6 +762,12 @@ export default function AddContactScreen({ navigation }: Props) {
         onRemove={handleRemoveRelationship}
         onClose={() => setRelationshipManagerOpen(false)}
       />
+      <AvatarPicker
+        visible={avatarOpen}
+        value={form.avatarId}
+        onClose={() => setAvatarOpen(false)}
+        onSelect={(id) => { setAvatarOpen(false); set("avatarId", id); }}
+      />
     </View>
   );
 }
@@ -1005,6 +1062,14 @@ function ChevronRight() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  bulkLink: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 4, marginTop: -4, marginBottom: 6 },
+  bulkLinkText: { fontSize: 14, fontWeight: "700", color: colors.primary },
+  avatarRow: {
+    flexDirection: "row", alignItems: "center", gap: 12, padding: 12, marginBottom: 12,
+    borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
+  },
+  avatarRowTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
+  avatarRowSub: { fontSize: 13, color: colors.textSub, marginTop: 2 },
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },

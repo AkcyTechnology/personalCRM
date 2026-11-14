@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { getContact, loadContacts, markContacted, snoozeContact, subscribeContacts } from "../data/contacts";
+import { completeReminder, getContact, loadContacts, markContacted, snoozeContact, snoozeReminder, subscribeContacts } from "../data/contacts";
 import { loadSettings, subscribeSettings } from "../data/userSettings";
 import {
   ACTION_CONTACTED,
+  ACTION_DONE,
   ACTION_SNOOZE,
   getNotificationsModule,
   setupNotificationsAsync,
@@ -30,12 +31,19 @@ function resync() {
   }, 600);
 }
 
-async function openContact(contactId: string) {
+/**
+ * Opens the person a notification is about. On a cold start (or behind the
+ * app lock) navigation isn't ready yet, so it retries for a few seconds.
+ * A contact deleted since the notification was planned is simply ignored.
+ */
+async function openContact(contactId: string, tries = 0) {
   const contact = await getContact(contactId);
   if (!contact) return;
-  const go = () => navigationRef.navigate("PersonDetail", { contact });
-  if (navigationRef.isReady()) go();
-  else setTimeout(go, 800);
+  if (navigationRef.isReady()) {
+    navigationRef.navigate("PersonDetail", { contact });
+    return;
+  }
+  if (tries < 40) setTimeout(() => openContact(contactId, tries + 1), 250);
 }
 
 /**
@@ -55,8 +63,16 @@ export default function ReminderSync() {
 
     const N = getNotificationsModule();
     const handle = async (response: import("expo-notifications").NotificationResponse) => {
-      const data = response.notification.request.content.data as { contactId?: string } | undefined;
+      const data = response.notification.request.content.data as { contactId?: string; reminderId?: string; kind?: string } | undefined;
       const contactId = data?.contactId;
+      const reminderId = data?.reminderId;
+      if (data?.kind === "dated" && contactId && reminderId) {
+        track("reminder_opened", { action: response.actionIdentifier === ACTION_DONE ? "done" : response.actionIdentifier === ACTION_SNOOZE ? "snooze" : "open" });
+        if (response.actionIdentifier === ACTION_DONE) await completeReminder(contactId, reminderId);
+        else if (response.actionIdentifier === ACTION_SNOOZE) await snoozeReminder(contactId, reminderId, 1);
+        else await openContact(contactId);
+        return;
+      }
       track("reminder_opened", { action: response.actionIdentifier === ACTION_CONTACTED ? "contacted" : response.actionIdentifier === ACTION_SNOOZE ? "snooze" : "open" });
       if (response.actionIdentifier === ACTION_CONTACTED && contactId) {
         await markContacted(contactId, "other");

@@ -19,7 +19,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "./AddContactScreen";
 import { loadContacts, subscribeContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
-import { healthScore, healthScoreColor } from "../utils/healthScore";
+import { healthScore, healthScoreColor, healthSortKey } from "../utils/healthScore";
 import { daysSinceIntervalStart, isDue } from "../utils/reminderInterval";
 import { logMoment } from "../app/momentActions";
 import Avatar, { initials } from "../components/Avatar";
@@ -35,7 +35,7 @@ const CLUSTER_COLORS = [colors.primary, colors.warm, colors.accent, colors.secon
 const MAX_CLUSTERS = 7;
 const OTHER = "Diğer";
 
-type Node = { contact: ContactForm; x: number; y: number; size: number; score: number; due: boolean; cluster: number };
+type Node = { contact: ContactForm; x: number; y: number; size: number; score: number | null; due: boolean; cluster: number };
 type Hub = { label: string; x: number; y: number; color: string; count: number };
 
 /** Deterministic radial layout: you in the centre, one cluster per relationship type. */
@@ -65,7 +65,7 @@ function layout(contacts: ContactForm[], threshold: number, w: number, h: number
     hubs.push({ label, x: hx, y: hy, color, count: list.length });
 
     // Yakın (sağlıklı) ilişkiler küme merkezine yakın, zayıflayanlar dışarıda.
-    const sorted = [...list].sort((a, b) => healthScore(b, threshold) - healthScore(a, threshold));
+    const sorted = [...list].sort((a, b) => healthSortKey(b, threshold) - healthSortKey(a, threshold));
     sorted.forEach((c, k) => {
       const a = angle + k * 2.39996; // altın açı
       const dist = 34 + size * 0.55 * Math.sqrt(k + 1);
@@ -209,9 +209,9 @@ function UniverseMap({ navigation }: { navigation: any }) {
               x2={n.x}
               y2={n.y}
               stroke={map.hubs[n.cluster].color}
-              strokeOpacity={(focusCluster === null || focusCluster === n.cluster ? 0.35 : 0.06) * (n.score < 40 ? 0.5 : 1)}
+              strokeOpacity={(focusCluster === null || focusCluster === n.cluster ? 0.35 : 0.06) * (n.score !== null && n.score < 40 ? 0.5 : 1)}
               strokeWidth={1.5}
-              strokeDasharray={n.score < 40 ? "4 4" : undefined}
+              strokeDasharray={n.score !== null && n.score < 40 ? "4 4" : undefined}
             />
           ))}
           {map.hubs.map((hub, i) => (
@@ -230,7 +230,7 @@ function UniverseMap({ navigation }: { navigation: any }) {
 
         {map.nodes.map((n, i) => {
           const dim = focusCluster !== null && focusCluster !== n.cluster;
-          const faded = n.score < 40;
+          const faded = n.score !== null && n.score < 40;
           const dy = reduceMotion
             ? 0
             : float.interpolate({ inputRange: [0, 1], outputRange: [0, i % 2 === 0 ? -4 : 4] });
@@ -396,7 +396,7 @@ function PersonPreview({
         <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetTop}>
-            <Avatar name={contact.fullName} size={64} ringColor={healthScoreColor(score)} />
+            <Avatar name={contact.fullName} avatarId={contact.avatarId} size={64} ringColor={healthScoreColor(score)} />
             <View style={{ flex: 1 }}>
               <Text style={styles.sheetName}>{contact.fullName}</Text>
               <Text style={styles.sheetSub}>

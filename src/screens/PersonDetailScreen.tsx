@@ -13,18 +13,18 @@ import {
 import AppHeader from "../components/AppHeader";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { addContacts, deleteContact as deleteContactById, deleteInteraction, getContact, updateContact } from "../data/contacts";
+import { addContacts, deleteContact as deleteContactById, deleteInteraction, getContact, updateContact, updateInteraction } from "../data/contacts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateField from "../components/DateField";
 import LogInteractionModal, { interactionMeta } from "../components/LogInteractionModal";
 import { openEmail, openPhoneCall, openWhatsApp as openWhatsAppLink, openWebUrl, socialProfileUrl } from "../utils/links";
-import { ensureNotificationPermissionAsync } from "../utils/notifications";
+import { askNotificationPermissionWithContext } from "../utils/notifications";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm, InteractionType } from "./AddContactScreen";
-import { categorical, colors } from "../theme/colors";
+import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { effectiveIntervalDays, intervalLabel, INTERVAL_PRESETS } from "../utils/reminderInterval";
-import { healthScore as centralHealthScore, healthScoreColor } from "../utils/healthScore";
+import { healthScore as centralHealthScore, healthScoreColor, healthScoreLabel } from "../utils/healthScore";
 import { showToast, showUndoToast } from "../components/Toast";
 import { hapticWarning } from "../utils/haptics";
 import { logMoment } from "../app/momentActions";
@@ -32,6 +32,9 @@ import { locale, t, tv } from "../i18n";
 import { relationshipJourney } from "../utils/engagement";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
+import Avatar from "../components/Avatar";
+import AvatarPicker from "../components/AvatarPicker";
+import ContactReminders from "../components/ContactReminders";
 import { confirmDialog } from "../utils/confirm";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PersonDetail">;
@@ -60,22 +63,7 @@ const ORANGE = colors.warning;
 const RED = colors.danger;
 const PINK = colors.secondary;
 
-function initials(name?: string) {
-  return (name || "?")
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("") || "?";
-}
 
-function avatarColor(name?: string) {
-  const p = categorical();
-  let h = 0;
-  for (const c of name || "") h += c.charCodeAt(0);
-  return p[h % p.length];
-}
 
 function parseDate(value?: string) {
   if (!value) return null;
@@ -141,6 +129,8 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   const [composerVisible, setComposerVisible] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [logType, setLogType] = useState<InteractionType>("other");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const pendingAction = useRef<InteractionType | null>(null);
 
   useEffect(() => {
@@ -178,10 +168,9 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
     socialsText: socialsToText(contact.socials),
   });
 
-  const color = avatarColor(contact.fullName);
   const days = daysSince(contact.lastContactDate);
   const interval = effectiveIntervalDays(contact, globalThreshold);
-  const score = contact.lastContactDate ? centralHealthScore(contact, globalThreshold) : null;
+  const score = centralHealthScore(contact, globalThreshold);
   const scoreColor = score === null ? MUTED : healthScoreColor(score);
 
   const timeline = useMemo(() => {
@@ -300,14 +289,14 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
   const saveInterval = async (days: number) => {
     await persist({ reminderIntervalDays: days, reminderEnabled: true });
     setIntervalPickerOpen(false);
-    ensureNotificationPermissionAsync();
+    askNotificationPermissionWithContext();
   };
 
   const toggleReminder = async () => {
     const enabled = contact.reminderEnabled === false;
     await persist({ reminderEnabled: enabled });
     showToast(enabled ? t("Hatırlatıcı açıldı") : t("Hatırlatıcı kapatıldı"));
-    if (enabled) ensureNotificationPermissionAsync();
+    if (enabled) askNotificationPermissionWithContext();
   };
 
   const logInteraction = async (type: InteractionType, note: string, date: string) => {
@@ -328,12 +317,13 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         text: t("Sil"),
         style: "destructive",
         onPress: async () => {
-          const before = contact.interactions;
+          const before = { interactions: contact.interactions, lastContactDate: contact.lastContactDate };
           const saved = await deleteInteraction(contact.id!, interactionId);
           if (!saved) return;
+          setEditingId(null);
           setContact(saved as EditableContact);
           showUndoToast(t("Görüşme kaydı silindi"), async () => {
-            const restored = await updateContact(contact.id!, { interactions: before });
+            const restored = await updateContact(contact.id!, before);
             if (restored) setContact(restored as EditableContact);
           });
         },
@@ -373,11 +363,17 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View style={[styles.avatarGlow, { backgroundColor: color + "18" }]}> 
-            <View style={[styles.avatar, { backgroundColor: color + "16", borderColor: color + "55" }]}> 
-              <Text style={[styles.avatarText, { color }]}>{initials(contact.fullName)}</Text>
+          <TouchableOpacity
+            onPress={() => setAvatarOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t("Avatarı değiştir")}
+            style={styles.avatarTap}
+          >
+            <Avatar name={contact.fullName} avatarId={contact.avatarId} size={92} />
+            <View style={styles.avatarEdit}>
+              <Ionicons name="pencil" size={13} color={colors.onFill} />
             </View>
-          </View>
+          </TouchableOpacity>
 
           {isEditing ? (
             <View style={styles.editBlock}>
@@ -403,19 +399,23 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
           <View style={styles.healthMiniCard}>
             <View style={{ flex: 1 }}>
               <View style={styles.healthLabelRow}>
-                <Text style={styles.healthLabel}>{t("Bağlantın")}</Text>
+                <Text style={styles.healthLabel}>{t("Takip durumu")}</Text>
                 <TouchableOpacity
                   onPress={() => setHealthInfoOpen(true)}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   accessibilityRole="button"
-                  accessibilityLabel={t("Bağlantın nasıl hesaplanır?")}
+                  accessibilityLabel={t("Takip durumu nasıl hesaplanır?")}
                   >
                   <Ionicons name="information-circle-outline" size={18} color={MUTED} />
                 </TouchableOpacity>
               </View>
               <Text style={styles.healthSub}>{days === null ? t("Henüz görüşme kaydı yok") : days === 0 ? t("Bugün görüşüldü") : t("{days} gündür görüşülmedi", { days })}</Text>
             </View>
-            <View style={[styles.healthCircle, { borderColor: scoreColor }]}> 
+            <View
+              style={[styles.healthCircle, { borderColor: scoreColor }]}
+              accessible
+              accessibilityLabel={score === null ? t("Takip durumu: henüz görüşme kaydı yok") : t("Takip durumu: {value} / 100, {label}", { value: score, label: t(healthScoreLabel(score)) })}
+            >
               <Text style={[styles.healthScore, { color: scoreColor }]}>{score === null ? "—" : score}</Text>
             </View>
           </View>
@@ -447,9 +447,10 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         {activeTab === "timeline" ? (
           <View>
             <JourneyStrip contact={contact} />
+            <ContactReminders contact={contact} onChange={(c) => setContact(c as EditableContact)} />
             <Text style={styles.sectionTitle}>{t("Hikâyeniz")}</Text>
             {(contact.interactions?.length ?? 0) > 0 ? (
-              <Text style={styles.historyHint}>{t("Bir kaydı silmek için üzerine basılı tut")}</Text>
+              <Text style={styles.historyHint}>{t("Düzenlemek için bir kayda dokun")}</Text>
             ) : null}
             <View style={styles.timelineCard}>
               {timeline.map((item, index) => (
@@ -458,8 +459,10 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
                   style={styles.timelineRow}
                   activeOpacity={item.id ? 0.7 : 1}
                   disabled={!item.id}
+                  onPress={() => item.id && setEditingId(item.id)}
                   onLongPress={() => item.id && removeInteraction(item.id)}
-                  accessibilityHint={item.id ? t("Silmek için basılı tut") : undefined}
+                  accessibilityRole={item.id ? "button" : undefined}
+                  accessibilityHint={item.id ? t("Düzenlemek için dokun, silmek için basılı tut") : undefined}
                 >
                   <View style={styles.timelineRail}>
                     <View style={[styles.timelineDot, { backgroundColor: item.color }]}>
@@ -636,6 +639,18 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
 
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
 
+      <AvatarPicker
+        visible={avatarOpen}
+        value={contact.avatarId}
+        onClose={() => setAvatarOpen(false)}
+        onSelect={async (id) => {
+          setAvatarOpen(false);
+          if (!contact.id) return;
+          const saved = await updateContact(contact.id, { avatarId: id });
+          if (saved) setContact(saved as EditableContact);
+        }}
+      />
+
       <LogInteractionModal
         visible={logOpen}
         contactName={contact.fullName}
@@ -643,6 +658,30 @@ export default function PersonDetailScreen({ navigation, route }: Props) {
         onClose={() => setLogOpen(false)}
         onSave={logInteraction}
       />
+
+      {(() => {
+        const it = contact.interactions?.find((i) => i.id === editingId);
+        return (
+          <LogInteractionModal
+            visible={!!it}
+            contactName={contact.fullName}
+            initialType={it?.type ?? "other"}
+            initialNote={it?.note ?? ""}
+            initialDate={it?.date ?? ""}
+            onClose={() => setEditingId(null)}
+            onDelete={() => it && removeInteraction(it.id)}
+            onSave={async (type, note, date) => {
+              if (!it || !contact.id) return;
+              const saved = await updateInteraction(contact.id, it.id, { type, note, date });
+              setEditingId(null);
+              if (saved) {
+                setContact(saved as EditableContact);
+                showToast(t("Görüşme güncellendi"));
+              }
+            }}
+          />
+        );
+      })()}
 
       <MessageComposer
         visible={composerVisible}
@@ -788,8 +827,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarGlow: { width: 112, height: 112, borderRadius: 56, alignItems: "center", justifyContent: "center" },
-  avatar: { width: 92, height: 92, borderRadius: 46, borderWidth: 2, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 29, fontWeight: "900" },
+  avatarTap: { alignItems: "center", justifyContent: "center" },
+  avatarEdit: {
+    position: "absolute", right: 0, bottom: 2, width: 26, height: 26, borderRadius: 13,
+    backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: colors.surface,
+  },
   name: { marginTop: 14, fontSize: 25, fontWeight: "900", color: TEXT, textAlign: "center" },
   subtitle: { marginTop: 5, color: MUTED, fontSize: 13, textAlign: "center" },
   relationPill: { marginTop: 12, backgroundColor: SOFT_PURPLE, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },

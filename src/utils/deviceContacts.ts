@@ -11,7 +11,9 @@ import { t } from "../i18n";
 export type DeviceContact = {
   id: string;
   name: string;
+  /** First number; all numbers are in `phones`. */
   phone: string;
+  phones: string[];
   email: string;
   company: string;
   jobTitle: string;
@@ -53,6 +55,7 @@ function map(c: LegacyContacts.ExistingContact, i = 0): DeviceContact {
     id: c.id ?? String(i),
     name: (c.name ?? [c.firstName, c.lastName].filter(Boolean).join(" ")).trim(),
     phone: c.phoneNumbers?.[0]?.number?.trim() ?? "",
+    phones: [...new Set((c.phoneNumbers ?? []).map((p) => p.number?.trim() ?? "").filter(Boolean))],
     email: c.emails?.[0]?.email?.trim() ?? "",
     company: c.company?.trim() ?? "",
     jobTitle: c.jobTitle?.trim() ?? "",
@@ -63,9 +66,10 @@ function map(c: LegacyContacts.ExistingContact, i = 0): DeviceContact {
   };
 }
 
-async function ensurePermission(Contacts: typeof LegacyContacts) {
-  const { status } = await Contacts.requestPermissionsAsync();
-  if (status !== "granted") throw new ContactsPermissionError();
+async function ensurePermission(Contacts: typeof LegacyContacts): Promise<{ limited: boolean }> {
+  const res = await Contacts.requestPermissionsAsync();
+  if (res.status !== "granted") throw new ContactsPermissionError();
+  return { limited: res.accessPrivileges === "limited" };
 }
 
 /**
@@ -79,10 +83,13 @@ export async function pickDeviceContactAsync(): Promise<DeviceContact | null> {
   return picked ? map(picked) : null;
 }
 
-/** Reads only the fields needed for bulk import (no notes, addresses, images…). */
-export async function listDeviceContactsAsync(): Promise<DeviceContact[]> {
+/**
+ * Reads only the fields needed for bulk import (no notes, addresses, images…).
+ * `limited` is true when iOS 18+ gave access to selected contacts only.
+ */
+export async function listDeviceContactsAsync(): Promise<{ contacts: DeviceContact[]; limited: boolean }> {
   const Contacts = load();
-  await ensurePermission(Contacts);
+  const { limited } = await ensurePermission(Contacts);
   const { data } = await Contacts.getContactsAsync({
     fields: [
       Contacts.Fields.Name,
@@ -94,5 +101,12 @@ export async function listDeviceContactsAsync(): Promise<DeviceContact[]> {
     ],
     sort: Contacts.SortTypes.FirstName,
   });
-  return (data ?? []).map(map).filter((c) => !!c.name);
+  return { contacts: (data ?? []).map(map).filter((c) => !!c.name), limited };
+}
+
+/** iOS 18+ limited access: lets the user share more contacts with the app. */
+export async function presentContactAccessPickerAsync(): Promise<void> {
+  const Contacts = load();
+  if (Platform.OS !== "ios" || !Contacts.presentAccessPickerAsync) return;
+  await Contacts.presentAccessPickerAsync();
 }

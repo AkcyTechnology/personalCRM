@@ -249,7 +249,7 @@ function CardBody({ contact }: { contact: ContactForm }) {
   const lastNote = [...(contact.interactions ?? [])].filter((i) => i.note).sort((a, b) => b.date.localeCompare(a.date))[0];
   return (
     <LinearGradient colors={[colors.primarySoft, colors.surface]} style={styles.cardInner}>
-      <Avatar name={contact.fullName} size={120} ringColor={colors.brand} />
+      <Avatar name={contact.fullName} avatarId={contact.avatarId} size={120} ringColor={colors.brand} />
       <Text style={styles.name} numberOfLines={1}>{contact.fullName}</Text>
       {contact.relationship ? <Text style={styles.relation}>{tv(contact.relationship)}</Text> : null}
       <View style={styles.reason}>

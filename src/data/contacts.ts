@@ -1,6 +1,6 @@
-import type { ContactForm, Interaction, InteractionType } from "../screens/AddContactScreen";
+import type { ContactForm, DatedReminder, Interaction, InteractionType, SpecialDay } from "../screens/AddContactScreen";
 import { secureGetItem, secureSetItem } from "../storage/secureStorage";
-import { todayISO } from "../utils/dates";
+import { addDays, parseISODate, toISODate, todayISO } from "../utils/dates";
 
 const KEY = "crm_contacts";
 
@@ -149,10 +149,79 @@ export async function markContacted(
   });
 }
 
+/**
+ * lastContactDate follows the interaction history: when the moment it came
+ * from is edited or deleted, it moves to the newest remaining one, so a removed
+ * moment can't keep counting in weekly progress or the streak.
+ */
+function syncLastContact(c: ContactForm, interactions: Interaction[], removedDate?: string): string {
+  const newest = interactions.reduce((best, i) => (i.date > best ? i.date : best), "");
+  const current = c.lastContactDate || "";
+  const cameFromRemoved = !!removedDate && current === removedDate && !interactions.some((i) => i.date === current);
+  if (cameFromRemoved) return newest;
+  return newest > current ? newest : current;
+}
+
 export async function deleteInteraction(contactId: string, interactionId: string): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => {
+    const removed = (c.interactions ?? []).find((i) => i.id === interactionId);
+    const interactions = (c.interactions ?? []).filter((i) => i.id !== interactionId);
+    return { interactions, lastContactDate: syncLastContact(c, interactions, removed?.date) };
+  });
+}
+
+/** Edits one logged moment (type, date, note). */
+export async function updateInteraction(
+  contactId: string,
+  interactionId: string,
+  patch: Partial<Pick<Interaction, "type" | "date" | "note">>
+): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => {
+    const old = (c.interactions ?? []).find((i) => i.id === interactionId);
+    if (!old) return {};
+    const next: Interaction = { ...old, ...patch, note: patch.note !== undefined ? patch.note.trim() || undefined : old.note };
+    const interactions = (c.interactions ?? []).map((i) => (i.id === interactionId ? next : i)).sort((a, b) => b.date.localeCompare(a.date));
+    return { interactions, lastContactDate: syncLastContact(c, interactions, old.date !== next.date ? old.date : undefined) };
+  });
+}
+
+// ── Dated reminders & special days ───────────────────────────────────────────
+
+export async function addReminder(contactId: string, r: Omit<DatedReminder, "id" | "done">): Promise<ContactForm | undefined> {
   return updateContact(contactId, (c) => ({
-    interactions: (c.interactions ?? []).filter((i) => i.id !== interactionId),
+    reminders: [...(c.reminders ?? []), { ...r, note: r.note.trim(), id: generateId() }].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)),
   }));
+}
+
+/** Marks a reminder done. This is not a logged moment — no interaction is created. */
+export async function completeReminder(contactId: string, reminderId: string): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => ({
+    reminders: (c.reminders ?? []).map((r) => (r.id === reminderId ? { ...r, done: true } : r)),
+  }));
+}
+
+export async function snoozeReminder(contactId: string, reminderId: string, days = 1): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => ({
+    reminders: (c.reminders ?? []).map((r) => {
+      if (r.id !== reminderId) return r;
+      const base = parseISODate(r.date) ?? new Date();
+      const today = new Date();
+      const from = base < today ? today : base;
+      return { ...r, date: toISODate(addDays(from, days)), done: false };
+    }),
+  }));
+}
+
+export async function deleteReminder(contactId: string, reminderId: string): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => ({ reminders: (c.reminders ?? []).filter((r) => r.id !== reminderId) }));
+}
+
+export async function addSpecialDay(contactId: string, d: Omit<SpecialDay, "id">): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => ({ specialDays: [...(c.specialDays ?? []), { ...d, label: d.label.trim(), id: generateId() }] }));
+}
+
+export async function deleteSpecialDay(contactId: string, dayId: string): Promise<ContactForm | undefined> {
+  return updateContact(contactId, (c) => ({ specialDays: (c.specialDays ?? []).filter((d) => d.id !== dayId) }));
 }
 
 export async function getContact(id: string): Promise<ContactForm | undefined> {

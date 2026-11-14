@@ -27,12 +27,18 @@ type Props = {
   visible: boolean;
   contactName: string;
   initialType?: InteractionType;
+  /** Edit mode: prefill an existing moment. */
+  initialNote?: string;
+  initialDate?: string;
+  /** Edit mode: shows a delete button. */
+  onDelete?: () => void;
   onClose: () => void;
   onSave: (type: InteractionType, note: string, date: string) => void;
 };
 
 /** "Görüştüm" sheet: pick how you got in touch, optionally add a note. */
-export default function LogInteractionModal({ visible, contactName, initialType = "other", onClose, onSave }: Props) {
+export default function LogInteractionModal({ visible, contactName, initialType = "other", initialNote, initialDate, onDelete, onClose, onSave }: Props) {
+  const editing = initialDate !== undefined;
   const [type, setType] = useState<InteractionType>(initialType);
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayISO());
@@ -40,10 +46,10 @@ export default function LogInteractionModal({ visible, contactName, initialType 
   useEffect(() => {
     if (visible) {
       setType(initialType);
-      setNote("");
-      setDate(todayISO());
+      setNote(initialNote ?? "");
+      setDate(initialDate ?? todayISO());
     }
-  }, [visible, initialType]);
+  }, [visible, initialType, initialNote, initialDate]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -51,7 +57,9 @@ export default function LogInteractionModal({ visible, contactName, initialType 
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.handle} />
-            <Text style={styles.title}>{t("{name} ile görüştün 🎉", { name: contactName })}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {editing ? t("{name} ile görüşmeyi düzenle", { name: contactName }) : t("{name} ile görüştün", { name: contactName })}
+            </Text>
             <Text style={styles.sub}>{t("Nasıl iletişime geçtin?")}</Text>
 
             <View style={styles.types}>
@@ -96,6 +104,11 @@ export default function LogInteractionModal({ visible, contactName, initialType 
               <Ionicons name="checkmark-circle" size={20} color={colors.onFill} />
               <Text style={styles.saveText}>{t("Kaydet")}</Text>
             </TouchableOpacity>
+            {onDelete ? (
+              <TouchableOpacity style={styles.delete} onPress={onDelete} accessibilityRole="button">
+                <Text style={styles.deleteText}>{t("Görüşme kaydını sil")}</Text>
+              </TouchableOpacity>
+            ) : null}
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -127,4 +140,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, paddingVertical: 15, borderRadius: 14,
   },
   saveText: { color: colors.onFill, fontSize: 16, fontWeight: "700" },
+  delete: { marginTop: 8, minHeight: 46, alignItems: "center", justifyContent: "center" },
+  deleteText: { color: colors.danger, fontSize: 15, fontWeight: "700" },
 });

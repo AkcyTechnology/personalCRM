@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,13 +18,14 @@ import { loadSettings, saveSettings, updateSettings } from "../data/userSettings
 import { runExportBackup, runRestoreBackup } from "../data/backupActions";
 import { GOALS } from "../data/goals";
 import { t } from "../i18n";
-import { isDue } from "../utils/reminderInterval";
 import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
-import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
+import { connectionStatus, healthScoreColor, healthScoreLabel, MIN_SCORED_PEOPLE } from "../utils/healthScore";
+import { dueContacts, weekStats } from "../utils/stats";
 import HealthInfoModal from "../components/HealthInfoModal";
 import { colors, colorScheme } from "../theme/colors";
 import { showToast } from "../components/Toast";
+import Avatar from "../components/Avatar";
 import { hapticTap } from "../utils/haptics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -45,16 +46,7 @@ const THRESHOLD_OPTIONS = [7, 14, 21, 30];
 const TOP_SAFE = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function daysSince(iso?: string) {
-  if (!iso) return 999;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 999;
-  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
-}
 
-function initials(name: string) {
-  return name.trim().split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: any) {
@@ -73,10 +65,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [goals,          setGoals]          = useState<string[]>([]);
   const [userName,       setUserName]       = useState("");
   const [email,          setEmail]          = useState("");
+  const [userAvatarId,   setUserAvatarId]   = useState<string | undefined>(undefined);
   const [contactsList,   setContactsList]   = useState<ContactForm[]>([]);
-  const [totalContacts,  setTotalContacts]  = useState(0);
-  const [weeklyContacts, setWeeklyContacts] = useState(0);
-  const [needsAttention, setNeedsAttention] = useState(0);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
 
   useFocusEffect(
@@ -86,15 +76,13 @@ export default function ProfileScreen({ navigation }: any) {
         setThreshold(t);
         setUserName(s.userName || "");
         setEmail(s.email || "");
+        setUserAvatarId(s.userAvatarId);
         setGoals(s.goals || []);
         setWeeklyGoal(s.weeklyGoal || 3);
         setLanguage(s.language || "system");
         setTheme(s.theme || "system");
         setHaptics(s.haptics !== false);
         setContactsList(contacts);
-        setTotalContacts(contacts.length);
-        setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
-        setNeedsAttention(contacts.filter(c => isDue(c, t)).length);
       });
     }, [])
   );
@@ -104,9 +92,7 @@ export default function ProfileScreen({ navigation }: any) {
     setThresholdOpen(false);
     const s = await loadSettings();
     await saveSettings({ ...s, reachOutThresholdDays: val });
-    const contacts = await loadContacts();
-    setContactsList(contacts);
-    setNeedsAttention(contacts.filter(c => isDue(c, val)).length);
+    setContactsList(await loadContacts());
   };
 
   const toggleGoal = async (key: string) => {
@@ -116,14 +102,15 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const reload = async () => {
-    const contacts = await loadContacts();
-    setContactsList(contacts);
-    setTotalContacts(contacts.length);
-    setWeeklyContacts(contacts.filter(c => daysSince(c.lastContactDate) <= 7).length);
-    setNeedsAttention(contacts.filter(c => isDue(c, threshold)).length);
+    setContactsList(await loadContacts());
   };
 
-  const health = averageHealthScore(contactsList, threshold);
+  // Same sources as Home and Insights, so the numbers always agree.
+  const totalContacts = contactsList.length;
+  const week = useMemo(() => weekStats(contactsList, weeklyGoal), [contactsList, weeklyGoal]);
+  const dueCount = useMemo(() => dueContacts(contactsList, threshold).length, [contactsList, threshold]);
+  const status = useMemo(() => connectionStatus(contactsList, threshold), [contactsList, threshold]);
+  const health = status.score;
   const healthColor = healthScoreColor(health);
 
   return (
@@ -133,9 +120,7 @@ export default function ProfileScreen({ navigation }: any) {
       <View style={[styles.header, { paddingTop: topPad }]}>
         <View style={styles.headerRow}>
           {/* Avatar */}
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{initials(userName)}</Text>
-          </View>
+          <Avatar name={userName} avatarId={userAvatarId} size={52} />
 
           {/* Name + email */}
           <View style={styles.headerInfo}>
@@ -148,8 +133,11 @@ export default function ProfileScreen({ navigation }: any) {
             style={styles.editBtn}
             onPress={() => navigation.navigate("ProfileSettings")}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={t("Profili düzenle")}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           >
-            <Text style={styles.editBtnText}>{t("Düzenle")}</Text>
+            <Ionicons name="pencil" size={18} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -159,45 +147,47 @@ export default function ProfileScreen({ navigation }: any) {
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           <StatCard value={totalContacts}  label={t("Toplam kişi")} />
-          <StatCard value={weeklyContacts} label={t("Bu hafta")} />
-          <StatCard value={needsAttention} label={t("Yeniden bağlan")} danger={needsAttention > 0} />
+          <StatCard value={week.moments} label={t("Bu haftaki görüşmeler")} />
+          <StatCard value={dueCount} label={t("Görüşme zamanı gelen")} />
         </View>
 
         {/* ── Health bar ── */}
         <View style={styles.healthCard}>
           <View style={styles.healthLeft}>
             <View style={styles.healthLabelRow}>
-              <Text style={styles.healthLabel}>{t("Bağlantın")}</Text>
+              <Text style={styles.healthLabel}>{t("Bağlarının durumu")}</Text>
               <TouchableOpacity
                 onPress={() => setHealthInfoOpen(true)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityRole="button"
-                accessibilityLabel={t("Bağlantın nasıl hesaplanır?")}
+                accessibilityLabel={t("Bağlarının durumu nasıl hesaplanır?")}
                 >
                 <Ionicons name="information-circle-outline" size={18} color={colors.textSub} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.healthSub}>{t("Bağlantı genel durumu")}</Text>
-            <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: `${health}%` as any, backgroundColor: healthColor }]} />
+            <Text style={styles.healthSub}>
+              {health === null
+                ? t("Henüz yeterli veri yok: en az {min} kişi için görüşme kaydı gerekiyor ({count} var).", { min: MIN_SCORED_PEOPLE, count: status.scored })
+                : t("{label} · {count} kişinin görüşme kayıtlarına göre", { label: t(healthScoreLabel(health)), count: status.scored })}
+            </Text>
+            {health !== null ? (
+              <View style={styles.barTrack}>
+                <View style={[styles.barFill, { width: `${health}%` as any, backgroundColor: healthColor }]} />
+              </View>
+            ) : null}
+          </View>
+          {health !== null ? (
+            <View style={styles.healthRight}>
+              <Text style={[styles.healthScore, { color: healthColor }]}>{health}</Text>
+              <Text style={styles.healthSuffix}>/100</Text>
             </View>
-          </View>
-          <View style={styles.healthRight}>
-            <Text style={[styles.healthScore, { color: healthColor }]}>{health}</Text>
-            <Text style={styles.healthSuffix}>/100</Text>
-          </View>
+          ) : null}
         </View>
 
         {/* ── Hesap ── */}
         <SectionLabel title={t("Hesap")} />
 
         <View style={styles.card}>
-          <RowItem
-            icon={<PersonIcon />}
-            title={t("Profil Ayarları")}
-            sub={t("Ad, e-posta ve profil bilgileri")}
-            onPress={() => navigation.navigate("ProfileSettings")}
-          />
           <RowItem
             icon={<BellIcon />}
             title={t("Bildirim Ayarları")}
@@ -236,7 +226,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.rowSub}>{t("{days} gündür görüşmediğin kişileri hatırlat", { days: threshold })}</Text>
             </View>
             <View style={styles.pill}>
-              <Text style={styles.pillText}>{threshold}g</Text>
+              <Text style={styles.pillText}>{t("{days} gün", { days: threshold })}</Text>
             </View>
           </TouchableOpacity>
 
@@ -376,16 +366,6 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* ── Veri Özeti ── */}
-        <SectionLabel title={t("Veri Özeti")} />
-
-        <View style={styles.card}>
-          <DataRow label={t("Toplam kişi")}         value={`${totalContacts}`} />
-          <DataRow label={t("Bu hafta iletişim")}    value={`${weeklyContacts}`} />
-          <DataRow label={t("Görüşmek isteyebileceğin")}   value={`${needsAttention}`} />
-          <DataRow label={t("Varsayılan sıklık")}           value={t("{days} gün", { days: threshold })} last />
         </View>
 
         {/* ── Hedefler ── */}
@@ -542,14 +522,6 @@ function RowItem({
   );
 }
 
-function DataRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <View style={[styles.dataRow, !last && styles.rowBorder]}>
-      <Text style={styles.dataLabel}>{label}</Text>
-      <Text style={styles.dataValue}>{value}</Text>
-    </View>
-  );
-}
 
 function PickerModal({
   visible, title, desc, onClose, children,
@@ -586,14 +558,6 @@ function PickerOption({ label, active, onPress }: { label: string; active: boole
 
 const ic = { color: TEAL, size: 16 };
 
-function PersonIcon() {
-  return (
-    <View style={{ alignItems: "center" }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: ic.color }} />
-      <View style={{ width: 13, height: 6, borderWidth: 1.5, borderBottomWidth: 0, borderRadius: 6, borderColor: ic.color, marginTop: 2 }} />
-    </View>
-  );
-}
 
 function BellIcon() {
   return (
@@ -694,9 +658,9 @@ const styles = StyleSheet.create({
   headerName:  { fontSize: 17, fontWeight: "700", color: TEXT, letterSpacing: -0.2 },
   headerEmail: { marginTop: 2, fontSize: 12, color: TEXTSUB },
   editBtn: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 12, backgroundColor: TEAL_SOFT,
-    borderWidth: 1, borderColor: TEAL + "40",
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: TEAL_SOFT,
   },
   editBtnText: { fontSize: 13, fontWeight: "600", color: TEAL_DARK },
 

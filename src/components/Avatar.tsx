@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet } from "react-native";
-import { categorical } from "../theme/colors";
-
-const PALETTE = categorical();
+import { Image, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { colors } from "../theme/colors";
+import { avatarSource } from "../data/avatars";
 
 export function initials(name?: string) {
   return (
@@ -15,49 +15,48 @@ export function initials(name?: string) {
   );
 }
 
-export function avatarColor(name?: string) {
-  let h = 0;
-  for (const c of name || "") h += c.charCodeAt(0);
-  return PALETTE[h % PALETTE.length];
-}
-
 type Props = {
-  name: string;
+  /** Kept for callers and accessibility; the picture never depends on it. */
+  name?: string;
+  /** Chosen illustrated avatar (see data/avatars.ts). */
+  avatarId?: string;
+  /** A real photo, when the contact has one; wins over the avatar. */
+  photoUri?: string;
   size?: number;
-  /** Optional status ring (e.g. relationship health colour). */
+  /** Optional status ring (e.g. follow-up status colour). */
   ringColor?: string;
 };
 
-/** Initials avatar; the optional ring communicates status without words. */
-export default function Avatar({ name, size = 44, ringColor }: Props) {
-  const color = avatarColor(name);
-  const inner = ringColor ? size - 8 : size;
+/**
+ * The one avatar used everywhere (lists, profile, person of the day, search,
+ * Universe). Photo → chosen illustration → neutral person icon. Nothing is
+ * guessed from the name or phone number.
+ */
+export default function Avatar({ avatarId, photoUri, size = 44, ringColor }: Props) {
+  const inner = ringColor ? size - 6 : size;
+  const source = photoUri ? { uri: photoUri } : avatarSource(avatarId);
   return (
     <View
       style={[
         styles.ring,
         { width: size, height: size, borderRadius: size / 2 },
-        ringColor ? { borderWidth: 2.5, borderColor: ringColor } : null,
+        ringColor ? { borderWidth: 2, borderColor: ringColor } : null,
       ]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <View
-        style={[
-          styles.inner,
-          { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: color + "1A" },
-        ]}
-      >
-        <Text style={[styles.text, { color, fontSize: Math.round(inner * 0.36) }]} allowFontScaling={false}>
-          {initials(name)}
-        </Text>
-      </View>
+      {source ? (
+        <Image source={source} style={{ width: inner, height: inner, borderRadius: inner / 2 }} resizeMode="cover" />
+      ) : (
+        <View style={[styles.neutral, { width: inner, height: inner, borderRadius: inner / 2 }]}>
+          <Ionicons name="person" size={Math.round(inner * 0.5)} color={colors.textMuted} />
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   ring: { alignItems: "center", justifyContent: "center" },
-  inner: { alignItems: "center", justifyContent: "center" },
-  text: { fontWeight: "800" },
+  neutral: { alignItems: "center", justifyContent: "center", backgroundColor: colors.borderLight },
 });

@@ -32,6 +32,7 @@ import type { InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import EmptyState from "../components/EmptyState";
+import { hasAnyHistory } from "../utils/stats";
 import { t, tv } from "../i18n";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -386,7 +387,11 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
             onSecondaryPress={() => navigation.navigate("ImportContacts")}
           />
         ) : status === "reachOut" && !search && activeFilter === "Tümü" ? (
-          <EmptyState icon="checkmark-circle-outline" title={t("Herkesle bağın taze ✨")} description={t("Harika gidiyorsun!")} />
+          hasAnyHistory(contacts) ? (
+            <EmptyState icon="checkmark-circle-outline" title={t("Şu an görüşme zamanı gelen kimse yok")} description={t("Görüşme aralıkları doldukça kişiler burada görünür.")} />
+          ) : (
+            <EmptyState icon="time-outline" title={t("Henüz görüşme kaydı yok")} description={t("Bir kişiyle görüştüğünde “Görüştüm” ile kaydet; hatırlatmalar buna göre hesaplanır.")} />
+          )
         ) : (
           <EmptyState
             icon="search-outline"
@@ -605,7 +610,7 @@ function PersonCard({
       )}
 
       {/* Avatar */}
-      <Avatar name={item.fullName} size={48} ringColor={ring} />
+      <Avatar name={item.fullName} avatarId={item.avatarId} size={48} ringColor={ring} />
 
       {/* Info */}
       <View style={styles.cardInfo}>

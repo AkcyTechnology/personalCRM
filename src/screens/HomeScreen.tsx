@@ -258,7 +258,7 @@ export default function HomeScreen({ navigation }: any) {
                 accessibilityRole="button"
                 accessibilityLabel={`${data.pod.fullName}. ${reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}`}
               >
-                <Avatar name={data.pod.fullName} size={68} ringColor={healthScoreColor(healthScore(data.pod, threshold))} />
+                <Avatar name={data.pod.fullName} avatarId={data.pod.avatarId} size={68} ringColor={healthScoreColor(healthScore(data.pod, threshold))} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.podName} numberOfLines={1}>{data.pod.fullName}</Text>
                   <Text style={styles.podReason} numberOfLines={2}>{reasonText(reasonFor(data.pod), firstName(data.pod.fullName))}</Text>
@@ -391,7 +391,7 @@ export default function HomeScreen({ navigation }: any) {
                         : t("{name}, doğum günü {days} gün sonra", { name: contact.fullName, days: daysLeft })
                     }
                   >
-                    <Avatar name={contact.fullName} size={36} />
+                    <Avatar name={contact.fullName} avatarId={contact.avatarId} size={36} />
                     <View>
                       <Text style={styles.bdayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
                       <Text style={[styles.bdayDays, daysLeft <= 1 && { color: colors.secondary }]}>
@@ -525,7 +525,7 @@ function TodayCard({
         accessibilityRole="button"
         accessibilityLabel={days >= 9999 ? contact.fullName : t("{name}, {days} gündür görüşülmedi", { name: contact.fullName, days })}
       >
-        <Avatar name={contact.fullName} size={56} ringColor={ring} />
+        <Avatar name={contact.fullName} avatarId={contact.avatarId} size={56} ringColor={ring} />
         <Text style={styles.todayName} numberOfLines={1}>{firstName(contact.fullName)}</Text>
         <View style={styles.rowCenter}>
           <Ionicons name="time-outline" size={13} color={colors.textSub} />

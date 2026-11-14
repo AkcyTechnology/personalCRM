@@ -17,6 +17,13 @@ export type UserSettings = {
   notif_followUp: boolean;
   notif_weeklySummary: boolean;
   notif_smartNudge: boolean;
+  notif_dailySummary: boolean;
+  /** Hour (0–23) for automatic reminders. */
+  notifyHour: number;
+  /** Automatic reminders never fire between quietStart and quietEnd. */
+  quietHoursEnabled: boolean;
+  quietStart: number;
+  quietEnd: number;
   /** Require Face ID / fingerprint / device passcode to open the app. */
   appLockEnabled: boolean;
   acceptedTermsAt?: string;
@@ -30,6 +37,10 @@ export type UserSettings = {
   analytics: boolean;
   /** The analytics question was shown once (yes or no). */
   analyticsAsked: boolean;
+  /** The user's own illustrated avatar. */
+  userAvatarId?: string;
+  /** The in-app explanation before the notification prompt was shown. */
+  notifPrompted?: boolean;
 };
 
 const DEFAULTS: UserSettings = {
@@ -43,6 +54,11 @@ const DEFAULTS: UserSettings = {
   notif_followUp: true,
   notif_weeklySummary: false,
   notif_smartNudge: true,
+  notif_dailySummary: false,
+  notifyHour: 10,
+  quietHoursEnabled: true,
+  quietStart: 22,
+  quietEnd: 8,
   appLockEnabled: false,
   weeklyGoal: 3,
   theme: "system",

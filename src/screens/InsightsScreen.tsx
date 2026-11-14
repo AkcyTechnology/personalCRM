@@ -15,10 +15,12 @@ import { loadContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm } from "./AddContactScreen";
 import { categorical, colors } from "../theme/colors";
-import { isDue, isSnoozed, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
-import { averageHealthScore, healthScoreColor } from "../utils/healthScore";
+import { isSnoozed } from "../utils/reminderInterval";
+import { connectionStatus, healthScoreColor, healthScoreLabel, MIN_SCORED_PEOPLE } from "../utils/healthScore";
+import { daysSinceLastContact, dueContacts, hasAnyHistory, upcomingContacts, weekStats } from "../utils/stats";
 import HealthInfoModal from "../components/HealthInfoModal";
-import { t, tv } from "../i18n";
+import Avatar from "../components/Avatar";
+import { locale, t, tv } from "../i18n";
 
 const TEAL = colors.primary;
 const TEAL_DARK = colors.primaryDark;
@@ -30,37 +32,9 @@ const WHITE = colors.surface;
 
 type InsightTone = "teal" | "green" | "amber" | "red" | "blue" | "purple";
 
-function safeDate(iso?: string) {
-  if (!iso) return null;
 
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
-function daysSince(iso?: string) {
-  const date = safeDate(iso);
-  if (!date) return 9999;
 
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
-}
-
-function initials(name: string) {
-  return name
-    .trim()
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function avatarColor(name: string) {
-  const palette = categorical();
-
-  let h = 0;
-  for (const c of name) h += c.charCodeAt(0);
-
-  return palette[h % palette.length];
-}
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
@@ -134,6 +108,7 @@ export default function InsightsScreen({ navigation, embedded }: any) {
 
   const [contacts, setContacts] = useState<ContactForm[]>([]);
   const [threshold, setThreshold] = useState(14);
+  const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
 
   const isCompact = width < 380;
@@ -143,35 +118,24 @@ export default function InsightsScreen({ navigation, embedded }: any) {
       Promise.all([loadContacts(), loadSettings()]).then(([c, s]) => {
         setContacts(c);
         setThreshold(s.reachOutThresholdDays || 14);
+        setWeeklyGoal(s.weeklyGoal || 3);
       });
     }, [])
   );
 
   const data = useMemo(() => {
     const active = contacts.filter((c) => !isSnoozed(c));
+    const week = weekStats(contacts, weeklyGoal);
+    const status = connectionStatus(contacts, threshold);
+    const due = dueContacts(active, threshold);
+    const upcoming = upcomingContacts(active, threshold, 7);
+    const known = hasAnyHistory(contacts);
 
-    const contactedThisWeek = active.filter((c) => daysSince(c.lastContactDate) <= 7);
-
-    const needsAttention = [...active]
-      .filter((c) => isDue(c, threshold))
-      .sort((a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate));
-
-    const atRisk = [...active]
-      .filter((c) => {
-        const d = daysSince(c.lastContactDate);
-        const interval = effectiveIntervalDays(c, threshold);
-        return d >= Math.floor(interval * 0.7) && d < interval;
-      })
-      .sort((a, b) => daysSince(b.lastContactDate) - daysSince(a.lastContactDate));
-
-    const strongConnections = [...active]
-      .filter((c) => daysSince(c.lastContactDate) <= 7)
-      .sort((a, b) => daysSince(a.lastContactDate) - daysSince(b.lastContactDate));
-
-    const mostNeglected = [...active]
-      .filter((c) => neglectScore(c, threshold) > 0)
-      .sort((a, b) => neglectScore(b, threshold) - neglectScore(a, threshold))
-      .slice(0, 5);
+    const strongConnections = active
+      .map((c) => ({ c, d: daysSinceLastContact(c) }))
+      .filter((x): x is { c: ContactForm; d: number } => x.d !== null && x.d <= 7)
+      .sort((a, b) => a.d - b.d)
+      .map((x) => x.c);
 
     const birthdayList = active
       .map((c) => ({
@@ -198,56 +162,40 @@ export default function InsightsScreen({ navigation, embedded }: any) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
 
-    const averageHealth = averageHealthScore(active, threshold);
+    const first = due[0];
+    const firstDays = first ? daysSinceLastContact(first) : null;
+    const focusText = !known
+      ? t("Henüz görüşme kaydı yok")
+      : due.length > 0
+        ? t("Görüşme zamanı gelen {count} kişi var", { count: due.length })
+        : upcoming.length > 0
+          ? t("{count} kişiyle görüşme zamanı yaklaşıyor", { count: upcoming.length })
+          : t("Görüşme zamanı gelen kimse yok");
 
-    const weeklyGoal = Math.min(Math.max(3, Math.ceil(contacts.length * 0.15)), 8);
+    const insightText = !known
+      ? t("Bir görüşme kaydettiğinde burada gerçek verilerinle özet göreceksin.")
+      : first && firstDays !== null
+        ? t("{name} ile en son {days} gün önce görüştün.", { name: first.fullName, days: firstDays })
+        : first
+          ? t("{name} için henüz görüşme kaydı yok.", { name: first.fullName })
+          : week.people > 0
+            ? t("Bu hafta {count} kişiyle görüştün.", { count: week.people })
+            : t("Bu hafta henüz görüşme kaydetmedin.");
 
-    const weeklyProgress =
-      active.length === 0
-        ? 0
-        : clamp(Math.round((contactedThisWeek.length / weeklyGoal) * 100));
+    return { week, status, due, upcoming, known, strongConnections, birthdayList, relationshipMix, focusText, insightText };
+  }, [contacts, threshold, weeklyGoal]);
 
-    const healthyConnections =
-      active.length === 0
-        ? 0
-        : clamp(Math.round(((active.length - needsAttention.length) / active.length) * 100));
-
-    const focusText =
-      needsAttention.length > 0
-        ? t("Görüşmek isteyebileceğin {count} kişi var", { count: needsAttention.length })
-        : atRisk.length > 0
-        ? t("{count} bağı yakında hatırlamak iyi olur", { count: atRisk.length })
-        : t("Bağların güzel görünüyor");
-
-    const insightText =
-      needsAttention.length > 0
-        ? t("{name} ile {days} gündür konuşmadınız.", { name: needsAttention[0].fullName, days: daysSince(needsAttention[0].lastContactDate) })
-        : atRisk.length > 0
-        ? t("{name} ile görüşme zamanı {days} gün sonra.", { name: atRisk[0].fullName, days: effectiveIntervalDays(atRisk[0], threshold) - daysSince(atRisk[0].lastContactDate) })
-        : contactedThisWeek.length > 0
-        ? t("Bu hafta {count} kişiyle bağ kurdun.", { count: contactedThisWeek.length })
-        : t("Bu hafta küçük bir merhaba ile başlayabilirsin.");
-
-    return {
-      contactedThisWeek,
-      needsAttention,
-      atRisk,
-      strongConnections,
-      mostNeglected,
-      birthdayList,
-      relationshipMix,
-      averageHealth,
-      weeklyGoal,
-      weeklyProgress,
-      healthyConnections,
-      focusText,
-      insightText,
-    };
-  }, [contacts, threshold]);
-
-  const priorityList = [...data.needsAttention, ...data.atRisk]
-    .sort((a, b) => neglectScore(b, threshold) - neglectScore(a, threshold))
-    .slice(0, 4);
+  const priorityList: { contact: ContactForm; label: string; tone: string }[] = [
+    ...data.due.map((c) => {
+      const d = daysSinceLastContact(c);
+      return { contact: c, label: d === null ? t("Görüşme kaydı yok") : t("{days} gündür görüşülmedi", { days: d }), tone: colors.warning };
+    }),
+    ...data.upcoming.map(({ contact, inDays }) => ({
+      contact,
+      label: inDays === 0 ? t("Bugün") : t("{days} gün sonra", { days: inDays }),
+      tone: colors.primary,
+    })),
+  ].slice(0, 5);
 
   return (
     <View style={styles.screen}>
@@ -268,37 +216,38 @@ export default function InsightsScreen({ navigation, embedded }: any) {
               <Text style={styles.heroDesc}>{data.insightText}</Text>
             </View>
 
-            <HealthBadge value={data.averageHealth} />
+            <HealthBadge value={data.status.score} />
           </View>
 
           <View style={styles.heroProgressBlock}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressLabel}>{t("Haftalık hedef")}</Text>
-              <Text style={styles.progressValue} accessibilityLabel={t("Haftalık hedef: {done} / {goal}", { done: data.contactedThisWeek.length, goal: data.weeklyGoal })}>
-                {data.contactedThisWeek.length}/{data.weeklyGoal}
+              <Text style={styles.progressValue} accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done: data.week.people, goal: data.week.goal })}>
+                {data.week.people}/{data.week.goal}
               </Text>
             </View>
 
-            <ProgressBar value={data.weeklyProgress} color={TEAL} />
+            <ProgressBar value={clamp(Math.round((data.week.people / data.week.goal) * 100))} color={TEAL} />
+            <Text style={styles.weekRange}>{weekRangeText(data.week.start, data.week.end)} · {t("görüştüğün farklı kişiler")}</Text>
           </View>
         </View>
 
         <View style={styles.metricsGrid}>
           <MetricCard
-            label={t("Toplam")}
+            label={t("Toplam kişi")}
             value={contacts.length}
             tone="teal"
           />
 
           <MetricCard
-            label={t("Bu hafta")}
-            value={data.contactedThisWeek.length}
+            label={t("Bu haftaki görüşmeler")}
+            value={data.week.moments}
             tone="green"
           />
 
           <MetricCard
-            label={t("Yeniden bağlan")}
-            value={data.needsAttention.length}
+            label={t("Görüşme zamanı gelen")}
+            value={data.due.length}
             tone="red"
           />
 
@@ -310,31 +259,25 @@ export default function InsightsScreen({ navigation, embedded }: any) {
         </View>
 
         <SectionTitle
-          title={t("Görüşmek isteyebileceklerin")}
+          title={t("Görüşme zamanı gelen ve yaklaşanlar")}
         />
 
         {priorityList.length > 0 ? (
           <View style={styles.stack}>
-            {priorityList.map((c, i) => {
-              const days = daysSince(c.lastContactDate);
-              const interval = effectiveIntervalDays(c, threshold);
-              const isLate = days >= interval;
-
-              return (
-                <PriorityCard
-                  key={`${c.fullName}-${i}`}
-                  contact={c}
-                  label={isLate ? t("{days} gündür görüşülmedi", { days }) : t("{days} gün kaldı", { days: interval - days })}
-                  tone={isLate ? colors.danger : colors.warning}
-                  onPress={() => navigation.navigate("PersonDetail", { contact: c })}
-                />
-              );
-            })}
+            {priorityList.map(({ contact: c, label, tone }, i) => (
+              <PriorityCard
+                key={`${c.id ?? c.fullName}-${i}`}
+                contact={c}
+                label={label}
+                tone={tone}
+                onPress={() => navigation.navigate("PersonDetail", { contact: c })}
+              />
+            ))}
           </View>
         ) : (
           <EmptyState
-            title={t("Herkesle bağın taze ✨")}
-            desc={t("Harika gidiyorsun!")}
+            title={data.known ? t("Önümüzdeki 7 günde görüşme zamanı gelen kimse yok") : t("Henüz görüşme kaydı yok")}
+            desc={data.known ? t("Hatırlatmalar görüşme aralıklarına göre hesaplanır.") : t("Bir kişiyle görüştüğünde “Görüştüm” ile kaydet; hatırlatmalar buna göre hesaplanır.")}
           />
         )}
 
@@ -362,27 +305,30 @@ export default function InsightsScreen({ navigation, embedded }: any) {
         ) : null}
 
         <SectionTitle
-          title={t("Bağlantın")}
+          title={t("Bağlarının durumu")}
           onInfoPress={() => setHealthInfoOpen(true)}
         />
 
         <View style={styles.card}>
-          <HealthRow
-            label={t("Genel sağlık")}
-            value={data.averageHealth}
-            color={healthScoreColor(data.averageHealth)}
-          />
-
+          {data.status.score === null ? (
+            <View style={styles.healthRow}>
+              <Text style={styles.healthRowLabel}>{t("Henüz yeterli veri yok")}</Text>
+              <Text style={styles.noDataText}>
+                {t("Durum, en az {min} kişi için görüşme kaydı olduğunda hesaplanır. Şu an: {count}.", { min: MIN_SCORED_PEOPLE, count: data.status.scored })}
+              </Text>
+            </View>
+          ) : (
+            <HealthRow
+              label={t("Takip durumu ({count} kişiye göre)", { count: data.status.scored })}
+              value={data.status.score}
+              color={healthScoreColor(data.status.score)}
+              statusText={t(healthScoreLabel(data.status.score))}
+            />
+          )}
           <HealthRow
             label={t("Haftalık hedef")}
-            value={data.weeklyProgress}
+            value={clamp(Math.round((data.week.people / data.week.goal) * 100))}
             color={TEAL}
-          />
-
-          <HealthRow
-            label={t("Sağlıklı bağlantılar")}
-            value={data.healthyConnections}
-            color={colors.accent}
             last
           />
         </View>
@@ -419,7 +365,7 @@ export default function InsightsScreen({ navigation, embedded }: any) {
                 <CompactPerson
                   key={`${c.fullName}-strong-${i}`}
                   contact={c}
-                  rightText={dayLabel(daysSince(c.lastContactDate))}
+                  rightText={dayLabel(daysSinceLastContact(c) ?? 0)}
                   onPress={() => navigation.navigate("PersonDetail", { contact: c })}
                 />
               ))}
@@ -444,13 +390,22 @@ function InsightsHeader() {
   );
 }
 
-function HealthBadge({ value }: { value: number }) {
+function HealthBadge({ value }: { value: number | null }) {
   return (
-    <View style={styles.healthBadge}>
-      <Text style={styles.healthBadgeValue}>{value}</Text>
-      <Text style={styles.healthBadgeLabel}>{t("Skor")}</Text>
+    <View
+      style={styles.healthBadge}
+      accessible
+      accessibilityLabel={value === null ? t("Takip durumu: henüz yeterli veri yok") : t("Takip durumu: {value} / 100, {label}", { value, label: t(healthScoreLabel(value)) })}
+    >
+      <Text style={styles.healthBadgeValue}>{value === null ? "—" : value}</Text>
+      <Text style={styles.healthBadgeLabel}>{value === null ? t("Veri az") : t(healthScoreLabel(value))}</Text>
     </View>
   );
+}
+
+function weekRangeText(start: Date, end: Date) {
+  const f = (d: Date) => d.toLocaleDateString(locale(), { day: "numeric", month: "short" });
+  return `${f(start)} – ${f(end)}`;
 }
 
 function MetricCard({
@@ -519,21 +474,9 @@ function PriorityCard({
   tone: string;
   onPress?: () => void;
 }) {
-  const color = avatarColor(contact.fullName);
-
   return (
-    <TouchableOpacity style={styles.priorityCard} onPress={onPress} activeOpacity={0.75}>
-      <View
-        style={[
-          styles.avatar,
-          {
-            backgroundColor: color + "16",
-            borderColor: color + "35",
-          },
-        ]}
-      >
-        <Text style={[styles.avatarText, { color }]}>{initials(contact.fullName)}</Text>
-      </View>
+    <TouchableOpacity style={styles.priorityCard} onPress={onPress} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={`${contact.fullName}, ${label}`}>
+      <Avatar name={contact.fullName} avatarId={contact.avatarId} size={44} />
 
       <View style={styles.personInfo}>
         <Text style={styles.personName} numberOfLines={1}>
@@ -561,23 +504,9 @@ function BirthdayCard({
   label: string;
   onPress?: () => void;
 }) {
-  const color = avatarColor(contact.fullName);
-
   return (
-    <TouchableOpacity style={styles.birthdayCard} onPress={onPress} activeOpacity={0.75}>
-      <View
-        style={[
-          styles.birthdayAvatar,
-          {
-            backgroundColor: color + "16",
-            borderColor: color + "30",
-          },
-        ]}
-      >
-        <Text style={[styles.birthdayInitials, { color }]}>
-          {initials(contact.fullName)}
-        </Text>
-      </View>
+    <TouchableOpacity style={styles.birthdayCard} onPress={onPress} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={`${contact.fullName}, ${label}`}>
+      <Avatar name={contact.fullName} avatarId={contact.avatarId} size={48} />
 
       <Text style={styles.birthdayName} numberOfLines={1}>
         {contact.fullName.split(" ")[0]}
@@ -593,11 +522,13 @@ function HealthRow({
   value,
   color,
   last,
+  statusText,
 }: {
   label: string;
   value: number;
   color: string;
   last?: boolean;
+  statusText?: string;
 }) {
   return (
     <View
@@ -609,7 +540,7 @@ function HealthRow({
     >
       <View style={styles.healthRowTop}>
         <Text style={styles.healthRowLabel}>{label}</Text>
-        <Text style={[styles.healthRowValue, { color }]}>{value}%</Text>
+        <Text style={[styles.healthRowValue, { color }]}>{statusText ? `${statusText} · ${value}` : `${value}%`}</Text>
       </View>
 
       <ProgressBar value={value} color={color} />
@@ -694,23 +625,9 @@ function CompactPerson({
   rightText: string;
   onPress?: () => void;
 }) {
-  const color = avatarColor(contact.fullName);
-
   return (
-    <TouchableOpacity style={styles.compactRow} onPress={onPress} activeOpacity={0.75}>
-      <View
-        style={[
-          styles.compactAvatar,
-          {
-            backgroundColor: color + "16",
-            borderColor: color + "30",
-          },
-        ]}
-      >
-        <Text style={[styles.compactInitials, { color }]}>
-          {initials(contact.fullName)}
-        </Text>
-      </View>
+    <TouchableOpacity style={styles.compactRow} onPress={onPress} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={`${contact.fullName}, ${rightText}`}>
+      <Avatar name={contact.fullName} avatarId={contact.avatarId} size={40} />
 
       <View style={styles.personInfo}>
         <Text style={styles.personName} numberOfLines={1}>
@@ -906,6 +823,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  weekRange: { fontSize: 12, color: colors.textSub, marginTop: 8 },
+  noDataText: { fontSize: 13, lineHeight: 19, color: colors.textSub, marginTop: 4 },
   progressLabel: {
     fontSize: 12,
     color: SUB,

@@ -96,7 +96,7 @@ fs.mkdirSync(OUT, { recursive: true });
       await page.waitForTimeout(800);
     });
     await step("people: two contacts listed", async () => { await click(label_("Kişiler")); await text("2 kişi").waitFor({ timeout: 4000 }); });
-    await step("people: status filter Yeniden bağlan", async () => { await click(text("Yeniden bağlan")); await text("Herkesle bağın taze ✨").waitFor({ timeout: 3000 }); await click(text("Tümü")); });
+    await step("people: status filter Yeniden bağlan", async () => { await click(text("Yeniden bağlan")); await text("Şu an görüşme zamanı gelen kimse yok").waitFor({ timeout: 3000 }); await click(text("Tümü")); });
     await step("people: search", async () => { await label_("Kişi ara").fill("zzz"); await text("Sonuç yok").waitFor({ timeout: 3000 }); await click(label_("Aramayı temizle")); });
     await shot("06-people");
 

@@ -13,6 +13,7 @@ import type { ContactForm, InteractionType } from "./AddContactScreen";
 import { colors } from "../theme/colors";
 import { isSnoozed, isDue, effectiveIntervalDays, neglectScore } from "../utils/reminderInterval";
 import { showToast, showUndoToast } from "../components/Toast";
+import Avatar from "../components/Avatar";
 import { locale, t } from "../i18n";
 
 const PURPLE = colors.primary;
@@ -36,9 +37,6 @@ function daysSince(iso?: string) {
   return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
 }
 
-function initials(name: string) {
-  return name.trim().split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
-}
 
 function nextBirthdayInfo(birthday?: string) {
   if (!birthday) return null;
@@ -164,9 +162,7 @@ export default function RemindersScreen({ navigation }: any) {
                   accessibilityRole="button"
                   accessibilityLabel={t("{name}, {days} gündür görüşülmedi", { name: contact.fullName, days })}
                 >
-                  <View style={[styles.iconCircle, { backgroundColor: PURPLE + "15" }]}>
-                    <Text style={[styles.iconText, { color: PURPLE }]}>{initials(contact.fullName)}</Text>
-                  </View>
+                  <Avatar name={contact.fullName} avatarId={contact.avatarId} size={44} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{contact.fullName}</Text>
                     <Text style={styles.cardDesc} numberOfLines={1}>
@@ -214,9 +210,7 @@ export default function RemindersScreen({ navigation }: any) {
                   onPress={() => goToContact(contact)}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initials(contact.fullName)}</Text>
-                  </View>
+                  <Avatar name={contact.fullName} avatarId={contact.avatarId} size={44} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{contact.fullName}</Text>
                     <Text style={styles.cardDesc}>{t("Doğum günü")}</Text>
