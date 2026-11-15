@@ -8,6 +8,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 import UniverseScreen from "../screens/UniverseScreen";
 import BottomTabBar from "../components/BottomTabBar";
 import { warm } from "../theme/warm";
+import { SPACE_BASE } from "../data/planets";
 
 type Tab = "Home" | "People" | "Insights" | "Profile";
 
@@ -30,7 +31,7 @@ export default function MainTabs({ navigation }: Props) {
       <View style={styles.screen}>
         <ActiveScreen tab={activeTab} navigation={navigation} />
       </View>
-      <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+      <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} backdrop={activeTab === "Insights" ? SPACE_BASE : undefined} />
     </View>
   );
 }

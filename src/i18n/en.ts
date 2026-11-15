@@ -1071,4 +1071,5 @@ export const en: Record<string, string | [string, string]> = {
   "{count} kişi kayıtlı": ["{count} person saved", "{count} people saved"],
   "Görüşme kaydettikçe haftalık hedef ve bağlarının durumu dolacak.": "Your weekly goal and follow-up status fill in as you log moments.",
   "Bildirimler, gizlilik, kullanım amaçları, dil, görünüm ve yedekler": "Notifications, privacy, use cases, language, appearance and backups",
+  "{circle} gezegeni: {count} kişi": ["{circle} planet: {count} person", "{circle} planet: {count} people"],
 };

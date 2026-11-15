@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Modal,
@@ -14,7 +13,8 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Line, Circle as SvgCircle } from "react-native-svg";
+import Svg, { Ellipse, Line } from "react-native-svg";
+import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "./AddContactScreen";
 import { loadContacts, subscribeContacts } from "../data/contacts";
@@ -22,22 +22,29 @@ import { loadSettings } from "../data/userSettings";
 import { healthScore, healthScoreColor, healthSortKey } from "../utils/healthScore";
 import { daysSinceIntervalStart, isDue } from "../utils/reminderInterval";
 import { logMoment } from "../app/momentActions";
-import Avatar, { initials } from "../components/Avatar";
-import EmptyState from "../components/EmptyState";
+import Avatar from "../components/Avatar";
 import LogInteractionModal from "../components/LogInteractionModal";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
+import { useReduceMotion } from "../hooks/useReduceMotion";
+import { SUN, SPACE_BG, SPACE_BASE, PLANET_TINT, assignPlanets, planetImage, type PlanetKey } from "../data/planets";
 import { consumeGlow } from "../app/glow";
 import { t, tv } from "../i18n";
 
-const CLUSTER_COLORS = [colors.primary, colors.warm, colors.accent, colors.secondary, colors.warning, colors.success, colors.primaryDark, colors.warmStrong];
-const MAX_CLUSTERS = 7;
+const MAX_CLUSTERS = 8;
 const OTHER = "Diğer";
+const PLANET = 60;
+const SUN_SIZE = 92;
+/** Moon slots around a planet, in radians from straight up; the bottom is left for its name. */
+const ARC = [0, -0.8, 0.8, -1.6, 1.6, -2.3, 2.3];
+
+/** Text on the night sky (the map stays dark in both themes). */
+const SKY = { text: "#FFFFFF", sub: "rgba(255,255,255,0.78)", line: "rgba(255,255,255,0.22)", chip: "rgba(255,255,255,0.12)", chipBorder: "rgba(255,255,255,0.24)", base: SPACE_BASE };
 
 type Node = { contact: ContactForm; x: number; y: number; size: number; score: number | null; due: boolean; cluster: number };
-type Hub = { label: string; x: number; y: number; color: string; count: number };
+type Hub = { label: string; x: number; y: number; planet: PlanetKey; color: string; count: number; orbit: number };
 
-/** Deterministic radial layout: you in the centre, one cluster per relationship type. */
+/** Deterministic solar layout: you are the sun, each relationship type a planet on its orbit, people as moons around it. */
 function layout(contacts: ContactForm[], threshold: number, w: number, h: number) {
   const groups = new Map<string, ContactForm[]>();
   for (const c of contacts) {
@@ -49,39 +56,48 @@ function layout(contacts: ContactForm[], threshold: number, w: number, h: number
     const rest = entries.slice(MAX_CLUSTERS - 1).flatMap(([, list]) => list);
     entries = [...entries.slice(0, MAX_CLUSTERS - 1), [OTHER, rest]];
   }
+  const planets = assignPlanets(entries.map(([label]) => label));
 
   const cx = w / 2, cy = h / 2;
-  const hubRadius = Math.min(w, h) * (entries.length === 1 ? 0 : 0.3);
-  const size = contacts.length > 60 ? 26 : contacts.length > 30 ? 32 : 40;
+  const base = Math.min(w, h);
+  // Two orbits once there are more than four planets, so they don't crowd.
+  const orbits = entries.length > 4 ? [base * 0.27, base * 0.4] : [base * 0.34];
+  const size = contacts.length > 60 ? 24 : contacts.length > 30 ? 28 : 34;
   const hubs: Hub[] = [];
   const nodes: Node[] = [];
+  const pad = size / 2 + 4;
 
   entries.forEach(([label, list], gi) => {
-    const angle = (2 * Math.PI * gi) / entries.length - Math.PI / 2;
-    const hx = cx + Math.cos(angle) * hubRadius;
-    const hy = cy + Math.sin(angle) * hubRadius;
-    const color = CLUSTER_COLORS[gi % CLUSTER_COLORS.length];
-    hubs.push({ label, x: hx, y: hy, color, count: list.length });
+    const angle = (2 * Math.PI * gi) / entries.length - Math.PI / 2 + (gi % 2 ? 0.18 : 0);
+    const orbit = orbits[gi % orbits.length];
+    const hx = cx + Math.cos(angle) * orbit;
+    const hy = cy + Math.sin(angle) * orbit * 1.05;
+    hubs.push({ label, x: hx, y: hy, planet: planets[gi], color: PLANET_TINT[planets[gi]], count: list.length, orbit });
 
-    // Yakın (sağlıklı) ilişkiler küme merkezine yakın, zayıflayanlar dışarıda.
+    // Moons sit on arcs above the planet (its name is below), closest bonds
+    // first; a full arc starts a wider one.
     const sorted = [...list].sort((a, b) => healthSortKey(b, threshold) - healthSortKey(a, threshold));
     sorted.forEach((c, k) => {
-      const a = angle + k * 2.39996; // altın açı
-      const dist = 34 + size * 0.55 * Math.sqrt(k + 1);
-      const x = Math.max(size / 2 + 4, Math.min(w - size / 2 - 4, hx + Math.cos(a) * dist));
-      const y = Math.max(size / 2 + 4, Math.min(h - size / 2 - 4, hy + Math.sin(a) * dist));
+      const ring = Math.floor(k / ARC.length);
+      const a = -Math.PI / 2 + ARC[k % ARC.length] + (ring % 2 ? 0.4 : 0);
+      const dist = PLANET / 2 + size / 2 + 6 + ring * (size + 6);
+      const x = Math.max(pad, Math.min(w - pad, hx + Math.cos(a) * dist));
+      const y = Math.max(pad, Math.min(h - pad, hy + Math.sin(a) * dist));
       const score = c.reminderEnabled === false ? 100 : healthScore(c, threshold);
       nodes.push({ contact: c, x, y, size, score, due: isDue(c, threshold), cluster: gi });
     });
   });
-  return { hubs, nodes, cx, cy };
+  return { hubs, nodes, cx, cy, orbits: [...new Set(orbits)] };
 }
 
 export default function UniverseScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
 
   return (
     <View style={styles.screen}>
+      {/* Night sky: a softly animated GIF, still when Reduce Motion is on. */}
+      <Image source={SPACE_BG} style={StyleSheet.absoluteFill} contentFit="cover" autoplay={!reduceMotion} accessible={false} />
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title} accessibilityRole="header">{t("Evrenin")}</Text>
         <TouchableOpacity
@@ -90,25 +106,25 @@ export default function UniverseScreen({ navigation }: { navigation: any }) {
           accessibilityRole="button"
           accessibilityLabel={t("Bu ayın hikâyesi")}
         >
-          <Ionicons name="sparkles" size={16} color={colors.onFill} />
+          <Ionicons name="sparkles" size={16} color={SKY.text} />
           <Text style={styles.storyBtnText}>{t("Bu ayın hikâyesi")}</Text>
         </TouchableOpacity>
       </View>
-      <UniverseMap navigation={navigation} />
+      <UniverseMap navigation={navigation} reduceMotion={reduceMotion} />
     </View>
   );
 }
 
-function UniverseMap({ navigation }: { navigation: any }) {
+function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMotion: boolean }) {
   const { width, height } = useWindowDimensions();
   const [contacts, setContacts] = useState<ContactForm[] | null>(null);
   const [threshold, setThreshold] = useState(14);
   const [selected, setSelected] = useState<ContactForm | null>(null);
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [focusCluster, setFocusCluster] = useState<number | null>(null);
-  const [reduceMotion, setReduceMotion] = useState(false);
   const [glowId, setGlowId] = useState<string | null>(null);
   const float = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -126,10 +142,6 @@ function UniverseMap({ navigation }: { navigation: any }) {
   );
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (reduceMotion) return;
     const loop = Animated.loop(
       Animated.sequence([
@@ -137,12 +149,14 @@ function UniverseMap({ navigation }: { navigation: any }) {
         Animated.timing(float, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
+    const turn = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 60000, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
-    return () => loop.stop();
-  }, [float, reduceMotion]);
+    turn.start();
+    return () => { loop.stop(); turn.stop(); };
+  }, [float, spin, reduceMotion]);
 
   const canvasW = width;
-  const canvasH = Math.max(380, Math.min(height * 0.58, width * 1.3));
+  const canvasH = Math.max(440, Math.min(height * 0.64, width * 1.35));
   const map = useMemo(
     () => (contacts ? layout(contacts, threshold, canvasW, canvasH) : null),
     [contacts, threshold, canvasW, canvasH]
@@ -152,33 +166,27 @@ function UniverseMap({ navigation }: { navigation: any }) {
 
   if (contacts.length === 0) {
     return (
-      <EmptyState
-        icon="planet-outline"
-        title={t("Evrenin burada şekillenecek")}
-        description={t("İlk kişini ekle, bağların burada canlansın.")}
-        buttonLabel={t("Kişi ekle")}
-        onPress={() => navigation.navigate("AddContact")}
-      />
+      <View style={styles.empty}>
+        <Image source={SUN} style={{ width: 120, height: 120 }} contentFit="contain" accessible={false} />
+        <Text style={styles.emptyTitle}>{t("Evrenin burada şekillenecek")}</Text>
+        <Text style={styles.emptyText}>{t("İlk kişini ekle, bağların burada canlansın.")}</Text>
+        <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate("AddContact")} accessibilityRole="button">
+          <Ionicons name="add" size={18} color={SKY.base} />
+          <Text style={styles.emptyBtnText}>{t("Kişi ekle")}</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   const dueCount = map.nodes.filter((n) => n.due).length;
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
       <View style={{ width: canvasW, height: canvasH }}>
         <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFill}>
-          {map.hubs.map((hub, i) => (
-            <Line
-              key={`hub-${i}`}
-              x1={map.cx}
-              y1={map.cy}
-              x2={hub.x}
-              y2={hub.y}
-              stroke={hub.color}
-              strokeOpacity={focusCluster === null || focusCluster === i ? 0.45 : 0.1}
-              strokeWidth={3}
-            />
+          {map.orbits.map((r) => (
+            <Ellipse key={`orbit-${r}`} cx={map.cx} cy={map.cy} rx={r} ry={r * 1.05} stroke={SKY.line} strokeWidth={1} strokeDasharray="3 6" fill="none" />
           ))}
           {map.nodes.map((n, i) => (
             <Line
@@ -188,25 +196,47 @@ function UniverseMap({ navigation }: { navigation: any }) {
               x2={n.x}
               y2={n.y}
               stroke={map.hubs[n.cluster].color}
-              strokeOpacity={(focusCluster === null || focusCluster === n.cluster ? 0.35 : 0.06) * (n.score !== null && n.score < 40 ? 0.5 : 1)}
-              strokeWidth={1.5}
-              strokeDasharray={n.score !== null && n.score < 40 ? "4 4" : undefined}
+              strokeOpacity={(focusCluster === null || focusCluster === n.cluster ? 0.5 : 0.08) * (n.score !== null && n.score < 40 ? 0.5 : 1)}
+              strokeWidth={1}
+              strokeDasharray={n.score !== null && n.score < 40 ? "3 4" : undefined}
             />
-          ))}
-          {map.hubs.map((hub, i) => (
-            <SvgCircle key={`hubdot-${i}`} cx={hub.x} cy={hub.y} r={7} fill={hub.color} opacity={0.9} />
           ))}
         </Svg>
 
-        {/* Sen */}
-        <View
-          style={[styles.me, { left: map.cx - 32, top: map.cy - 32 }]}
-          accessible
-          accessibilityLabel={t("Sen, evrenin merkezi")}
-        >
-          <Text style={styles.meText}>{t("Sen")}</Text>
+        {/* You: the sun */}
+        <View style={[styles.sunWrap, { left: map.cx - SUN_SIZE / 2, top: map.cy - SUN_SIZE / 2 }]} accessible accessibilityLabel={t("Sen, evrenin merkezi")}>
+          <Animated.View style={{ width: SUN_SIZE, height: SUN_SIZE, transform: [{ rotate }] }}>
+            <Image source={SUN} style={{ width: SUN_SIZE, height: SUN_SIZE }} contentFit="contain" />
+          </Animated.View>
+          <Text style={styles.sunLabel}>{t("Sen")}</Text>
         </View>
 
+        {/* Planets: one per relationship type */}
+        {map.hubs.map((hub, i) => {
+          const active = focusCluster === i;
+          const dim = focusCluster !== null && !active;
+          const dy = reduceMotion ? 0 : float.interpolate({ inputRange: [0, 1], outputRange: [0, i % 2 ? 3 : -3] });
+          return (
+            <Animated.View
+              key={`planet-${hub.label}`}
+              style={[styles.planetWrap, { left: hub.x - PLANET / 2 - 20, top: hub.y - PLANET / 2, opacity: dim ? 0.35 : 1, transform: [{ translateY: dy as any }] }]}
+            >
+              <TouchableOpacity
+                onPress={() => setFocusCluster(active ? null : i)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={t("{circle} gezegeni: {count} kişi", { circle: tv(hub.label), count: hub.count })}
+                style={styles.planetHit}
+              >
+                <Image source={planetImage(hub.planet)} style={{ width: PLANET, height: PLANET }} contentFit="contain" />
+                <Text style={[styles.planetLabel, active && { color: hub.color }]} numberOfLines={1}>{tv(hub.label)}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+
+        {/* People: moons around their planet */}
         {map.nodes.map((n, i) => {
           const dim = focusCluster !== null && focusCluster !== n.cluster;
           const faded = n.score !== null && n.score < 40;
@@ -219,7 +249,7 @@ function UniverseMap({ navigation }: { navigation: any }) {
               key={n.contact.id ?? i}
               style={[
                 styles.nodeWrap,
-                { left: n.x - n.size / 2, top: n.y - n.size / 2, opacity: dim ? 0.2 : faded ? 0.55 : 1, transform: [{ translateY: dy as any }] },
+                { left: n.x - n.size / 2, top: n.y - n.size / 2, opacity: dim ? 0.2 : faded ? 0.6 : 1, transform: [{ translateY: dy as any }] },
               ]}
             >
               {n.due && !reduceMotion ? <Pulse size={n.size} color={colors.warm} /> : null}
@@ -236,45 +266,30 @@ function UniverseMap({ navigation }: { navigation: any }) {
                   days < 9999 ? t("{days} gündür görüşülmedi", { days }) : "",
                   n.due ? t("seni özlemiş olabilir") : "",
                 ].filter(Boolean).join(", ")}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
               >
-                <View
-                  style={[
-                    styles.node,
-                    {
-                      width: n.size,
-                      height: n.size,
-                      borderRadius: n.size / 2,
-                      borderColor: healthScoreColor(n.score),
-                      backgroundColor: colors.surface,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.nodeText, { fontSize: n.size * 0.34, color: map.hubs[n.cluster].color }]} allowFontScaling={false}>
-                    {initials(n.contact.fullName)}
-                  </Text>
-                </View>
+                <Avatar name={n.contact.fullName} avatarId={n.contact.avatarId} size={n.size} ringColor={healthScoreColor(n.score)} />
               </TouchableOpacity>
             </Animated.View>
           );
         })}
       </View>
 
-      {/* Legend / cluster filter */}
+      {/* Legend / planet filter */}
       <View style={styles.legend}>
         {map.hubs.map((hub, i) => {
           const active = focusCluster === i;
           return (
             <TouchableOpacity
               key={hub.label}
-              style={[styles.legendChip, active && { backgroundColor: hub.color, borderColor: hub.color }]}
+              style={[styles.legendChip, active && { borderColor: hub.color, backgroundColor: "rgba(255,255,255,0.22)" }]}
               onPress={() => setFocusCluster(active ? null : i)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={t("{circle}: {count} kişi", { circle: tv(hub.label), count: hub.count })}
             >
-              <View style={[styles.legendDot, { backgroundColor: active ? colors.onFill : hub.color }]} />
-              <Text style={[styles.legendText, active && { color: colors.onFill }]}>{tv(hub.label)} · {hub.count}</Text>
+              <Image source={planetImage(hub.planet)} style={{ width: 20, height: 20 }} contentFit="contain" />
+              <Text style={styles.legendText}>{tv(hub.label)} · {hub.count}</Text>
             </TouchableOpacity>
           );
         })}
@@ -282,7 +297,7 @@ function UniverseMap({ navigation }: { navigation: any }) {
 
       <View style={styles.hintRow}>
         <View style={styles.hintItem}><View style={[styles.hintDot, { borderColor: colors.success }]} /><Text style={styles.hintText}>{t("Güçlü bağ")}</Text></View>
-        <View style={styles.hintItem}><View style={[styles.hintDot, { borderColor: colors.danger, opacity: 0.55 }]} /><Text style={styles.hintText}>{t("Soluyor")}</Text></View>
+        <View style={styles.hintItem}><View style={[styles.hintDot, { borderColor: colors.danger, opacity: 0.6 }]} /><Text style={styles.hintText}>{t("Soluyor")}</Text></View>
         {dueCount > 0 ? <Text style={styles.hintText}>{t("{count} kişi seni özlemiş olabilir", { count: dueCount })}</Text> : null}
       </View>
 
@@ -400,61 +415,49 @@ function PersonPreview({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 10 },
-  title: { fontSize: 26, fontWeight: "800", color: colors.text },
+  screen: { flex: 1, backgroundColor: SKY.base },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 6 },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: "600", color: SKY.text },
   storyBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 14,
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: SKY.chip,
+    borderWidth: 1,
+    borderColor: SKY.chipBorder,
   },
-  storyBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 14 },
-  me: {
-    position: "absolute",
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.inverse,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 4,
-    borderColor: colors.primarySoft,
-  },
-  meText: { color: colors.onInverse, fontWeight: "900", fontSize: 15 },
+  storyBtnText: { color: SKY.text, fontWeight: "600", fontSize: 14 },
+  sunWrap: { position: "absolute", width: SUN_SIZE, alignItems: "center" },
+  sunLabel: { position: "absolute", top: SUN_SIZE / 2 - 10, fontSize: 14, lineHeight: 20, fontWeight: "700", color: "#5A2E00" },
+  planetWrap: { position: "absolute", width: PLANET + 40, alignItems: "center", zIndex: 2 },
+  planetHit: { alignItems: "center", minWidth: 48, minHeight: 48 },
+  planetLabel: { marginTop: 2, fontSize: 12, lineHeight: 16, fontWeight: "600", color: SKY.text, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, maxWidth: PLANET + 40 },
   nodeWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  node: {
-    borderWidth: 3,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  nodeText: { fontWeight: "800" },
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 20, marginTop: 8 },
   legendChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
-    minHeight: 36,
+    minHeight: 40,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
+    borderColor: SKY.chipBorder,
+    backgroundColor: SKY.chip,
   },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 14, fontWeight: "700", color: colors.text },
+  legendText: { fontSize: 13, fontWeight: "500", color: SKY.text },
   hintRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, paddingHorizontal: 20, marginTop: 14 },
   hintItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   hintDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3 },
-  hintText: { fontSize: 13, color: colors.textSub, fontWeight: "600" },
+  hintText: { fontSize: 13, color: SKY.sub, fontWeight: "500" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 32, paddingBottom: 100 },
+  emptyTitle: { fontSize: 18, lineHeight: 24, fontWeight: "600", color: SKY.text, textAlign: "center" },
+  emptyText: { fontSize: 14, lineHeight: 20, color: SKY.sub, textAlign: "center" },
+  emptyBtn: { marginTop: 6, minHeight: 48, paddingHorizontal: 20, borderRadius: 10, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6 },
+  emptyBtnText: { fontSize: 14, fontWeight: "600", color: SKY.base },
   sheetOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, gap: 12 },
   sheetHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },

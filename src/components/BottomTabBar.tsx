@@ -41,13 +41,16 @@ const ion = (name: IconName, active: boolean) => (color: string) =>
 export default function BottomTabBar({
   activeTab,
   onTabPress,
+  backdrop,
 }: {
   activeTab: Tab;
   onTabPress: (tab: Tab) => void;
+  /** Background behind the capsule when a screen has its own (the Universe sky). */
+  backdrop?: string;
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View style={[styles.wrapper, backdrop ? { backgroundColor: backdrop } : null, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <View style={styles.capsule} accessibilityRole="tablist">
         <TabItem label={t("Ana Sayfa")} active={activeTab === "Home"} onPress={() => onTabPress("Home")} icon={ion("home-outline", activeTab === "Home")} />
         <TabItem label={t("Kişiler")} active={activeTab === "People"} onPress={() => onTabPress("People")} icon={ion("people-outline", activeTab === "People")} />

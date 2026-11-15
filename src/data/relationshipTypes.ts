@@ -4,7 +4,7 @@ const KEY = "crm_custom_relationships";
 
 export const DEFAULT_RELATIONSHIPS = [
   "Müşteri", "Tanıdık", "İş arkadaşı", "Mentor",
-  "Arkadaş", "Aile", "Potansiyel müşteri", "Mentee",
+  "Arkadaş", "Aile", "Okul", "Potansiyel müşteri", "Mentee",
 ];
 
 export async function loadCustomRelationships(): Promise<string[]> {
