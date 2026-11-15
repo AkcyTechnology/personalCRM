@@ -18,6 +18,8 @@ import { runExportBackup, runRestoreBackup } from "../data/backupActions";
 import { t } from "../i18n";
 import { colors, colorScheme } from "../theme/colors";
 import { showToast } from "../components/Toast";
+import { GOALS } from "../data/goals";
+import GoalIcon from "../components/GoalIcon";
 import { hapticTap } from "../utils/haptics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -48,6 +50,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
   const [themeOpen,      setThemeOpen]      = useState(false);
   const [theme,          setTheme]          = useState<"system" | "light" | "dark">("system");
   const [haptics,        setHaptics]        = useState(true);
+  const [goals,          setGoals]          = useState<string[]>([]);
+  const [purposesOpen,   setPurposesOpen]   = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -57,6 +61,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         setLanguage(s.language || "system");
         setTheme(s.theme || "system");
         setHaptics(s.haptics !== false);
+        setGoals(s.goals || []);
       });
     }, [])
   );
@@ -67,6 +72,14 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const s = await loadSettings();
     await saveSettings({ ...s, reachOutThresholdDays: val });
   };
+
+  // Same stored keys and save logic as before; only where it lives changed.
+  const toggleGoal = async (key: string) => {
+    const next = goals.includes(key) ? goals.filter((g) => g !== key) : [...goals, key];
+    setGoals(next);
+    await updateSettings({ goals: next });
+  };
+  const purposesSummary = GOALS.filter((g) => goals.includes(g.key)).map((g) => t(g.short)).join(", ");
 
   return (
     <View style={styles.screen}>
@@ -101,6 +114,23 @@ export default function AccountSettingsScreen({ navigation }: any) {
         <SectionLabel title={t("Uygulama")} />
 
         <View style={styles.card}>
+          <TouchableOpacity
+            style={[styles.rowItem, styles.rowBorder]}
+            onPress={() => setPurposesOpen(true)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t("Kullanım amaçların: {list}", { list: purposesSummary || t("seçilmedi") })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: TEAL_SOFT }]}>
+              <GoalIcon goal="networking" size={18} color={TEAL} />
+            </View>
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowTitle}>{t("Kullanım amaçların")}</Text>
+              <Text style={styles.rowSub} numberOfLines={2}>{purposesSummary || t("Henüz seçilmedi")}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.rowItem, styles.rowBorder]}
             onPress={() => setThresholdOpen(true)}
@@ -243,6 +273,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
       </ScrollView>
 
+      <PurposesSheet visible={purposesOpen} selected={goals} onToggle={toggleGoal} onClose={() => setPurposesOpen(false)} />
+
       {/* ── Threshold modal ── */}
       <PickerModal
         visible={thresholdOpen}
@@ -322,6 +354,50 @@ export default function AccountSettingsScreen({ navigation }: any) {
       </PickerModal>
 
     </View>
+  );
+}
+
+function PurposesSheet({ visible, selected, onToggle, onClose }: { visible: boolean; selected: string[]; onToggle: (key: string) => void; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.sheetOverlay} onPress={onClose} accessibilityRole="button" accessibilityLabel={t("Kapat")}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle} accessibilityRole="header">{t("Kullanım amaçların")}</Text>
+          <Text style={styles.sheetDesc}>{t("Connectly'yi ne için kullanıyorsun? Birden fazla seçebilirsin.")}</Text>
+          <View style={styles.grid}>
+            {GOALS.map((g) => {
+              const on = selected.includes(g.key);
+              return (
+                <TouchableOpacity
+                  key={g.key}
+                  style={[styles.purpose, on && styles.purposeOn]}
+                  onPress={() => onToggle(g.key)}
+                  activeOpacity={0.8}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  aria-checked={on}
+                  accessibilityLabel={t(g.short)}
+                >
+                  <View style={styles.purposeTop}>
+                    <GoalIcon goal={g.key} size={22} color={on ? TEAL : TEXTSUB} />
+                    {on ? (
+                      <View style={styles.purposeCheck}>
+                        <Ionicons name="checkmark" size={12} color={colors.onFill} />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.purposeText, on && styles.purposeTextOn]}>{t(g.short)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity style={styles.sheetDone} onPress={onClose} accessibilityRole="button">
+            <Text style={styles.sheetDoneText}>{t("Tamam")}</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -460,6 +536,23 @@ function UploadIcon() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  sheetOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
+  sheet: { backgroundColor: CARD, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 32 },
+  sheetHandle: { alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, marginBottom: 12 },
+  sheetTitle: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: TEXT },
+  sheetDesc: { fontSize: 13, lineHeight: 18, color: TEXTSUB, marginTop: 4, marginBottom: 14 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  purpose: {
+    flexBasis: "47%", flexGrow: 1, minHeight: 88, padding: 12, borderRadius: 12, gap: 10,
+    borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, justifyContent: "space-between",
+  },
+  purposeOn: { backgroundColor: TEAL_SOFT, borderColor: TEAL },
+  purposeTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  purposeCheck: { width: 20, height: 20, borderRadius: 10, backgroundColor: TEAL, alignItems: "center", justifyContent: "center" },
+  purposeText: { fontSize: 14, lineHeight: 20, fontWeight: "500", color: TEXT },
+  purposeTextOn: { color: TEAL_DARK, fontWeight: "600" },
+  sheetDone: { marginTop: 16, minHeight: 48, borderRadius: 10, backgroundColor: TEAL, alignItems: "center", justifyContent: "center" },
+  sheetDoneText: { fontSize: 15, fontWeight: "600", color: colors.onFill },
   goalsCard: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 14 },
   goalChip: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,

@@ -30,7 +30,7 @@ export default function MainTabs({ navigation }: Props) {
       <View style={styles.screen}>
         <ActiveScreen tab={activeTab} navigation={navigation} />
       </View>
-      <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+      <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} variant={activeTab === "Home" ? "home" : "default"} />
     </View>
   );
 }

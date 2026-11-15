@@ -137,15 +137,6 @@ export default function ProfileSettingsScreen({ navigation }: any) {
           <Text style={styles.saveBtnText}>{saving ? t("Kaydediliyor…") : t("Kaydet")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionLabel}>{t("UYGULAMA")}</Text>
-
-        <TouchableOpacity
-          style={styles.linkRow}
-          onPress={() => navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] })}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.linkRowText}>{t("Tanıtımı Tekrar Göster")}</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );

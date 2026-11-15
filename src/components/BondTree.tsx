@@ -9,6 +9,8 @@ type Props = {
   tree: TreeState;
   size?: number;
   accessibilityLabel?: string;
+  /** Skip the decorative sparkles (compact cards). */
+  minimal?: boolean;
 };
 
 const LEAF = "M0,0 C4,-6 12,-6 16,0 C12,6 4,6 0,0 Z";
@@ -56,7 +58,7 @@ function Sparkle({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
  * The user's "bond tree": grows one leaf per moment, blossoms for each person
  * reached this week, and rests (never dies) when the user is away.
  */
-export default function BondTree({ tree, size = 140, accessibilityLabel }: Props) {
+export default function BondTree({ tree, size = 140, accessibilityLabel, minimal = false }: Props) {
   const reduceMotion = useReduceMotion();
   const sway = useRef(new Animated.Value(0)).current;
   const bump = useRef(new Animated.Value(1)).current;
@@ -161,7 +163,7 @@ export default function BondTree({ tree, size = 140, accessibilityLabel }: Props
       >
         <Svg width={size} height={size} viewBox="0 0 200 200">
           {art}
-          {tree.vitality === "thriving" && tree.stage >= 2 ? (
+          {!minimal && tree.vitality === "thriving" && tree.stage >= 2 ? (
             <G>
               <Sparkle x={40} y={60} s={0.9} />
               <Sparkle x={160} y={44} s={0.7} />

@@ -152,17 +152,23 @@ fs.mkdirSync(OUT, { recursive: true });
     await shot("11-shuffle");
     await step("shuffle: close", () => click(label_("Kapat")));
 
-    await step("profile: insights, purposes and settings link", async () => {
+    await step("profile: insights and settings link", async () => {
       await click(label_("Profil"));
       await text("İçgörüler").waitFor({ timeout: 3000 });
-      await text("Kullanım amaçların").waitFor({ timeout: 3000 });
-      await vis(page.getByRole("checkbox", { name: "Yeni bağlantılar", checked: true })).waitFor({ timeout: 3000 });
-      // Each metric once: "Toplam kişi" must not be repeated by the İçgörüler section.
-      const totals = await page.getByText("Toplam kişi", { exact: true }).locator("visible=true").count();
-      if (totals !== 1) throw new Error(`"Toplam kişi" shown ${totals} times`);
+      await text("Yaklaşan görüşmeler").waitFor({ timeout: 3000 });
+      await text("2 kişi kayıtlı").waitFor({ timeout: 3000 });
+      // Purposes now live in Hesap ayarları, not on Profile.
+      if (await page.getByText("Kullanım amaçların", { exact: true }).locator("visible=true").count()) throw new Error("purposes still on Profile");
     });
-    await step("settings: Profile → Hesap ayarları → setting → back", async () => {
+    await shot("13-profile");
+    await step("settings: Profile → Hesap ayarları → purposes panel", async () => {
       await click(label_("Hesap ayarları"));
+      await click(vis(page.getByLabel(/^Kullanım amaçların: /)));
+      await vis(page.getByRole("checkbox", { name: "Yeni bağlantılar", checked: true })).waitFor({ timeout: 3000 });
+      await shot("14-purposes");
+      await click(text("Tamam"));
+    });
+    await step("settings: weekly goal → back", async () => {
       await text("Görünüm").waitFor({ timeout: 3000 });
       await label_("Titreşim").waitFor({ timeout: 3000 });
       if (await page.getByText("Onboarding'i tekrar göster").count()) throw new Error("intro replay row still present");
@@ -170,7 +176,7 @@ fs.mkdirSync(OUT, { recursive: true });
       await click(text("5 kişi"));
       await label_("Haftalık hedef: 5 kişi").waitFor({ timeout: 3000 });
       await click(label_("Geri"));
-      await text("Kullanım amaçların").waitFor({ timeout: 3000 });
+      await text("İçgörüler").waitFor({ timeout: 3000 });
     });
 
     await step("privacy: open", async () => { await click(label_("Profil")); await click(label_("Hesap ayarları")); await click(text("Gizlilik ve Güvenlik")); await text("Tüm verileri sil").waitFor({ timeout: 3000 }); });
