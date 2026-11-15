@@ -1,22 +1,18 @@
+import type { ReactNode } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme/colors";
-import { radius } from "../theme/radius";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { hapticImpact, hapticTap } from "../utils/haptics";
+import OrbitIcon from "./OrbitIcon";
+import { warm, type as typeScale } from "../theme/warm";
+import { hapticTap } from "../utils/haptics";
 import { t } from "../i18n";
-
-const TEAL   = colors.primary;
-const PURPLE = colors.primary;
-const GRAY   = colors.textSub;
-
-// ── Tab Item ──────────────────────────────────────────────────────────────────
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-function TabItem({ label, icon, active, onPress }: {
-  label: string; icon: IconName; active: boolean; onPress: () => void;
-}) {
+export type Tab = "Home" | "People" | "Insights" | "Profile";
+
+function TabItem({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon: (color: string) => ReactNode }) {
+  const color = active ? warm.onSelected : warm.textSub;
   return (
     <TouchableOpacity
       style={styles.tabItem}
@@ -26,128 +22,59 @@ function TabItem({ label, icon, active, onPress }: {
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
     >
-      <Ionicons name={active ? (icon.replace("-outline", "") as IconName) : icon} size={24} color={active ? PURPLE : GRAY} />
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+      <View style={[styles.iconPill, active && styles.iconPillActive]}>{icon(color)}</View>
+      <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-// ── BottomTabBar ──────────────────────────────────────────────────────────────
+const ion = (name: IconName, active: boolean) => (color: string) =>
+  <Ionicons name={active ? (name.replace("-outline", "") as IconName) : name} size={22} color={color} />;
 
-export type Tab = "Home" | "People" | "Insights" | "Profile";
-
-type Props = {
-  activeTab: Tab;
-  onTabPress: (tab: Tab) => void;
-  onAddPress: () => void;
-};
-
-export default function BottomTabBar({ activeTab, onTabPress, onAddPress }: Props) {
+/**
+ * Four labelled tabs in a light, thin-bordered capsule. The active tab's icon
+ * sits on a small butter-yellow pill. There is no centre "+": adding a person
+ * lives on the People and Home screens.
+ */
+export default function BottomTabBar({ activeTab, onTabPress }: { activeTab: Tab; onTabPress: (tab: Tab) => void }) {
   const insets = useSafeAreaInsets();
-
   return (
-    <View style={[styles.wrapper, { paddingBottom: insets.bottom || 8 }]}>
-      <View style={styles.topLine} />
-
-      <View style={styles.row}>
-        <TabItem label={t("Ana Sayfa")} icon="home-outline"   active={activeTab === "Home"}   onPress={() => onTabPress("Home")} />
-        <TabItem label={t("Kişiler")}   icon="people-outline" active={activeTab === "People"} onPress={() => onTabPress("People")} />
-
-        {/* Centre action button */}
-        <View style={styles.addSlot}>
-          <TouchableOpacity
-            onPress={() => { hapticImpact(); onAddPress(); }}
-            activeOpacity={0.82}
-            style={styles.addBtn}
-            accessibilityRole="button"
-            accessibilityLabel={t("Yeni kişi ekle")}
-          >
-            <Ionicons name="add" size={34} color={colors.onFill} />
-          </TouchableOpacity>
-        </View>
-
-        <TabItem label={t("Evren")}  icon="planet-outline" active={activeTab === "Insights"} onPress={() => onTabPress("Insights")} />
-        <TabItem label={t("Profil")} icon="person-outline" active={activeTab === "Profile"}  onPress={() => onTabPress("Profile")} />
+    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={styles.capsule} accessibilityRole="tablist">
+        <TabItem label={t("Ana Sayfa")} active={activeTab === "Home"} onPress={() => onTabPress("Home")} icon={ion("home-outline", activeTab === "Home")} />
+        <TabItem label={t("Kişiler")} active={activeTab === "People"} onPress={() => onTabPress("People")} icon={ion("people-outline", activeTab === "People")} />
+        <TabItem
+          label={t("Evren")}
+          active={activeTab === "Insights"}
+          onPress={() => onTabPress("Insights")}
+          icon={(color) => <OrbitIcon color={color} filled={activeTab === "Insights"} />}
+        />
+        <TabItem label={t("Profil")} active={activeTab === "Profile"} onPress={() => onTabPress("Profile")} icon={ion("person-outline", activeTab === "Profile")} />
       </View>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  wrapper: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.bottomBar,
-    borderTopRightRadius: radius.bottomBar,
-    paddingTop: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-      },
-      android: { elevation: 10 },
-    }),
-  },
-  topLine: {
-    position: "absolute",
-    top: 0,
-    left: 24,
-    right: 24,
-    height: 1,
-    backgroundColor: colors.borderLight,
-    borderRadius: 1,
-  },
-  row: {
+  wrapper: { backgroundColor: warm.bg, paddingHorizontal: 16, paddingTop: 8 },
+  capsule: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 4,
-    gap: 4,
-    minHeight: 56,
-  },
-  tabLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: GRAY,
-  },
-  tabLabelActive: {
-    color: PURPLE,
-    fontWeight: "600",
-  },
-
-  // Centre slot lifts the button above the bar
-  addSlot: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 10,
-  },
-  addBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.fab,
-    backgroundColor: TEAL,
-    alignItems: "center",
-    justifyContent: "center",
-    // lift above bar baseline
-    marginBottom: 6,
+    backgroundColor: warm.surface,
+    borderWidth: 1,
+    borderColor: warm.border,
+    borderRadius: 28,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
     ...Platform.select({
-      ios: {
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 10,
-      },
-      android: { elevation: 6 },
+      ios: { shadowColor: warm.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
+      android: { elevation: 1 },
     }),
   },
+  tabItem: { flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", gap: 2 },
+  iconPill: { width: 52, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  iconPillActive: { backgroundColor: warm.selected },
+  tabLabel: { ...typeScale.tab, color: warm.textSub },
+  tabLabelActive: { color: warm.text, fontFamily: "InstrumentSans_600SemiBold" },
 });

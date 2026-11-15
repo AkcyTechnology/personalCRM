@@ -52,7 +52,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("home: empty state", () => text("İlk kişini ekle").waitFor({ timeout: 4000 }));
     await shot("01-home-empty");
 
-    await step("add: open", () => click(label_("Yeni kişi ekle")));
+    await step("add: open", () => click(text("Kişi ekle")));
     await step("add: validation on empty save", async () => { await click(text("Kişiyi Kaydet")); await text("Ad Soyad zorunlu.").waitFor({ timeout: 3000 }); });
     await shot("02-add-validation");
     await step("add: fill essentials", async () => {
@@ -89,15 +89,30 @@ fs.mkdirSync(OUT, { recursive: true });
     await shot("05-home-done");
 
     await step("add: duplicate warning then save", async () => {
-      await click(label_("Yeni kişi ekle"));
+      await click(label_("Kişiler"));
+      await click(label_("Kişi ekle"));
       await vis(page.getByPlaceholder("Ahmet Yılmaz", { exact: true })).fill("Ahmet Yılmaz");
       await click(text("Mentor"));
       await click(text("Kişiyi Kaydet"));
       await page.waitForTimeout(800);
     });
     await step("people: two contacts listed", async () => { await click(label_("Kişiler")); await text("2 kişi").waitFor({ timeout: 4000 }); });
-    await step("people: status filter Yeniden bağlan", async () => { await click(text("Yeniden bağlan")); await text("Şu an görüşme zamanı gelen kimse yok").waitFor({ timeout: 3000 }); await click(text("Tümü")); });
-    await step("people: search", async () => { await label_("Kişi ara").fill("zzz"); await text("Sonuç yok").waitFor({ timeout: 3000 }); await click(label_("Aramayı temizle")); });
+    await step("people: quick filter Zamanı gelen", async () => {
+      await click(text("Zamanı gelen"));
+      await text("Eşleşen kişi bulunamadı").waitFor({ timeout: 3000 });
+      await click(text("Filtreleri temizle"));
+      await text("2 kişi").waitFor({ timeout: 3000 });
+    });
+    await step("people: filter panel counts and applies", async () => {
+      await click(label_("Filtreler"));
+      await click(vis(page.getByRole("checkbox", { name: "Mentor" })));
+      await click(text("1 kişiyi göster"));
+      await label_("Filtreler, 1 etkin").waitFor({ timeout: 3000 });
+      await click(label_("Filtreler, 1 etkin"));
+      await click(text("Temizle"));
+      await click(text("2 kişiyi göster"));
+    });
+    await step("people: search", async () => { await label_("Kişi ara").fill("zzz"); await text("Eşleşen kişi bulunamadı").waitFor({ timeout: 3000 }); await click(vis(page.getByText("Aramayı temizle", { exact: true }))); });
     await shot("06-people");
 
     await step("detail: history shows note", async () => {
@@ -179,7 +194,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("home empty state", () => text("Add your first person").waitFor({ timeout: 4000 }));
     await page.screenshot({ path: path.join(OUT, "en-01-home.png") });
     await step("add a person", async () => {
-      await click(vis(page.getByLabel("Add a person", { exact: true })));
+      await click(vis(page.getByText("Add person", { exact: true })));
       await vis(page.getByPlaceholder("Alex Morgan", { exact: true })).fill("Alex Morgan");
       await click(text("Friend"));
       await click(text("1 month ago"));

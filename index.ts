@@ -2,6 +2,12 @@ import 'react-native-gesture-handler';
 import { createElement, useEffect, useState, type ComponentType } from 'react';
 import { Appearance } from 'react-native';
 import { registerRootComponent } from 'expo';
+import * as Font from 'expo-font';
+import {
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+} from '@expo-google-fonts/instrument-sans';
 import { applyColorScheme } from './src/theme/colors';
 import { loadSettings } from './src/data/userSettings';
 
@@ -16,9 +22,15 @@ function Root() {
     loadSettings()
       .then((s) => s.theme)
       .catch(() => 'system' as const)
-      .then((pref) => {
+      .then(async (pref) => {
         const scheme = pref === 'system' ? Appearance.getColorScheme() : pref;
         applyColorScheme(scheme === 'dark' ? 'dark' : 'light');
+        // Instrument Sans for the People screen and tab bar; system font if it fails.
+        await Font.loadAsync({
+          InstrumentSans_400Regular,
+          InstrumentSans_500Medium,
+          InstrumentSans_600SemiBold,
+        }).catch(() => {});
         setApp(() => require('./App').default as ComponentType);
       });
   }, []);

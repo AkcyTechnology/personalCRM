@@ -7,7 +7,7 @@ import PeopleScreen from "../screens/PeopleScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import UniverseScreen from "../screens/UniverseScreen";
 import BottomTabBar from "../components/BottomTabBar";
-import { colors } from "../theme/colors";
+import { warm } from "../theme/warm";
 
 type Tab = "Home" | "People" | "Insights" | "Profile";
 
@@ -30,11 +30,7 @@ export default function MainTabs({ navigation }: Props) {
       <View style={styles.screen}>
         <ActiveScreen tab={activeTab} navigation={navigation} />
       </View>
-      <BottomTabBar
-        activeTab={activeTab}
-        onTabPress={setActiveTab}
-        onAddPress={() => navigation.navigate("AddContact")}
-      />
+      <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
     </View>
   );
 }
@@ -42,7 +38,7 @@ export default function MainTabs({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: warm.bg,
   },
   screen: {
     flex: 1,
