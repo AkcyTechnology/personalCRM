@@ -413,13 +413,13 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
                       <Text style={[styles.swipeText, { color: warm.onPrimary }]}>{t("Görüştüm")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.swipeBtn, { backgroundColor: warm.selected }]}
+                      style={[styles.swipeBtn, { backgroundColor: warm.warning }]}
                       onPress={() => { methods.close(); setSnoozeTarget(item); }}
                       accessibilityRole="button"
                       accessibilityLabel={t("{name} hatırlatmasını ertele", { name: item.fullName })}
                     >
-                      <Ionicons name="alarm-outline" size={20} color={warm.onSelected} />
-                      <Text style={[styles.swipeText, { color: warm.onSelected }]}>{t("Ertele")}</Text>
+                      <Ionicons name="alarm-outline" size={20} color={warm.onPrimary} />
+                      <Text style={[styles.swipeText, { color: warm.onPrimary }]}>{t("Ertele")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -467,7 +467,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               accessibilityState={{ selected: on }}
             >
               <Text style={[styles.sortText, on && styles.sortTextOn]}>{t(s.label)}</Text>
-              {on ? <Ionicons name="checkmark" size={20} color={warm.onSelected} /> : null}
+              {on ? <Ionicons name="checkmark" size={20} color={warm.onSelectedSoft} /> : null}
             </TouchableOpacity>
           );
         })}
@@ -538,7 +538,7 @@ function PersonRow({
           <Text style={styles.meta}>{last}</Text>
           {due && !selectMode ? (
             <View style={styles.duePill}>
-              <Ionicons name="time-outline" size={13} color={warm.onSelected} />
+              <Ionicons name="time-outline" size={13} color={warm.onSelectedSoft} />
               <Text style={styles.duePillText}>{t("Zamanı geldi")}</Text>
             </View>
           ) : null}
@@ -585,6 +585,7 @@ function ChipGroup<K extends string>({ options, selected, onToggle }: { options:
             onPress={() => onToggle(o.key)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: on }}
+            aria-checked={on}
           >
             {on ? <Ionicons name="checkmark" size={14} color={warm.onSelected} /> : null}
             <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
@@ -732,9 +733,9 @@ const styles = StyleSheet.create({
   toolBtnOn: { backgroundColor: warm.selected, borderColor: warm.selected },
   badge: {
     position: "absolute", top: 5, right: 5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
-    backgroundColor: warm.primary, alignItems: "center", justifyContent: "center",
+    backgroundColor: warm.surface, alignItems: "center", justifyContent: "center",
   },
-  badgeText: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14, color: warm.onPrimary },
+  badgeText: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14, color: warm.primary },
 
   quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: -4 },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -756,18 +757,18 @@ const styles = StyleSheet.create({
   rowFirst: { borderTopWidth: 1, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   rowLast: { borderBottomWidth: 1, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowDragging: { backgroundColor: warm.selected },
-  rowSelected: { backgroundColor: warm.selected + "88" },
+  rowDragging: { backgroundColor: warm.selectedSoft },
+  rowSelected: { backgroundColor: warm.selectedSoft },
   rowText: { flex: 1, minWidth: 0, gap: 1 },
   name: { ...ts.name, color: warm.text },
   statusLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   duePill: {
     flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: 10, backgroundColor: warm.selected,
+    borderRadius: 10, backgroundColor: warm.selectedSoft,
   },
-  duePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16, color: warm.onSelected },
+  duePillText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16, color: warm.onSelectedSoft },
   check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: warm.textSub, alignItems: "center", justifyContent: "center" },
-  checkOn: { backgroundColor: warm.selected, borderColor: warm.primary },
+  checkOn: { backgroundColor: warm.selected, borderColor: warm.selected },
 
   swipeActions: { flexDirection: "row" },
   swipeBtn: { width: 84, alignItems: "center", justifyContent: "center", gap: 4 },
@@ -827,7 +828,7 @@ const styles = StyleSheet.create({
   },
   footerPrimary: { flex: 1, alignSelf: "auto" },
   sortRow: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderRadius: 12 },
-  sortRowOn: { backgroundColor: warm.selected },
+  sortRowOn: { backgroundColor: warm.selectedSoft },
   sortText: { ...ts.body, color: warm.text },
-  sortTextOn: { fontFamily: fonts.semibold, color: warm.onSelected },
+  sortTextOn: { fontFamily: fonts.semibold, color: warm.onSelectedSoft },
 });

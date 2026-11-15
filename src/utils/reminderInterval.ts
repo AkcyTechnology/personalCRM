@@ -23,17 +23,32 @@ export function daysSinceIntervalStart(contact: ContactForm): number {
   return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
 }
 
+/**
+ * Days since the catch-up rhythm started: the interval start or last contact,
+ * else the day the person was added (the same anchor the reminder plan and
+ * the People filters use). 9999 when there is no date at all.
+ */
+function daysSinceAnchor(contact: ContactForm): number {
+  const own = daysSinceIntervalStart(contact);
+  if (own < 9999) return own;
+  const added = contact.createdAt ? new Date(contact.createdAt) : null;
+  if (!added || Number.isNaN(added.getTime())) return 9999;
+  return Math.max(0, Math.floor((Date.now() - added.getTime()) / 86_400_000));
+}
+
 export function isDue(contact: ContactForm, globalThreshold: number): boolean {
   if (contact.reminderEnabled === false) return false;
   if (isSnoozed(contact)) return false;
-  return daysSinceIntervalStart(contact) >= effectiveIntervalDays(contact, globalThreshold);
+  const days = daysSinceAnchor(contact);
+  return days < 9999 && days >= effectiveIntervalDays(contact, globalThreshold);
 }
 
 export function neglectScore(contact: ContactForm, globalThreshold: number): number {
   if (contact.reminderEnabled === false) return -1;
   if (isSnoozed(contact)) return -1;
   const interval = effectiveIntervalDays(contact, globalThreshold);
-  return daysSinceIntervalStart(contact) / Math.max(1, interval);
+  const days = daysSinceAnchor(contact);
+  return days >= 9999 ? 0 : days / Math.max(1, interval);
 }
 
 export const INTERVAL_PRESETS = [

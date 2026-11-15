@@ -119,8 +119,8 @@ export const en: Record<string, string | [string, string]> = {
   "Kişisel ilişkiler": "Personal",
   "İş bağlantılarımı takip etmek": "Nurture my professional network",
   "İş bağlantıları": "Professional",
-  "Networking yapmak": "Grow my network",
-  "Networking": "Networking",
+  "Yeni bağlantılar kurmak": "Make new connections",
+  "Yeni bağlantılar": "New connections",
   "Özel günleri ve hatırlatıcıları takip etmek": "Remember birthdays and special days",
   "Özel günler": "Special days",
 
@@ -1030,4 +1030,11 @@ export const en: Record<string, string | [string, string]> = {
   "Şehir veya şirket ara": "Search city or company",
   "Şirket": "Company",
   "Eşleşen şehir veya şirket yok": "No matching city or company",
+
+  // ── Profile & account settings ──
+  "Henüz kişi eklemedin": "You haven't added anyone yet",
+  "İlk kişini eklediğinde özetlerin ve içgörülerin burada görünür.": "Your summary and insights appear here once you add your first person.",
+  "Bir görüşmeyi “Görüştüm” ile kaydettiğinde bu haftaki görüşmeler ve bağlarının durumu burada görünür.": "Once you log a moment with “I caught up”, this week's moments and your follow-up status appear here.",
+  "Kullanım amaçların": "What you use Connectly for",
+  "Bildirimler, gizlilik, dil, görünüm ve yedekler": "Notifications, privacy, language, appearance and backups",
 };

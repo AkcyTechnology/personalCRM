@@ -12,7 +12,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export type Tab = "Home" | "People" | "Insights" | "Profile";
 
 function TabItem({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon: (color: string) => ReactNode }) {
-  const color = active ? warm.onSelected : warm.textSub;
+  const color = active ? warm.onSelectedSoft : warm.textSub;
   return (
     <TouchableOpacity
       style={styles.tabItem}
@@ -58,7 +58,7 @@ export default function BottomTabBar({ activeTab, onTabPress }: { activeTab: Tab
 }
 
 const styles = StyleSheet.create({
-  wrapper: { backgroundColor: warm.bg, paddingHorizontal: 16, paddingTop: 8 },
+  wrapper: { backgroundColor: warm.bg, paddingHorizontal: 16, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: warm.border },
   capsule: {
     flexDirection: "row",
     backgroundColor: warm.surface,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   tabItem: { flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", gap: 2 },
   iconPill: { width: 52, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  iconPillActive: { backgroundColor: warm.selected },
+  iconPillActive: { backgroundColor: warm.selectedSoft },
   tabLabel: { ...typeScale.tab, color: warm.textSub },
-  tabLabelActive: { color: warm.text, fontFamily: "InstrumentSans_600SemiBold" },
+  tabLabelActive: { color: warm.primary, fontFamily: "InstrumentSans_600SemiBold" },
 });

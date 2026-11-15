@@ -25,7 +25,6 @@ import { logMoment } from "../app/momentActions";
 import Avatar, { initials } from "../components/Avatar";
 import EmptyState from "../components/EmptyState";
 import LogInteractionModal from "../components/LogInteractionModal";
-import InsightsScreen from "./InsightsScreen";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { consumeGlow } from "../app/glow";
@@ -80,7 +79,6 @@ function layout(contacts: ContactForm[], threshold: number, w: number, h: number
 
 export default function UniverseScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
-  const [view, setView] = useState<"universe" | "story">("universe");
 
   return (
     <View style={styles.screen}>
@@ -96,26 +94,7 @@ export default function UniverseScreen({ navigation }: { navigation: any }) {
           <Text style={styles.storyBtnText}>{t("Bu ayın hikâyesi")}</Text>
         </TouchableOpacity>
       </View>
-      <View style={styles.segment} accessibilityRole="tablist">
-        {(["universe", "story"] as const).map((key) => {
-          const active = view === key;
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              onPress={() => setView(key)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-            >
-              <Ionicons name={key === "universe" ? "planet-outline" : "stats-chart-outline"} size={16} color={active ? colors.onFill : colors.textSub} />
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                {key === "universe" ? t("Bağ haritası") : t("İçgörüler")}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {view === "universe" ? <UniverseMap navigation={navigation} /> : <InsightsScreen navigation={navigation} embedded />}
+      <UniverseMap navigation={navigation} />
     </View>
   );
 }
@@ -434,11 +413,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   storyBtnText: { color: colors.onFill, fontWeight: "800", fontSize: 14 },
-  segment: { flexDirection: "row", marginHorizontal: 20, padding: 4, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-  segmentBtn: { flex: 1, minHeight: 40, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { fontSize: 14, fontWeight: "700", color: colors.textSub },
-  segmentTextActive: { color: colors.onFill },
   me: {
     position: "absolute",
     width: 64,

@@ -12,6 +12,7 @@ import PeopleScreen from "../screens/PeopleScreen";
 import RemindersScreen from "../screens/RemindersScreen";
 import PersonDetailScreen from "../screens/PersonDetailScreen";
 import ProfileSettingsScreen from "../screens/ProfileSettingsScreen";
+import AccountSettingsScreen from "../screens/AccountSettingsScreen";
 import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 import PrivacySecurityScreen from "../screens/PrivacySecurityScreen";
 import ManageSubscriptionScreen from "../screens/ManageSubscriptionScreen";
@@ -34,6 +35,7 @@ export type RootStackParamList = {
   Reminders:               { filter?: "all" | "upcoming"; threshold?: number } | undefined;
   PersonDetail:            { contact: ContactForm };
   ProfileSettings:         undefined;
+  AccountSettings:         undefined;
   NotificationSettings:    undefined;
   PrivacySecurity:         undefined;
   ManageSubscription:      undefined;
@@ -77,6 +79,7 @@ export default function RootNavigator() {
       <Stack.Screen name="Reminders"       component={RemindersScreen} />
       <Stack.Screen name="PersonDetail"         component={PersonDetailScreen} />
       <Stack.Screen name="ProfileSettings"      component={ProfileSettingsScreen} />
+      <Stack.Screen name="AccountSettings"      component={AccountSettingsScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="PrivacySecurity"      component={PrivacySecurityScreen} />
       <Stack.Screen name="ManageSubscription"   component={ManageSubscriptionScreen} />

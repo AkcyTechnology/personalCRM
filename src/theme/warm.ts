@@ -1,45 +1,31 @@
-import { colorScheme } from "./colors";
+import { colors } from "./colors";
 
 /**
- * Warm palette for the redesigned People screen and the tab bar: off-white
- * paper, butter yellow for what's selected, dark mustard for the main action.
- * No blues or cool greys. Light values are the brief's; the dark set keeps the
- * same warm hues for users who chose dark mode. All text pairs are ≥ 4.5:1.
+ * Colours for the People screen and the tab bar, taken from the app's own
+ * tokens (white background, the brand turquoise) so they follow light/dark
+ * mode like every other screen. Kept as a separate map so those screens read
+ * the same names as before.
  */
-const light = {
-  bg: "#FAF8F2",
-  surface: "#FFFEFA",
-  border: "#E8E0D1",
-  selected: "#F6E8AE",
-  onSelected: "#28251E",
-  primary: "#76520F",
-  onPrimary: "#FFFFFF",
-  text: "#28251E",
-  textSub: "#665D50",
-  overlay: "rgba(40,37,30,0.38)",
-  shadow: "#3A3020",
-  danger: "#B42318",
-  success: "#3F6B2A",
+export const warm = {
+  bg: colors.bg,
+  surface: colors.surface,
+  border: colors.border,
+  /** Selected chip / active filter: filled turquoise. */
+  selected: colors.primary,
+  onSelected: colors.onFill,
+  /** Softer selection (tab icon pill). */
+  selectedSoft: colors.primarySoft,
+  onSelectedSoft: colors.primary,
+  primary: colors.primary,
+  onPrimary: colors.onFill,
+  text: colors.text,
+  textSub: colors.textSub,
+  overlay: colors.overlay,
+  shadow: colors.shadow,
+  danger: colors.danger,
+  success: colors.success,
+  warning: colors.warning,
 };
-
-const dark: typeof light = {
-  bg: "#1B1915",
-  surface: "#23201B",
-  border: "#3A3429",
-  selected: "#E9D58A",
-  onSelected: "#28251E",
-  primary: "#E2BE62",
-  onPrimary: "#28251E",
-  text: "#F3EFE6",
-  textSub: "#B9AE9B",
-  overlay: "rgba(0,0,0,0.55)",
-  shadow: "#000000",
-  danger: "#F28B82",
-  success: "#9CCB86",
-};
-
-/** Resolved once, like `colors`: the theme is applied before screens load. */
-export const warm = colorScheme() === "dark" ? dark : light;
 
 /** Instrument Sans, one family per weight (Android ignores fontWeight on custom fonts). */
 export const fonts = {

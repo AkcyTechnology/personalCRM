@@ -18,6 +18,7 @@ import { GOALS } from "../data/goals";
 import { colors } from "../theme/colors";
 import { INTERVAL_PRESETS } from "../utils/reminderInterval";
 import { track } from "../utils/analytics";
+import GoalIcon from "../components/GoalIcon";
 import { t } from "../i18n";
 
 const PURPLE = colors.primary;
@@ -245,7 +246,7 @@ export default function OnboardingFlowScreen({ navigation }: any) {
                     accessibilityState={{ checked: active }}
                   >
                     <View style={[s.goalIcon, active && s.goalIconActive]}>
-                      <Text style={s.goalEmoji}>{p.icon}</Text>
+                      <GoalIcon goal={p.key} size={18} color={colors.primary} />
                     </View>
                     <Text style={[s.goalLabel, active && s.goalLabelActive]}>{t(p.label)}</Text>
                     <View style={[s.goalCheck, active && s.goalCheckActive]}>
@@ -405,7 +406,6 @@ const s = StyleSheet.create({
     backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center",
   },
   goalIconActive: { backgroundColor: colors.primarySoft },
-  goalEmoji: { fontSize: 20 },
   goalLabel: { flex: 1, fontSize: 14, fontWeight: "700", color: TEXT },
   goalLabelActive: { color: PURPLE },
   goalCheck: {

@@ -323,6 +323,7 @@ const Row = memo(function Row({
       accessibilityRole="checkbox"
       accessibilityLabel={[contact.name, contact.phone || contact.email, added ? t("eklendi") : hint].filter(Boolean).join(", ")}
       accessibilityState={{ checked: selected, disabled: added }}
+      aria-checked={selected}
     >
       <Avatar name={contact.name} size={40} />
       <View style={styles.rowInfo}>

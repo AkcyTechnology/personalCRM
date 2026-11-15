@@ -47,7 +47,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("onboarding: start", () => click(text("Başlayalım")));
     await step("onboarding: welcome", () => click(text("Devam et")));
     await step("onboarding: profile", async () => { await vis(page.getByPlaceholder("Ad Soyad")).fill("Test Kullanıcı"); await click(text("Devam")); });
-    await step("onboarding: goals", async () => { await click(text("Networking yapmak")); await click(vis(page.getByText(/^Devam/))); });
+    await step("onboarding: goals", async () => { await click(text("Yeni bağlantılar kurmak")); await click(vis(page.getByText(/^Devam/))); });
     await step("onboarding: finish", () => click(text("Uygulamaya geç")));
     await step("home: empty state", () => text("İlk kişini ekle").waitFor({ timeout: 4000 }));
     await shot("01-home-empty");
@@ -134,7 +134,9 @@ fs.mkdirSync(OUT, { recursive: true });
 
     await step("universe: map renders", async () => { await click(label_("Evren")); await label_("Sen, evrenin merkezi").waitFor({ timeout: 4000 }); });
     await shot("09-universe");
-    await step("universe: insights segment", async () => { await click(text("İçgörüler")); await page.waitForTimeout(500); await click(text("Bağ haritası")); });
+    await step("universe: opens straight to the map (no tabs)", async () => {
+      if (await page.getByText("Bağ haritası", { exact: true }).locator("visible=true").count()) throw new Error("tab bar still shown");
+    });
     await step("story: names hidden by default", async () => {
       await click(label_("Bu ayın hikâyesi"));
       await text("Bağlantı hikâyen").waitFor({ timeout: 4000 });
@@ -150,14 +152,28 @@ fs.mkdirSync(OUT, { recursive: true });
     await shot("11-shuffle");
     await step("shuffle: close", () => click(label_("Kapat")));
 
-    await step("profile: appearance and haptics settings", async () => {
+    await step("profile: insights, purposes and settings link", async () => {
       await click(label_("Profil"));
+      await text("İçgörüler").waitFor({ timeout: 3000 });
+      await text("Kullanım amaçların").waitFor({ timeout: 3000 });
+      await vis(page.getByRole("checkbox", { name: "Yeni bağlantılar", checked: true })).waitFor({ timeout: 3000 });
+      // Each metric once: "Toplam kişi" must not be repeated by the İçgörüler section.
+      const totals = await page.getByText("Toplam kişi", { exact: true }).locator("visible=true").count();
+      if (totals !== 1) throw new Error(`"Toplam kişi" shown ${totals} times`);
+    });
+    await step("settings: Profile → Hesap ayarları → setting → back", async () => {
+      await click(label_("Hesap ayarları"));
       await text("Görünüm").waitFor({ timeout: 3000 });
       await label_("Titreşim").waitFor({ timeout: 3000 });
-      await click(label_("Ana Sayfa"));
+      if (await page.getByText("Onboarding'i tekrar göster").count()) throw new Error("intro replay row still present");
+      await click(text("Haftalık hedef"));
+      await click(text("5 kişi"));
+      await label_("Haftalık hedef: 5 kişi").waitFor({ timeout: 3000 });
+      await click(label_("Geri"));
+      await text("Kullanım amaçların").waitFor({ timeout: 3000 });
     });
 
-    await step("privacy: open", async () => { await click(label_("Profil")); await click(text("Gizlilik ve Güvenlik")); await text("Tüm verileri sil").waitFor({ timeout: 3000 }); });
+    await step("privacy: open", async () => { await click(label_("Profil")); await click(label_("Hesap ayarları")); await click(text("Gizlilik ve Güvenlik")); await text("Tüm verileri sil").waitFor({ timeout: 3000 }); });
     await shot("08-privacy");
     await step("privacy: policy page", async () => { await click(text("Gizlilik Politikası")); await text("Rehber erişimi").waitFor({ timeout: 3000 }); await click(text("Geri")); });
     await step("privacy: wipe all data", async () => {
@@ -189,7 +205,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("onboarding in English", async () => { await vis(page.getByText(/Never lose/)).waitFor({ timeout: 4000 }); await click(text("Skip")); });
     await step("sign-up in English", async () => { await click(text("Let's begin")); await click(text("Continue")); });
     await step("profile step", async () => { await vis(page.getByPlaceholder("Full name")).fill("Test User"); await click(text("Continue")); });
-    await step("goals step", async () => { await click(text("Grow my network")); await click(vis(page.getByText(/^Continue/))); });
+    await step("goals step", async () => { await click(text("Make new connections")); await click(vis(page.getByText(/^Continue/))); });
     await step("finish", () => click(text("Go to the app")));
     await step("home empty state", () => text("Add your first person").waitFor({ timeout: 4000 }));
     await page.screenshot({ path: path.join(OUT, "en-01-home.png") });
@@ -203,7 +219,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("warm home copy", () => text("There's someone you might love catching up with").waitFor({ timeout: 4000 }));
     await step("bond tree in English", () => text("Your bond tree").waitFor({ timeout: 4000 }));
     await page.screenshot({ path: path.join(OUT, "en-02-home-due.png") });
-    await step("universe tab label", async () => { await click(vis(page.getByLabel("Universe", { exact: true }))); await text("Connection map").waitFor({ timeout: 4000 }); });
+    await step("universe tab label", async () => { await click(vis(page.getByLabel("Universe", { exact: true }))); await vis(page.getByLabel("You, at the centre of your universe", { exact: true })).waitFor({ timeout: 4000 }); });
     await page.screenshot({ path: path.join(OUT, "en-03-universe.png") });
     await context.close();
   }
