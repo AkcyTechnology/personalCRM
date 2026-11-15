@@ -6,7 +6,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { loadContacts, subscribeContacts } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
 import type { ContactForm } from "./AddContactScreen";
-import { colors, colorScheme } from "../theme/colors";
+import { colors } from "../theme/colors";
 import { isDue, daysSinceIntervalStart } from "../utils/reminderInterval";
 import { averageHealthScore, healthScoreColor, healthScoreLabel } from "../utils/healthScore";
 import {
@@ -36,15 +36,17 @@ import { t } from "../i18n";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-/**
- * Home's own palette (warm paper, white cards, mustard main action). Local to
- * this screen on purpose; the rest of the app keeps the turquoise theme.
- * Green stays only as a "done" indicator.
- */
-const H =
-  colorScheme() === "dark"
-    ? { bg: "#1B1915", card: "#23201B", border: "#3A3429", text: "#F3EFE6", sub: "#B9AE9B", selected: "#E9D58A", onSelected: "#28251E", primary: "#E2BE62", onPrimary: "#28251E", track: "#3A3429" }
-    : { bg: "#FAF8F2", card: "#FFFFFF", border: "#E8E0D1", text: "#28251E", sub: "#665D50", selected: "#F6E8AE", onSelected: "#28251E", primary: "#76520F", onPrimary: "#FFFFFF", track: "#EFE8DA" };
+/** Home uses the app's standard palette (white surfaces, turquoise primary). */
+const H = {
+  bg: colors.bg,
+  card: colors.surface,
+  border: colors.border,
+  text: colors.text,
+  sub: colors.textSub,
+  primary: colors.primary,
+  onPrimary: colors.onFill,
+  track: colors.borderLight,
+};
 
 const R = { card: 12, row: 10, button: 8, bar: 16 };
 
@@ -541,7 +543,7 @@ const styles = StyleSheet.create({
 
   skeleton: { borderRadius: R.card, backgroundColor: H.card, borderWidth: 1, borderColor: H.border },
 
-  backdrop: { flex: 1, backgroundColor: "rgba(40,37,30,0.38)", justifyContent: "center", padding: 20 },
+  backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: 20 },
   sheet: { backgroundColor: H.card, borderRadius: R.card, padding: 20 },
   stageRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 40 },
 });

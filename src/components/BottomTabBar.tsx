@@ -4,10 +4,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import OrbitIcon from "./OrbitIcon";
 import { warm, type as typeScale } from "../theme/warm";
-import { colorScheme } from "../theme/colors";
-
-/** Matches the Home screen's background (HomeScreen's local palette). */
-const homeBg = colorScheme() === "dark" ? "#1B1915" : "#FAF8F2";
 import { hapticTap } from "../utils/haptics";
 import { t } from "../i18n";
 
@@ -45,17 +41,14 @@ const ion = (name: IconName, active: boolean) => (color: string) =>
 export default function BottomTabBar({
   activeTab,
   onTabPress,
-  variant = "default",
 }: {
   activeTab: Tab;
   onTabPress: (tab: Tab) => void;
-  /** "home": the Home screen's warm background and squarer capsule. */
-  variant?: "default" | "home";
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrapper, variant === "home" && { backgroundColor: homeBg }, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <View style={[styles.capsule, variant === "home" && styles.capsuleHome]} accessibilityRole="tablist">
+    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={styles.capsule} accessibilityRole="tablist">
         <TabItem label={t("Ana Sayfa")} active={activeTab === "Home"} onPress={() => onTabPress("Home")} icon={ion("home-outline", activeTab === "Home")} />
         <TabItem label={t("Kişiler")} active={activeTab === "People"} onPress={() => onTabPress("People")} icon={ion("people-outline", activeTab === "People")} />
         <TabItem
@@ -86,7 +79,6 @@ const styles = StyleSheet.create({
       android: { elevation: 1 },
     }),
   },
-  capsuleHome: { borderRadius: 16 },
   tabItem: { flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", gap: 2 },
   iconPill: { width: 52, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   iconPillActive: { backgroundColor: warm.selectedSoft },
