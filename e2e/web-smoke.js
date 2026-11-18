@@ -105,11 +105,19 @@ fs.mkdirSync(OUT, { recursive: true });
     });
     await step("people: filter panel counts and applies", async () => {
       await click(label_("Filtreler"));
+      // Grup is one collapsed row; the summary reads "Tümü" until something is picked.
+      await click(label_("Grup: Tümü"));
       await click(vis(page.getByRole("checkbox", { name: "Mentor" })));
+      await label_("Grup: Mentor").waitFor({ timeout: 3000 });
+      // Collapsing and reopening keeps the choice.
+      await click(label_("Grup: Mentor"));
+      await click(label_("Grup: Mentor"));
+      await vis(page.getByRole("checkbox", { name: "Mentor", checked: true })).waitFor({ timeout: 3000 });
       await click(text("1 kişiyi göster"));
       await label_("Filtreler, 1 etkin").waitFor({ timeout: 3000 });
       await click(label_("Filtreler, 1 etkin"));
       await click(text("Temizle"));
+      await label_("Grup: Tümü").waitFor({ timeout: 3000 });
       await click(text("2 kişiyi göster"));
     });
     await step("people: search", async () => { await label_("Kişi ara").fill("zzz"); await text("Eşleşen kişi bulunamadı").waitFor({ timeout: 3000 }); await click(vis(page.getByText("Aramayı temizle", { exact: true }))); });

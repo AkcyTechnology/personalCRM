@@ -1079,4 +1079,5 @@ export const en: Record<string, string | [string, string]> = {
   "Aynı isim veya telefonla kayıtlı {count} kişi var": ["{count} person shares a name or phone number", "{count} people share a name or phone number"],
   "Tümünü göster": "Show all",
   "Göster": "Show",
+  "{count} grup seçili": ["{count} group selected", "{count} groups selected"],
 };

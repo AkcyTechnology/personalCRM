@@ -618,6 +618,64 @@ function ChipGroup<K extends string>({ options, selected, onToggle }: { options:
   );
 }
 
+/**
+ * Grup in the filter panel: one collapsible row ("Grup · Tümü ▾") that opens
+ * a plain checkbox list in place, instead of a wall of chips.
+ */
+function GroupSelect({
+  options, selected, open, onToggleOpen, onToggle,
+}: {
+  options: { key: string; label: string }[];
+  selected: string[];
+  open: boolean;
+  onToggleOpen: () => void;
+  onToggle: (k: string) => void;
+}) {
+  const summary =
+    selected.length === 0
+      ? t("Tümü")
+      : selected.length === 1
+        ? options.find((o) => o.key === selected[0])?.label ?? tv(selected[0])
+        : t("{count} grup seçili", { count: selected.length });
+  return (
+    <View style={styles.groupBox}>
+      <TouchableOpacity
+        style={styles.groupRow}
+        onPress={onToggleOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`${t("Grup")}: ${summary}`}
+        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
+      >
+        <Text style={styles.groupTitle}>{t("Grup")}</Text>
+        <Text style={[styles.groupSummary, selected.length > 0 && styles.groupSummaryOn]} numberOfLines={1}>{summary}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={warm.textSub} />
+      </TouchableOpacity>
+      {open
+        ? options.map((o) => {
+            const on = selected.includes(o.key);
+            return (
+              <TouchableOpacity
+                key={o.key}
+                style={styles.groupOption}
+                onPress={() => onToggle(o.key)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                aria-checked={on}
+                accessibilityLabel={o.label}
+              >
+                <View style={[styles.groupCheck, on && styles.groupCheckOn]}>
+                  {on ? <Ionicons name="checkmark" size={15} color={warm.onPrimary} /> : null}
+                </View>
+                <Text style={styles.groupOptionText}>{o.label}</Text>
+              </TouchableOpacity>
+            );
+          })
+        : null}
+    </View>
+  );
+}
+
 function FilterSheet({
   visible, contacts, customGroups, value, countFor, onClose, onApply,
 }: {
@@ -631,11 +689,15 @@ function FilterSheet({
 }) {
   const [draft, setDraft] = useState<AdvancedFilters>(value);
   const [placeQuery, setPlaceQuery] = useState("");
+  // The group list starts collapsed each time the panel opens; collapsing it
+  // keeps the choices (they live in `draft`).
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setDraft(value);
       setPlaceQuery("");
+      setGroupsOpen(false);
     }
   }, [visible, value]);
 
@@ -666,8 +728,13 @@ function FilterSheet({
 
   return (
     <Sheet visible={visible} title={t("Filtreler")} onClose={onClose} footer={footer}>
-      <Text style={styles.section}>{t("Grup")}</Text>
-      <ChipGroup options={groups} selected={draft.groups} onToggle={(k) => setDraft({ ...draft, groups: toggle(draft.groups, k) })} />
+      <GroupSelect
+        options={groups}
+        selected={draft.groups}
+        open={groupsOpen}
+        onToggleOpen={() => setGroupsOpen((o) => !o)}
+        onToggle={(k) => setDraft({ ...draft, groups: toggle(draft.groups, k) })}
+      />
 
       <Text style={styles.section}>{t("Son görüşme")}</Text>
       <ChipGroup
@@ -847,6 +914,18 @@ const styles = StyleSheet.create({
   section: { ...ts.chip, color: warm.text, fontFamily: fonts.semibold, marginTop: 16, marginBottom: 8 },
   subSection: { ...ts.meta, color: warm.textSub, marginTop: 10, marginBottom: 6 },
   sheetSearch: { flex: 0, minHeight: 44 },
+  groupBox: { marginTop: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: warm.border },
+  groupRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
+  groupTitle: { ...ts.chip, color: warm.text, fontFamily: fonts.semibold },
+  groupSummary: { flex: 1, ...ts.chip, color: warm.textSub, textAlign: "right" },
+  groupSummaryOn: { color: warm.primary },
+  groupOption: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 2 },
+  groupCheck: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: warm.textSub,
+    alignItems: "center", justifyContent: "center",
+  },
+  groupCheckOn: { backgroundColor: warm.primary, borderColor: warm.primary },
+  groupOptionText: { flex: 1, ...ts.body, color: warm.text },
   sheetFooter: { flexDirection: "row", gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: warm.border, marginTop: 8 },
   footerSecondary: {
     minHeight: 48, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1, borderColor: warm.border,
