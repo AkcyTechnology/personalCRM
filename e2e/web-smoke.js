@@ -23,6 +23,7 @@ fs.mkdirSync(OUT, { recursive: true });
 
   async function run(viewport, label) {
     const context = await browser.newContext({ viewport, locale: "tr-TR" });
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(`[${label}] pageerror: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") errors.push(`[${label}] console: ${m.text().slice(0, 200)}`); });
@@ -65,6 +66,44 @@ fs.mkdirSync(OUT, { recursive: true });
     await step("home: dynamic due count", () => text("Görüşmek isteyebileceğin biri var").waitFor({ timeout: 4000 }));
     await step("home: bell badge label", () => label_("Hatırlatıcılar, 1 kişi").waitFor({ timeout: 3000 }));
     await shot("03-home-due");
+    await step("hello: Merhaba de opens the message panel", async () => {
+      await click(text("Merhaba de"));
+      await text("Mesajını hazırla").waitFor({ timeout: 3000 });
+      await text("Ahmet Yılmaz").waitFor({ timeout: 3000 });
+      // Empty message: both actions are off.
+      const copyBtn = vis(page.getByRole("button", { name: "Kopyala" }));
+      if (!(await copyBtn.isDisabled())) throw new Error("Kopyala should be disabled while empty");
+      await vis(page.getByRole("button", { name: "WhatsApp’ta aç" })).waitFor({ timeout: 3000 });
+    });
+    await step("hello: suggestion fills the editable field, edits are kept", async () => {
+      const field = label_("Mesaj");
+      await click(vis(page.getByText(/^(Merhaba|Selam) Ahmet/)));
+      const first = await field.inputValue();
+      if (!/^(Merhaba|Selam) Ahmet/.test(first)) throw new Error(`field: ${first}`);
+      await field.fill(first + " Görüşelim.");
+      // Picking the other suggestion asks first; the web confirm is accepted by the handler.
+      let asked = false;
+      page.once("dialog", () => { asked = true; });
+      await click(vis(page.getByText(/^(Merhaba|Selam) Ahmet/).nth(1)));
+      if (!asked) throw new Error("hand-edited draft was replaced without asking");
+      await click(text("Kendi mesajımı yaz"));
+      if ((await field.inputValue()) !== "") throw new Error("own message should start empty");
+      await field.fill("Selam Ahmet, nasılsın?");
+    });
+    await step("hello: copy shows feedback and logs nothing", async () => {
+      await click(vis(page.getByRole("button", { name: "Kopyala" })));
+      await text("Mesaj kopyalandı").waitFor({ timeout: 3000 });
+    });
+    await shot("03b-hello");
+    await step("hello: draft comes back for the same person", async () => {
+      await click(page.getByLabel("Kapat", { exact: true }).locator("visible=true").last());
+      await click(text("Merhaba de"));
+      if ((await label_("Mesaj").inputValue()) !== "Selam Ahmet, nasılsın?") throw new Error("draft lost");
+      await click(page.getByLabel("Kapat", { exact: true }).locator("visible=true").last());
+      // Copying (or WhatsApp) is not a logged catch-up.
+      await text("Görüşmek isteyebileceğin biri var").waitFor({ timeout: 3000 });
+      await label_("Hatırlatıcılar, 1 kişi").waitFor({ timeout: 3000 });
+    });
     await step("home: bond tree card and how-it-grows sheet", async () => {
       await click(vis(page.getByLabel(/^Bağ ağacın: /)));
       await text("Bağ ağacın nasıl büyür?").waitFor({ timeout: 3000 });

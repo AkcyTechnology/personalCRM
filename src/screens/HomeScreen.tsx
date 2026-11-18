@@ -23,6 +23,7 @@ import {
 import { logMoment } from "../app/momentActions";
 import HealthInfoModal from "../components/HealthInfoModal";
 import MessageComposer from "../components/MessageComposer";
+import HelloSheet from "../components/HelloSheet";
 import LogInteractionModal from "../components/LogInteractionModal";
 import ProgressRing from "../components/ProgressRing";
 import BondTree from "../components/BondTree";
@@ -62,6 +63,7 @@ export default function HomeScreen({ navigation }: any) {
   const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [userName, setUserName] = useState("");
   const [composerTarget, setComposerTarget] = useState<ContactForm | null>(null);
+  const [helloTarget, setHelloTarget] = useState<ContactForm | null>(null);
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
   const [treeInfoOpen, setTreeInfoOpen] = useState(false);
@@ -179,7 +181,7 @@ export default function HomeScreen({ navigation }: any) {
                 <View style={styles.podActions}>
                   <TouchableOpacity
                     style={[styles.primaryBtn, { flex: 1 }]}
-                    onPress={() => setComposerTarget(data.pod)}
+                    onPress={() => setHelloTarget(data.pod)}
                     accessibilityRole="button"
                     accessibilityHint={t("Mesaj önerisini açar; metni düzenleyip kopyalayabilirsin")}
                   >
@@ -315,8 +317,10 @@ export default function HomeScreen({ navigation }: any) {
           if (target) logMoment(target, type, note, date, () => reload());
         }}
       />
-      {/* "Merhaba de": the full suggestion, editable and copyable, for this person. */}
+      {/* Sparks keep the existing composer. */}
       <MessageComposer visible={!!composerTarget} contact={composerTarget} onClose={() => setComposerTarget(null)} />
+      {/* "Merhaba de" on the person of the day: suggestions, editable draft, WhatsApp or Copy. */}
+      <HelloSheet visible={!!helloTarget} contact={helloTarget} onClose={() => setHelloTarget(null)} />
     </View>
   );
 }
