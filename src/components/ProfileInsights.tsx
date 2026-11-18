@@ -3,6 +3,9 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { ContactForm } from "../screens/AddContactScreen";
 import Avatar from "./Avatar";
 import { recentWeeks } from "../utils/stats";
+import { contactRecency, insightFacts, withTr } from "../utils/insights";
+import { INTERACTION_TYPES } from "./LogInteractionModal";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { nextReminderISO } from "../utils/peopleFilters";
 import { addDays, parseISODate, toISODate } from "../utils/dates";
 import { colors } from "../theme/colors";
@@ -45,10 +48,10 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
     }
     const groups = [...counts.entries()].sort((a, b) => b[1] - a[1] || tv(a[0]).localeCompare(tv(b[0]), "tr"));
 
-    return { weeks, upcoming, groups };
-  }, [contacts, threshold]);
+    return { weeks, upcoming, groups, recency: contactRecency(contacts, now), facts: insightFacts(contacts, weeklyGoal, now) };
+  }, [contacts, threshold, weeklyGoal]);
 
-  const { weeks, upcoming, groups } = data;
+  const { weeks, upcoming, groups, recency, facts } = data;
   const goal = Math.max(1, weeklyGoal || 3);
   const done = weeks[WEEKS - 1].people;
   const pct = Math.min(1, done / goal);
@@ -137,6 +140,12 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
         </View>
       )}
 
+      {/* ── Son 30 günde iletişim ── */}
+      <RecencyCard r={recency} />
+
+      {/* ── Yazılı analiz ── */}
+      <Analysis facts={facts} />
+
       {/* ── Yaklaşan görüşmeler ── */}
       <Text style={styles.title} accessibilityRole="header">{t("Yaklaşan görüşmeler")}</Text>
       {upcoming.length === 0 ? (
@@ -165,6 +174,118 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
           ) : null}
         </View>
       )}
+    </View>
+  );
+}
+
+/** Everyone in one of three groups by their latest completed catch-up. */
+function RecencyCard({ r }: { r: ReturnType<typeof contactRecency> }) {
+  const hasHistory = r.recent + r.older > 0;
+  const segs = [
+    { n: r.recent, style: styles.segRecent },
+    { n: r.older, style: styles.segOlder },
+    { n: r.never, style: styles.segNever },
+  ].filter((x) => x.n > 0);
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle} accessibilityRole="header">{t("Son 30 günde iletişim")}</Text>
+      {r.total === 0 ? (
+        <Text style={styles.line}>{t("Henüz kişi eklenmedi")}</Text>
+      ) : !hasHistory ? (
+        <Text style={styles.line}>{t("{count} kişinin henüz görüşme kaydı yok", { count: r.total })}</Text>
+      ) : (
+        <>
+          <Text style={styles.statMain}>
+            {t("Son 30 günde {total} kişiden {countWith} görüştün.", { total: r.total, count: r.recent, countWith: locale().startsWith("tr") ? withTr(r.recent) : String(r.recent) })}
+          </Text>
+          <View
+            style={styles.stack}
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t("{recent} yakın zamanda, {older} 30 günden önce, {never} kayıt yok", { recent: r.recent, older: r.older, never: r.never })}
+          >
+            {segs.map((x, i) => (
+              <View key={i} style={[styles.seg, x.style, { flex: x.n }]} />
+            ))}
+          </View>
+          <View style={styles.legendList}>
+            <LegendRow style={styles.segOlder} text={t("{count} kişiyle son görüşmen 30 günden önce", { count: r.older })} />
+            <LegendRow style={styles.segNever} text={t("{count} kişinin görüşme kaydı yok", { count: r.never })} />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+function LegendRow({ style, text }: { style: object; text: string }) {
+  return (
+    <View style={styles.legendRow}>
+      <View style={[styles.legendDot, style]} />
+      <Text style={styles.legendText}>{text}</Text>
+    </View>
+  );
+}
+
+/** A few plain sentences about the data, shown only when there is something to say. */
+function Analysis({ facts }: { facts: ReturnType<typeof insightFacts> }) {
+  const fmt = (n: number) => n.toLocaleString(locale(), { maximumFractionDigits: 1 });
+  const items: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [];
+  if (facts.trend) {
+    const { thisWeek, prevAvg } = facts.trend;
+    items.push({
+      icon: "trending-up-outline",
+      text:
+        thisWeek > prevAvg
+          ? t("Bu hafta {count} kişiyle görüştün; önceki üç haftanın ortalaması {avg} kişiydi. Temponu artırdın.", { count: thisWeek, avg: fmt(prevAvg) })
+          : thisWeek < prevAvg
+            ? t("Bu hafta şimdiye kadar {count} kişiyle görüştün; önceki üç haftada ortalama {avg} kişiydi.", { count: thisWeek, avg: fmt(prevAvg) })
+            : t("Bu hafta {count} kişiyle görüştün; önceki haftalarla aynı tempodasın.", { count: thisWeek }),
+    });
+  }
+  if (facts.goal && facts.trend) {
+    items.push({
+      icon: "flag-outline",
+      text: facts.goal.reached
+        ? t("Bu haftanın hedefine ulaştın.")
+        : t("Haftalık hedefe ulaşmak için bu hafta {count} kişiyle daha görüşmen yeterli.", { count: facts.goal.left }),
+    });
+  }
+  if (facts.topGroup) {
+    items.push({
+      icon: "people-outline",
+      text: t("Son 30 günde en çok {group} grubundan kişilerle görüştün ({count} kişi).", { group: tv(facts.topGroup.group), count: facts.topGroup.people }),
+    });
+  }
+  if (facts.quietGroup) {
+    items.push({
+      icon: "leaf-outline",
+      text: t("{group} grubundaki {count} kişiyle son 30 günde görüşmedin; birine kısa bir mesaj iyi gelebilir.", { group: tv(facts.quietGroup.group), count: facts.quietGroup.people }),
+    });
+  }
+  if (facts.longestGap) {
+    items.push({
+      icon: "time-outline",
+      text: t("En uzun süredir görüşmediğin kişi {name}: {days} gün.", { name: facts.longestGap.contact.fullName, days: facts.longestGap.days }),
+    });
+  }
+  if (facts.channel) {
+    const label = INTERACTION_TYPES.find((x) => x.type === facts.channel!.type)?.label ?? "Diğer";
+    items.push({
+      icon: "chatbubbles-outline",
+      text: t("Son 30 günde kaydettiğin {total} görüşmenin {count} tanesi {type} ile oldu.", { total: facts.channel.total, count: facts.channel.count, type: t(label) }),
+    });
+  }
+  if (items.length === 0) return null;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle} accessibilityRole="header">{t("Yazılı analiz")}</Text>
+      {items.map((it, i) => (
+        <View key={i} style={styles.analysisRow}>
+          <Ionicons name={it.icon} size={16} color={colors.primary} style={{ marginTop: 2 }} />
+          <Text style={styles.analysisText}>{it.text}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -212,6 +333,19 @@ const styles = StyleSheet.create({
   groupTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.borderLight, overflow: "hidden" },
   groupFill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
   groupCount: { minWidth: 24, textAlign: "right", fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
+
+  statMain: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text },
+  stack: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", gap: 2, marginTop: 2 },
+  seg: { height: 8 },
+  segRecent: { backgroundColor: colors.primary },
+  segOlder: { backgroundColor: colors.primaryBorder },
+  segNever: { backgroundColor: colors.border },
+  legendList: { gap: 4, marginTop: 2 },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSub },
+  analysisRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  analysisText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.text },
 
   timeline: { ...card, paddingVertical: 4, paddingHorizontal: 12 },
   tlRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10 },
