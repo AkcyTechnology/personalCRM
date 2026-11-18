@@ -1,10 +1,8 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "../screens/AddContactScreen";
 import Avatar from "./Avatar";
-import { connectionStatus, healthScoreColor, healthScoreLabel, MIN_SCORED_PEOPLE } from "../utils/healthScore";
-import { daysSinceLastContact, weekStats } from "../utils/stats";
+import { recentWeeks } from "../utils/stats";
 import { nextReminderISO } from "../utils/peopleFilters";
 import { addDays, parseISODate, toISODate } from "../utils/dates";
 import { colors } from "../theme/colors";
@@ -15,24 +13,24 @@ type Props = {
   threshold: number;
   weeklyGoal: number;
   onOpenPerson: (c: ContactForm) => void;
-  onOpenHealthInfo: () => void;
 };
 
 const MAX_TIMELINE = 5;
+const WEEKS = 4;
+const CHART_H = 72;
 
 /**
- * İçgörüler on Profile. The weekly goal is the main visual; the rest is kept
- * light. Each number appears once: the goal card owns "people this week" and
- * "moments this week", the timeline owns who is due.
+ * İçgörüler on Profile, in this order: Görüşme aktivitesi (weekly goal plus
+ * the last four weeks), Bağlantılar, Yaklaşan görüşmeler. The goal and the
+ * chart use one measure: different people met per Monday–Sunday week.
  */
-export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpenPerson, onOpenHealthInfo }: Props) {
+export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpenPerson }: Props) {
   const data = useMemo(() => {
     const now = new Date();
     const today = toISODate(now);
     const end = toISODate(addDays(now, 7));
 
-    // Distinct people this week (several moments with one person count once).
-    const week = weekStats(contacts, weeklyGoal, now);
+    const weeks = recentWeeks(contacts, WEEKS, now);
 
     const upcoming = contacts
       .map((c) => ({ c, date: nextReminderISO(c, threshold) }))
@@ -45,45 +43,101 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
       const key = c.relationship?.trim() || "Diğer";
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    const mix = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const groups = [...counts.entries()].sort((a, b) => b[1] - a[1] || tv(a[0]).localeCompare(tv(b[0]), "tr"));
 
-    const strong = contacts
-      .map((c) => ({ c, d: daysSinceLastContact(c, now) }))
-      .filter((x): x is { c: ContactForm; d: number } => x.d !== null && x.d <= 7)
-      .sort((a, b) => a.d - b.d);
+    return { weeks, upcoming, groups };
+  }, [contacts, threshold]);
 
-    return { week, upcoming, mix, strong, status: connectionStatus(contacts, threshold) };
-  }, [contacts, threshold, weeklyGoal]);
-
-  const { week, upcoming, mix, strong, status } = data;
-  const pct = Math.min(1, week.people / week.goal);
-  const maxMix = mix[0]?.[1] ?? 1;
+  const { weeks, upcoming, groups } = data;
+  const goal = Math.max(1, weeklyGoal || 3);
+  const done = weeks[WEEKS - 1].people;
+  const pct = Math.min(1, done / goal);
+  const empty = weeks.every((w) => w.people === 0);
+  const maxWeek = Math.max(1, ...weeks.map((w) => w.people));
+  const total = contacts.length;
 
   return (
     <View style={styles.wrap}>
-      {/* ── Weekly goal: the main visual ── */}
-      <View style={styles.goalCard}>
+      {/* ── Görüşme aktivitesi ── */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle} accessibilityRole="header">{t("Görüşme aktivitesi")}</Text>
         <View style={styles.goalHead}>
-          <Text style={styles.goalTitle}>{t("Haftalık hedef")}</Text>
-          <Text style={styles.goalValue}>{t("{done} / {goal} kişi", { done: week.people, goal: week.goal })}</Text>
+          <Text style={styles.label}>{t("Haftalık hedef")}</Text>
+          <Text style={styles.goalValue}>{t("{done} / {goal} kişi", { done, goal })}</Text>
         </View>
         <View
-          style={styles.goalTrack}
+          style={styles.track}
           accessible
           accessibilityRole="progressbar"
-          accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done: week.people, goal: week.goal })}
-          accessibilityValue={{ min: 0, max: week.goal, now: Math.min(week.people, week.goal) }}
+          accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done, goal })}
+          accessibilityValue={{ min: 0, max: goal, now: Math.min(done, goal) }}
         >
-          <View style={[styles.goalFill, { width: `${Math.round(pct * 100)}%` }]} />
+          <View style={[styles.fill, { width: `${Math.round(pct * 100)}%` }]} />
         </View>
-        <Text style={styles.goalSub}>
-          {week.reached
-            ? t("Bu haftanın hedefine ulaştın.")
-            : t("Hedefe {count} kişi kaldı · bu hafta {moments} görüşme kaydı", { count: week.goal - week.people, moments: week.moments })}
-        </Text>
+
+        <View style={styles.divider} />
+        <Text style={styles.label}>{t("Son 4 hafta")}</Text>
+        {empty ? (
+          <Text style={styles.muted}>{t("Son 4 haftada görüşme kaydı yok")}</Text>
+        ) : (
+          <View style={styles.chart}>
+            {weeks.map((w, i) => {
+              const current = i === WEEKS - 1;
+              const label = current ? t("Bu hafta") : w.start.toLocaleDateString(locale(), { day: "numeric", month: "short" });
+              return (
+                <View
+                  key={w.start.toISOString()}
+                  style={styles.col}
+                  accessible
+                  accessibilityLabel={t("{week}: {count} kişi", { week: label, count: w.people })}
+                >
+                  <Text style={[styles.colValue, current && styles.colValueNow]}>{w.people}</Text>
+                  <View style={styles.colArea}>
+                    <View
+                      style={[
+                        styles.bar,
+                        { height: Math.max(w.people > 0 ? 6 : 2, Math.round((w.people / maxWeek) * CHART_H)) },
+                        current ? styles.barNow : styles.barPast,
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.colLabel, current && styles.colLabelNow]} numberOfLines={1}>{label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </View>
 
-      {/* ── Upcoming catch-ups ── */}
+      {/* ── Bağlantılar ── */}
+      <Text style={styles.title} accessibilityRole="header">{t("Bağlantılar")}</Text>
+      {groups.length === 0 ? (
+        <Text style={styles.line}>{t("Henüz kişi eklenmedi")}</Text>
+      ) : groups.length === 1 ? (
+        <Text style={styles.line}>{t("{circle} · {count} kişi", { circle: tv(groups[0][0]), count: groups[0][1] })}</Text>
+      ) : (
+        <View style={styles.list}>
+          {groups.map(([label, count]) => {
+            const share = count / total;
+            return (
+              <View
+                key={label}
+                style={styles.groupRow}
+                accessible
+                accessibilityLabel={t("{circle}: {count} kişi, yüzde {pct}", { circle: tv(label), count, pct: Math.round(share * 100) })}
+              >
+                <Text style={styles.groupLabel} numberOfLines={1}>{tv(label)}</Text>
+                <View style={styles.groupTrack}>
+                  <View style={[styles.groupFill, { width: `${Math.round(share * 100)}%` }]} />
+                </View>
+                <Text style={styles.groupCount}>{count}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* ── Yaklaşan görüşmeler ── */}
       <Text style={styles.title} accessibilityRole="header">{t("Yaklaşan görüşmeler")}</Text>
       {upcoming.length === 0 ? (
         <Text style={styles.line}>{t("Önümüzdeki 7 gün için hatırlatma yok")}</Text>
@@ -111,61 +165,6 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
           ) : null}
         </View>
       )}
-
-      {/* ── Distribution ── */}
-      <Text style={styles.title} accessibilityRole="header">{t("Bağlantı dağılımı")}</Text>
-      {mix.length === 1 ? (
-        <Text style={styles.line}>{t("{circle} · {count} kişi", { circle: tv(mix[0][0]), count: mix[0][1] })}</Text>
-      ) : (
-        <View style={styles.bars}>
-          {mix.map(([label, count]) => (
-            <View key={label} style={styles.barRow} accessible accessibilityLabel={t("{circle}: {count} kişi", { circle: tv(label), count })}>
-              <Text style={styles.barLabel} numberOfLines={1}>{tv(label)}</Text>
-              <View style={styles.barTrack}>
-                <View style={[styles.barFill, { width: `${Math.max(6, Math.round((count / maxMix) * 100))}%` }]} />
-              </View>
-              <Text style={styles.barCount}>{count}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* ── Follow-up status: one line, with the number only when there is enough data ── */}
-      <TouchableOpacity style={styles.statusRow} onPress={onOpenHealthInfo} accessibilityRole="button" accessibilityHint={t("Nasıl hesaplandığını gösterir")}>
-        <Text style={styles.statusTitle}>{t("Bağlarının durumu")}</Text>
-        {status.score === null ? (
-          <Text style={styles.statusValueMuted}>
-            {t("Henüz yeterli veri yok ({count}/{min} kişi)", { count: status.scored, min: MIN_SCORED_PEOPLE })}
-          </Text>
-        ) : (
-          <Text style={[styles.statusValue, { color: healthScoreColor(status.score) }]}>
-            {`${t(healthScoreLabel(status.score))} · ${status.score}/100`}
-          </Text>
-        )}
-        <Ionicons name="information-circle-outline" size={18} color={colors.textSub} />
-      </TouchableOpacity>
-
-      {/* ── Strong connections: only when there are any ── */}
-      {strong.length > 0 ? (
-        <>
-          <Text style={styles.title} accessibilityRole="header">{t("Güçlü bağlantılar")}</Text>
-          <Text style={styles.line}>{t("Son 7 günde görüştüğün kişiler")}</Text>
-          <View style={styles.strongRow}>
-            {strong.slice(0, 6).map(({ c, d }) => (
-              <TouchableOpacity
-                key={c.id ?? c.fullName}
-                style={styles.strongItem}
-                onPress={() => onOpenPerson(c)}
-                accessibilityRole="button"
-                accessibilityLabel={`${c.fullName}, ${d === 0 ? t("Bugün") : t("{days} gün önce", { days: d })}`}
-              >
-                <Avatar name={c.fullName} avatarId={c.avatarId} size={40} />
-                <Text style={styles.strongName} numberOfLines={1}>{c.fullName.split(" ")[0]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      ) : null}
     </View>
   );
 }
@@ -185,14 +184,34 @@ const styles = StyleSheet.create({
   wrap: { gap: 8 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text, marginTop: 16 },
   line: { fontSize: 14, lineHeight: 20, color: colors.textSub },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: "500", color: colors.text },
+  muted: { fontSize: 13, lineHeight: 18, color: colors.textSub, paddingVertical: 8 },
 
-  goalCard: { ...card, padding: 16, gap: 10 },
+  card: { ...card, padding: 14, gap: 8 },
+  cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text },
   goalHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
-  goalTitle: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text },
-  goalValue: { fontSize: 20, lineHeight: 26, fontWeight: "600", color: colors.primary, fontVariant: ["tabular-nums"] },
-  goalTrack: { height: 12, borderRadius: 6, backgroundColor: colors.borderLight, overflow: "hidden" },
-  goalFill: { height: 12, borderRadius: 6, backgroundColor: colors.primary },
-  goalSub: { fontSize: 13, lineHeight: 18, color: colors.textSub },
+  goalValue: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.primary, fontVariant: ["tabular-nums"] },
+  track: { height: 6, borderRadius: 3, backgroundColor: colors.borderLight, overflow: "hidden" },
+  fill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4 },
+
+  chart: { flexDirection: "row", gap: 8, paddingTop: 2 },
+  col: { flex: 1, alignItems: "center", gap: 4, minWidth: 0 },
+  colValue: { fontSize: 13, lineHeight: 18, fontWeight: "500", color: colors.textSub, fontVariant: ["tabular-nums"] },
+  colValueNow: { color: colors.primary, fontWeight: "600" },
+  colArea: { height: CHART_H, width: "100%", justifyContent: "flex-end", alignItems: "center" },
+  bar: { width: "62%", maxWidth: 40, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  barPast: { backgroundColor: colors.primaryBorder },
+  barNow: { backgroundColor: colors.primary },
+  colLabel: { fontSize: 12, lineHeight: 16, color: colors.textSub },
+  colLabelNow: { color: colors.text, fontWeight: "600" },
+
+  list: { ...card, paddingHorizontal: 14, paddingVertical: 6 },
+  groupRow: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 10 },
+  groupLabel: { width: 104, fontSize: 14, lineHeight: 20, color: colors.text },
+  groupTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.borderLight, overflow: "hidden" },
+  groupFill: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  groupCount: { minWidth: 24, textAlign: "right", fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
 
   timeline: { ...card, paddingVertical: 4, paddingHorizontal: 12 },
   tlRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10 },
@@ -204,20 +223,4 @@ const styles = StyleSheet.create({
   tlLine: { position: "absolute", top: "60%", bottom: -8, width: 1, backgroundColor: colors.border },
   tlName: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: "500", color: colors.text },
   more: { fontSize: 13, lineHeight: 18, color: colors.textSub, paddingVertical: 8, paddingLeft: 88 },
-
-  bars: { ...card, padding: 12, gap: 10 },
-  barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  barLabel: { width: 96, fontSize: 13, lineHeight: 18, color: colors.text },
-  barTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.borderLight, overflow: "hidden" },
-  barFill: { height: 8, borderRadius: 4, backgroundColor: colors.textMuted },
-  barCount: { width: 24, textAlign: "right", fontSize: 13, lineHeight: 18, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
-
-  statusRow: { ...card, marginTop: 16, minHeight: 48, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
-  statusTitle: { fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text },
-  statusValue: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: "600", textAlign: "right" },
-  statusValueMuted: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.textSub, textAlign: "right" },
-
-  strongRow: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  strongItem: { width: 56, minHeight: 48, alignItems: "center", gap: 4 },
-  strongName: { fontSize: 12, lineHeight: 16, color: colors.text },
 });

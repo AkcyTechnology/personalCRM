@@ -36,6 +36,18 @@ export function weekStats(contacts: ContactForm[], goal: number, now: Date = new
   return { start, end, people, moments: inWeek.length, goal: safeGoal, reached: people >= safeGoal };
 }
 
+/**
+ * The last `weeks` Monday-to-Sunday weeks (local time), oldest first, each
+ * with the number of different people met that week. Uses the same rule as
+ * weekStats, so the last entry always equals the weekly goal's progress.
+ */
+export function recentWeeks(contacts: ContactForm[], weeks = 4, now: Date = new Date()): { start: Date; people: number }[] {
+  return Array.from({ length: weeks }, (_, i) => {
+    const w = weekStats(contacts, 1, addDays(now, -7 * (weeks - 1 - i)));
+    return { start: w.start, people: w.people };
+  });
+}
+
 /** Most recent recorded contact date, or null when nothing was recorded. */
 export function lastContactISO(c: ContactForm): string | null {
   let best = c.lastContactDate || "";

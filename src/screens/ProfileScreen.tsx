@@ -16,7 +16,6 @@ import { t } from "../i18n";
 import { loadContacts } from "../data/contacts";
 import type { ContactForm } from "./AddContactScreen";
 import { hasAnyHistory } from "../utils/stats";
-import HealthInfoModal from "../components/HealthInfoModal";
 import Avatar from "../components/Avatar";
 import { SUN_AVATAR } from "../data/avatars";
 import ProfileInsights from "../components/ProfileInsights";
@@ -25,8 +24,8 @@ import { colors } from "../theme/colors";
 const TOP_SAFE = Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 48;
 
 /**
- * Profile: who you are, then İçgörüler (weekly goal first), then a link to
- * Hesap ayarları. Every number appears once on this page.
+ * Profile: who you are, then İçgörüler (Görüşme aktivitesi, Bağlantılar,
+ * Yaklaşan görüşmeler), then a link to Hesap ayarları. Every number appears once on this page.
  */
 export default function ProfileScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -39,7 +38,6 @@ export default function ProfileScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [userAvatarId, setUserAvatarId] = useState<string | undefined>(undefined);
   const [contacts, setContacts] = useState<ContactForm[]>([]);
-  const [healthInfoOpen, setHealthInfoOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,32 +78,21 @@ export default function ProfileScreen({ navigation }: any) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {!loaded ? null : contacts.length === 0 ? (
-          /* No people yet: one short empty state instead of zero cards. */
-          <View style={styles.emptyCard}>
-            <Ionicons name="people-outline" size={24} color={colors.textSub} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.emptyTitle}>{t("Henüz kişi eklemedin")}</Text>
-              <Text style={styles.emptyText}>{t("İlk kişini eklediğinde özetlerin ve içgörülerin burada görünür.")}</Text>
-            </View>
-            <TouchableOpacity style={styles.smallBtn} onPress={() => navigation.navigate("AddContact")} accessibilityRole="button">
-              <Text style={styles.smallBtnText}>{t("Kişi ekle")}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
+        {!loaded ? null : (
           <>
             {/* Total people: shown once, here. */}
-            <Text style={styles.summary}>
-              {t("{count} kişi kayıtlı", { count: contacts.length })}
-              {known ? "" : ` · ${t("Görüşme kaydettikçe haftalık hedef ve bağlarının durumu dolacak.")}`}
-            </Text>
+            {contacts.length > 0 ? (
+              <Text style={styles.summary}>
+                {t("{count} kişi kayıtlı", { count: contacts.length })}
+                {known ? "" : ` · ${t("Görüşme kaydettikçe görüşme aktivitesi dolacak.")}`}
+              </Text>
+            ) : null}
             <Text style={styles.sectionTitle} accessibilityRole="header">{t("İçgörüler")}</Text>
             <ProfileInsights
               contacts={contacts}
               threshold={threshold}
               weeklyGoal={weeklyGoal}
               onOpenPerson={(c: ContactForm) => navigation.navigate("PersonDetail", { contact: c })}
-              onOpenHealthInfo={() => setHealthInfoOpen(true)}
             />
           </>
         )}
@@ -130,7 +117,6 @@ export default function ProfileScreen({ navigation }: any) {
         </TouchableOpacity>
       </ScrollView>
 
-      <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
     </View>
   );
 }
@@ -163,11 +149,6 @@ const styles = StyleSheet.create({
   summary: { fontSize: 14, lineHeight: 20, color: colors.textSub },
   sectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text, marginTop: 12, marginBottom: 8 },
 
-  emptyCard: { ...card, flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-  emptyTitle: { fontSize: 15, lineHeight: 20, fontWeight: "600", color: colors.text },
-  emptyText: { fontSize: 13, lineHeight: 18, color: colors.textSub, marginTop: 2 },
-  smallBtn: { minHeight: 48, paddingHorizontal: 14, borderRadius: 10, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  smallBtnText: { fontSize: 14, fontWeight: "600", color: colors.onFill },
 
   settingsRow: { ...card, marginTop: 24, minHeight: 64, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   settingsIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },

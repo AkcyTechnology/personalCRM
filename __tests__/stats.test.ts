@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { connectionStatus, healthScoreLabel, MIN_SCORED_PEOPLE } from "../src/utils/healthScore";
-import { daysSinceLastContact, dueContacts, hasAnyHistory, weekStats } from "../src/utils/stats";
+import { daysSinceLastContact, dueContacts, hasAnyHistory, recentWeeks, weekStats } from "../src/utils/stats";
 import { addContact, deleteInteraction, loadContacts, markContacted, updateInteraction } from "../src/data/contacts";
 import { addDays, toISODate } from "../src/utils/dates";
 import type { ContactForm } from "../src/screens/AddContactScreen";
@@ -94,5 +94,23 @@ describe("editing and deleting moments", () => {
     expect(after!.lastContactDate).toBe("2026-10-27");
     expect(after!.interactions![0].note).toBe("kahve");
     expect(weekStats(await loadContacts(), 3, now)).toMatchObject({ people: 1, moments: 1 });
+  });
+});
+
+describe("recentWeeks", () => {
+  it("gives four Monday weeks oldest first, counting each person once per week", () => {
+    const list = [
+      // Two moments with A this week: A counts once.
+      person("A", { id: "a", interactions: [{ id: "1", type: "call", date: day(0) }, { id: "2", type: "message", date: day(-2) }] }),
+      person("B", { id: "b", interactions: [{ id: "3", type: "call", date: day(-3) }, { id: "4", type: "call", date: day(-16) }] }),
+    ];
+    const weeks = recentWeeks(list, 4, now);
+    expect(weeks.map((w) => toISODate(w.start))).toEqual(["2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26"]);
+    expect(weeks.map((w) => w.people)).toEqual([0, 1, 1, 1]);
+    // The last week matches the weekly goal's progress.
+    expect(weeks[3].people).toBe(weekStats(list, 3, now).people);
+  });
+  it("is all zeros with no moments", () => {
+    expect(recentWeeks([person("X", { id: "x" })], 4, now).map((w) => w.people)).toEqual([0, 0, 0, 0]);
   });
 });
