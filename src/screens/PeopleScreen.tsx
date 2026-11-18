@@ -20,6 +20,7 @@ import type { ContactForm, InteractionType } from "./AddContactScreen";
 import { loadContacts, deleteContacts, reorderContacts, addContacts, snoozeContact, subscribeContacts, updateContact } from "../data/contacts";
 import { loadSettings } from "../data/userSettings";
 import { DEFAULT_RELATIONSHIPS, loadCustomRelationships } from "../data/relationshipTypes";
+import { duplicateIds } from "../utils/duplicateContact";
 import Avatar from "../components/Avatar";
 import LogInteractionModal from "../components/LogInteractionModal";
 import SnoozeModal from "../components/SnoozeModal";
@@ -93,6 +94,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
   const [customGroups, setCustomGroups] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [quick, setQuick] = useState<QuickFilter>(initialQuick);
+  const [dupOnly, setDupOnly] = useState(false);
   const [filters, setFilters] = useState<AdvancedFilters>(EMPTY_FILTERS);
   const [sortKey, setSortKey] = useState<SortKey>(initialQuick === "due" ? "nextReminder" : "name");
   const [threshold, setThreshold] = useState(14);
@@ -120,13 +122,19 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
     }, [])
   );
 
-  const list = useMemo(
-    () => filterPeople(contacts, { query, quick, filters, sort: sortKey, threshold }),
-    [contacts, query, quick, filters, sortKey, threshold]
-  );
+  const dupIds = useMemo(() => duplicateIds(contacts), [contacts]);
+  const showDupes = dupOnly && dupIds.size > 0;
+  const list = useMemo(() => {
+    if (showDupes) {
+      return contacts
+        .filter((c) => c.id && dupIds.has(c.id))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, "tr"));
+    }
+    return filterPeople(contacts, { query, quick, filters, sort: sortKey, threshold });
+  }, [contacts, query, quick, filters, sortKey, threshold, showDupes, dupIds]);
 
   const filterCount = activeFilterCount(filters);
-  const canDrag = sortKey === "manual" && !query && quick === "all" && filterCount === 0;
+  const canDrag = !showDupes && sortKey === "manual" && !query && quick === "all" && filterCount === 0;
 
   // ── Selection & actions (unchanged behaviour) ──
   const exitSelectMode = () => {
@@ -322,6 +330,20 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
               })}
             </View>
 
+            {dupIds.size > 0 ? (
+              <View style={styles.dupBanner} accessibilityRole="alert">
+                <Ionicons name="copy-outline" size={18} color={warm.warning} />
+                <Text style={styles.dupText}>
+                  {showDupes
+                    ? t("Tekrarlanan kayıtlar gösteriliyor. Fazla olanı açıp silebilirsin.")
+                    : t("Aynı isim veya telefonla kayıtlı {count} kişi var", { count: dupIds.size })}
+                </Text>
+                <TouchableOpacity onPress={() => setDupOnly(!showDupes)} style={styles.dupBtn} accessibilityRole="button">
+                  <Text style={styles.dupBtnText}>{showDupes ? t("Tümünü göster") : t("Göster")}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {sortKey === "manual" ? (
               <Text style={styles.hint}>
                 {canDrag ? t("Bir kişiyi basılı tutup sürükleyerek sırasını değiştirebilirsin.") : t("Sürükleme için aramayı ve filtreleri temizle.")}
@@ -391,7 +413,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
           }
           renderItem={({ item, index }) => {
             const row = (
-              <View style={[styles.rowWrap, index === 0 && styles.rowFirst, index === list.length - 1 && styles.rowLast]}>
+              <View style={[styles.rowWrap, index === list.length - 1 && styles.rowLast]}>
                 {renderRow(item)}
               </View>
             );
@@ -747,16 +769,20 @@ const styles = StyleSheet.create({
   chipText: { ...ts.chip, color: warm.textSub },
   chipTextOn: { color: warm.onSelected, fontFamily: fonts.semibold },
   hint: { ...ts.meta, color: warm.textSub, marginTop: -6 },
+  dupBanner: {
+    flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 12, paddingRight: 4, minHeight: 52,
+    borderRadius: 12, backgroundColor: warm.surface, borderWidth: 1, borderColor: warm.border,
+  },
+  dupText: { flex: 1, ...ts.meta, color: warm.text },
+  dupBtn: { minHeight: 44, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
+  dupBtnText: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 20, color: warm.primary },
 
   listContent: { paddingHorizontal: SIDE, paddingBottom: 24 },
   resultMeta: { ...ts.meta, color: warm.textSub, marginBottom: 8 },
-  rowWrap: {
-    backgroundColor: warm.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: warm.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowFirst: { borderTopWidth: 1, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  rowLast: { borderBottomWidth: 1, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  // A plain list: no outer frame, just a hairline between people.
+  rowWrap: { backgroundColor: warm.bg, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: warm.border },
+  rowLast: { borderBottomWidth: 0 },
+  row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 2, paddingVertical: 12 },
   rowDragging: { backgroundColor: warm.selectedSoft },
   rowSelected: { backgroundColor: warm.selectedSoft },
   rowText: { flex: 1, minWidth: 0, gap: 1 },

@@ -55,3 +55,27 @@ export function findSameName(name: string, existing: ContactForm[]): ContactForm
   const n = normalizeName(name);
   return n ? existing.find((c) => normalizeName(c.fullName) === n) : undefined;
 }
+
+/**
+ * Ids of saved contacts that look like repeats of another saved contact: the
+ * same name, or a shared phone number. Used to point them out on the People
+ * list; nothing is merged or deleted automatically.
+ */
+export function duplicateIds(contacts: ContactForm[]): Set<string> {
+  const byKey = new Map<string, string[]>();
+  const add = (key: string, id: string) => {
+    const list = byKey.get(key);
+    if (list) {
+      if (!list.includes(id)) list.push(id);
+    } else byKey.set(key, [id]);
+  };
+  for (const c of contacts) {
+    if (!c.id) continue;
+    const n = normalizeName(c.fullName ?? "");
+    if (n) add(`n:${n}`, c.id);
+    for (const p of phonesOf(c)) add(`p:${p}`, c.id);
+  }
+  const out = new Set<string>();
+  for (const ids of byKey.values()) if (ids.length > 1) ids.forEach((id) => out.add(id));
+  return out;
+}

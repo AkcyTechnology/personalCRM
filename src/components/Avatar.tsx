@@ -1,7 +1,7 @@
 import { Image, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
-import { avatarSource } from "../data/avatars";
+import { avatarSource, fallbackAvatarId } from "../data/avatars";
 
 export function initials(name?: string) {
   return (
@@ -16,7 +16,7 @@ export function initials(name?: string) {
 }
 
 type Props = {
-  /** Kept for callers and accessibility; the picture never depends on it. */
+  /** Only seeds a stable stand-in picture for contacts saved without an avatar. */
   name?: string;
   /** Chosen illustrated avatar (see data/avatars.ts). */
   avatarId?: string;
@@ -29,12 +29,12 @@ type Props = {
 
 /**
  * The one avatar used everywhere (lists, profile, person of the day, search,
- * Universe). Photo → chosen illustration → neutral person icon. Nothing is
- * guessed from the name or phone number.
+ * Universe). Photo → chosen illustration → a stable stand-in illustration,
+ * so nobody shows up as an empty silhouette.
  */
-export default function Avatar({ avatarId, photoUri, size = 44, ringColor }: Props) {
+export default function Avatar({ name, avatarId, photoUri, size = 44, ringColor }: Props) {
   const inner = ringColor ? size - 6 : size;
-  const source = photoUri ? { uri: photoUri } : avatarSource(avatarId);
+  const source = photoUri ? { uri: photoUri } : avatarSource(avatarId) ?? avatarSource(fallbackAvatarId(name?.trim() || undefined));
   return (
     <View
       style={[

@@ -1,4 +1,4 @@
-import { findSameName, isDuplicateContact, phoneKey } from "../src/utils/duplicateContact";
+import { duplicateIds, findSameName, isDuplicateContact, phoneKey } from "../src/utils/duplicateContact";
 import type { ContactForm } from "../src/screens/AddContactScreen";
 
 const existing = [{ fullName: "Zeynep Kaya", phone: "+90 532 111 22 33", email: "Zeynep@Figma.com" } as ContactForm];
@@ -25,5 +25,20 @@ describe("isDuplicateContact", () => {
   });
   it("does not match a different person", () => {
     expect(isDuplicateContact({ name: "Mert Demir", phone: "0544 000 00 00" }, existing)).toBe(false);
+  });
+});
+
+describe("duplicateIds", () => {
+  const c = (id: string, fullName: string, phone = "") => ({ id, fullName, phone } as ContactForm);
+  it("flags the same name (case and spacing aside) and a shared phone", () => {
+    const ids = duplicateIds([
+      c("1", "Ahmet Thaa"), c("2", "ahmet  thaa"),
+      c("3", "Anneannem", "0532 111 22 33"), c("4", "Anneanne", "+90 532 111 2233"),
+      c("5", "Alper Öner", "0544 000 00 00"),
+    ]);
+    expect([...ids].sort()).toEqual(["1", "2", "3", "4"]);
+  });
+  it("is empty when everyone is distinct", () => {
+    expect(duplicateIds([c("1", "A"), c("2", "B")]).size).toBe(0);
   });
 });

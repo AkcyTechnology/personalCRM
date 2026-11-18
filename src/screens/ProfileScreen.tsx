@@ -18,6 +18,7 @@ import type { ContactForm } from "./AddContactScreen";
 import { hasAnyHistory } from "../utils/stats";
 import HealthInfoModal from "../components/HealthInfoModal";
 import Avatar from "../components/Avatar";
+import { SUN_AVATAR } from "../data/avatars";
 import ProfileInsights from "../components/ProfileInsights";
 import { colors } from "../theme/colors";
 
@@ -61,7 +62,7 @@ export default function ProfileScreen({ navigation }: any) {
       {/* ── Profile ── */}
       <View style={[styles.header, { paddingTop: topPad }]}>
         <View style={styles.headerRow}>
-          <Avatar name={userName} avatarId={userAvatarId} size={52} />
+          <Avatar name={userName} avatarId={userAvatarId ?? SUN_AVATAR} size={52} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName} numberOfLines={1} accessibilityRole="header">{userName || t("Profil")}</Text>
             {email ? <Text style={styles.headerEmail} numberOfLines={1}>{email}</Text> : null}

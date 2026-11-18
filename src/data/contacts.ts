@@ -1,5 +1,6 @@
 import type { ContactForm, DatedReminder, Interaction, InteractionType, SpecialDay } from "../screens/AddContactScreen";
 import { secureGetItem, secureSetItem } from "../storage/secureStorage";
+import { randomAvatarId } from "./avatars";
 import { addDays, parseISODate, toISODate, todayISO } from "../utils/dates";
 
 const KEY = "crm_contacts";
@@ -68,6 +69,7 @@ export async function addContact(contact: ContactForm): Promise<ContactForm[]> {
   const prepared: ContactForm = {
     ...contact,
     id: contact.id ?? generateId(),
+    avatarId: contact.avatarId ?? randomAvatarId(),
     createdAt: contact.createdAt ?? now,
     updatedAt: contact.updatedAt ?? now,
   };
@@ -79,6 +81,7 @@ export async function addContacts(contacts: ContactForm[]): Promise<ContactForm[
   const prepared = contacts.map((c) => ({
     ...c,
     id: c.id ?? generateId(),
+    avatarId: c.avatarId ?? randomAvatarId(),
     createdAt: c.createdAt ?? now,
     updatedAt: c.updatedAt ?? now,
   }));

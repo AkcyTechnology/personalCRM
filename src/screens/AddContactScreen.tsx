@@ -12,7 +12,7 @@ import {
   StatusBar,
   FlatList,
 } from "react-native";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ContactsPermissionError,
@@ -28,7 +28,7 @@ import { askNotificationPermissionWithContext } from "../utils/notifications";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { addContact, loadContacts } from "../data/contacts";
-import { findSameName, isDuplicateContact } from "../utils/duplicateContact";
+import { findSameName, findSameNumberOrEmail } from "../utils/duplicateContact";
 import { loadSettings } from "../data/userSettings";
 import {
   DEFAULT_RELATIONSHIPS,
@@ -297,6 +297,7 @@ export default function AddContactScreen({ navigation }: Props) {
   };
 
   const persist = async () => {
+    busy.current = true;
     setSaving(true);
     try {
       const socials = [
@@ -318,6 +319,7 @@ export default function AddContactScreen({ navigation }: Props) {
         reminderIntervalStart: form.lastContactDate ? undefined : toISODate(new Date()),
       });
     } catch {
+      busy.current = false;
       setSaving(false);
       showToast(t("Kişi kaydedilemedi. Lütfen tekrar dene."));
       return;
@@ -328,15 +330,28 @@ export default function AddContactScreen({ navigation }: Props) {
     if (form.reminderEnabled !== false) askNotificationPermissionWithContext();
   };
 
+  // A quick double tap used to slip two saves past the async duplicate check
+  // and create the same person twice; this guard is set synchronously.
+  const busy = useRef(false);
+
   const handleSave = async () => {
-    if (saving) return;
+    if (busy.current) return;
     if (!validate()) {
       showToast(t("Eksik veya hatalı alanları kontrol et"));
       return;
     }
+    busy.current = true;
     const existing = await loadContacts();
-    if (isDuplicateContact({ name: form.fullName, phone: form.phone, email: form.email }, existing) || findSameName(form.fullName, existing)) {
-      confirmDialog(t("Bu kişi zaten kayıtlı olabilir"), t("Aynı isim, telefon veya e-postaya sahip bir kişi var. Yine de eklensin mi?"),
+    const sameNumber = findSameNumberOrEmail({ phone: form.phone, email: form.email }, existing);
+    const sameName = findSameName(form.fullName, existing);
+    const match = sameNumber ?? sameName;
+    if (match) {
+      busy.current = false;
+      confirmDialog(
+        t("Bu kişi zaten kayıtlı olabilir"),
+        sameNumber
+          ? t("{name} aynı telefon numarası veya e-postayla kayıtlı. Yine de eklensin mi?", { name: match.fullName })
+          : t("“{name}” adında bir kişi zaten var. Yine de eklensin mi?", { name: match.fullName }),
         [
           { text: t("Vazgeç"), style: "cancel" },
           { text: t("Yine de ekle"), onPress: persist },

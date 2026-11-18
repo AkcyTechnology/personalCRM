@@ -15,6 +15,7 @@ import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
 import Avatar from "../components/Avatar";
+import { SUN_AVATAR } from "../data/avatars";
 import AvatarPicker from "../components/AvatarPicker";
 import { t } from "../i18n";
 
@@ -34,7 +35,7 @@ export default function ProfileSettingsScreen({ navigation }: any) {
         setEmail(s.email || "");
         setPhone(s.phone || "");
         setCity(s.city || "");
-        setAvatarId(s.userAvatarId);
+        setAvatarId(s.userAvatarId ?? SUN_AVATAR);
       });
     }, [])
   );

@@ -1072,4 +1072,11 @@ export const en: Record<string, string | [string, string]> = {
   "Görüşme kaydettikçe haftalık hedef ve bağlarının durumu dolacak.": "Your weekly goal and follow-up status fill in as you log moments.",
   "Bildirimler, gizlilik, kullanım amaçları, dil, görünüm ve yedekler": "Notifications, privacy, use cases, language, appearance and backups",
   "{circle} gezegeni: {count} kişi": ["{circle} planet: {count} person", "{circle} planet: {count} people"],
+  "Güneş, krem arka plan": "Sun, cream background",
+  "{name} aynı telefon numarası veya e-postayla kayıtlı. Yine de eklensin mi?": "{name} is saved with the same phone number or e-mail. Add anyway?",
+  "“{name}” adında bir kişi zaten var. Yine de eklensin mi?": "There's already someone called “{name}”. Add anyway?",
+  "Tekrarlanan kayıtlar gösteriliyor. Fazla olanı açıp silebilirsin.": "Showing repeated entries. Open the extra one to delete it.",
+  "Aynı isim veya telefonla kayıtlı {count} kişi var": ["{count} person shares a name or phone number", "{count} people share a name or phone number"],
+  "Tümünü göster": "Show all",
+  "Göster": "Show",
 };

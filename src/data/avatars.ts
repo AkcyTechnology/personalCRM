@@ -3,8 +3,12 @@ import type { ImageSourcePropType } from "react-native";
 /**
  * Illustrated avatars a person can be given when there is no photo. The id is
  * what gets stored on the contact (`avatarId`), so files can be redrawn
- * without touching user data. Never chosen automatically from a name.
+ * without touching user data. New contacts get a random one (never derived
+ * from the name); you get the sun, the same as on the Universe map.
  */
+/** Gender-neutral sun; the default for you. */
+export const SUN_AVATAR = "sun";
+
 export type AvatarOption = { id: string; source: ImageSourcePropType; label: string };
 
 export const AVATARS: AvatarOption[] = [
@@ -28,7 +32,27 @@ export const AVATARS: AvatarOption[] = [
   { id: "a18", source: require("../../assets/avatars/avatar-18.png"), label: "Kısa kıvırcık saçlı, sakallı ve gözlüklü, krem arka plan" },
   { id: "a19", source: require("../../assets/avatars/avatar-19.png"), label: "Uzun koyu saçlı, adaçayı arka plan" },
   { id: "a20", source: require("../../assets/avatars/avatar-20.png"), label: "Kıvırcık saçlı ve hafif sakallı, mavi arka plan" },
+  { id: SUN_AVATAR, source: require("../../assets/avatars/avatar-sun.png"), label: "Güneş, krem arka plan" },
 ];
+
+/** People-drawn avatars (everything but the sun), for random defaults. */
+const PEOPLE = AVATARS.filter((a) => a.id !== SUN_AVATAR);
+
+/** A random illustrated avatar for a new contact. */
+export function randomAvatarId(): string {
+  return PEOPLE[Math.floor(Math.random() * PEOPLE.length)].id;
+}
+
+/**
+ * A stable stand-in for contacts saved before avatars were assigned: the same
+ * contact always gets the same picture (from its id), so lists don't shuffle.
+ */
+export function fallbackAvatarId(seed?: string): string {
+  if (!seed) return SUN_AVATAR;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return PEOPLE[h % PEOPLE.length].id;
+}
 
 export function avatarSource(id?: string): ImageSourcePropType | null {
   if (!id) return null;

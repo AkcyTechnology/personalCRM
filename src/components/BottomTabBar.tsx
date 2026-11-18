@@ -12,7 +12,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export type Tab = "Home" | "People" | "Insights" | "Profile";
 
 function TabItem({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon: (color: string) => ReactNode }) {
-  const color = active ? warm.onSelectedSoft : warm.textSub;
+  const color = active ? warm.primary : warm.textSub;
   return (
     <TouchableOpacity
       style={styles.tabItem}
@@ -22,7 +22,7 @@ function TabItem({ label, active, onPress, icon }: { label: string; active: bool
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
     >
-      <View style={[styles.iconPill, active && styles.iconPillActive]}>{icon(color)}</View>
+      <View style={styles.iconPill}>{icon(color)}</View>
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
         {label}
       </Text>
@@ -34,8 +34,8 @@ const ion = (name: IconName, active: boolean) => (color: string) =>
   <Ionicons name={active ? (name.replace("-outline", "") as IconName) : name} size={22} color={color} />;
 
 /**
- * Four labelled tabs in a light, thin-bordered capsule. The active tab's icon
- * sits on a small butter-yellow pill. There is no centre "+": adding a person
+ * Four labelled tabs in a light, thin-bordered capsule. The active tab is
+ * shown by its filled icon and label colour only, with no background shape. There is no centre "+": adding a person
  * lives on the People and Home screens.
  */
 export default function BottomTabBar({
@@ -84,7 +84,6 @@ const styles = StyleSheet.create({
   },
   tabItem: { flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", gap: 2 },
   iconPill: { width: 52, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  iconPillActive: { backgroundColor: warm.selectedSoft },
   tabLabel: { ...typeScale.tab, color: warm.textSub },
   tabLabelActive: { color: warm.primary, fontFamily: "InstrumentSans_600SemiBold" },
 });
