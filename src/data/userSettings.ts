@@ -41,7 +41,19 @@ export type UserSettings = {
   userAvatarId?: string;
   /** The in-app explanation before the notification prompt was shown. */
   notifPrompted?: boolean;
+  /** Digital business card details (name, e-mail and phone come from above). */
+  title?: string;
+  company?: string;
+  about?: string;
+  website?: string;
+  linkedin?: string;
+  address?: string;
+  /** Which details the card and its QR code share. */
+  cardShow?: CardShow;
 };
+
+export type CardShow = { phone: boolean; email: boolean; city: boolean; website: boolean; linkedin: boolean; address: boolean };
+export const CARD_SHOW_DEFAULT: CardShow = { phone: true, email: true, city: true, website: true, linkedin: true, address: false };
 
 const DEFAULTS: UserSettings = {
   reachOutThresholdDays: 14,

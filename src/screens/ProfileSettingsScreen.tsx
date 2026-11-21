@@ -4,12 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Switch,
   TouchableOpacity,
   TextInput,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
-import { loadSettings, saveSettings } from "../data/userSettings";
+import { CARD_SHOW_DEFAULT, loadSettings, saveSettings, type CardShow } from "../data/userSettings";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
@@ -19,6 +20,24 @@ import { SUN_AVATAR } from "../data/avatars";
 import AvatarPicker from "../components/AvatarPicker";
 import { t } from "../i18n";
 
+type CardKey = "title" | "company" | "about" | "website" | "linkedin" | "address";
+const CARD_FIELDS: { key: CardKey; label: string; placeholder: string; keyboard?: "url" | "default"; multiline?: boolean }[] = [
+  { key: "title", label: "Unvan", placeholder: "Örn. Ürün Yöneticisi" },
+  { key: "company", label: "Şirket", placeholder: "Şirket adı" },
+  { key: "about", label: "Hakkımda", placeholder: "Kısa bir tanıtım", multiline: true },
+  { key: "website", label: "Web sitesi", placeholder: "ornek.com", keyboard: "url" },
+  { key: "linkedin", label: "LinkedIn", placeholder: "kullanici-adi veya profil linki", keyboard: "url" },
+  { key: "address", label: "Adres", placeholder: "İş adresi" },
+];
+const SHOW_ROWS: { key: keyof CardShow; label: string }[] = [
+  { key: "phone", label: "Telefon" },
+  { key: "email", label: "E-posta" },
+  { key: "city", label: "Şehir" },
+  { key: "website", label: "Web sitesi" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "address", label: "Adres" },
+];
+
 export default function ProfileSettingsScreen({ navigation }: any) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -26,6 +45,9 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   const [city, setCity] = useState("");
   const [avatarId, setAvatarId] = useState<string | undefined>(undefined);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  // Business card details: asked once, here, and shown on the digital card.
+  const [card, setCard] = useState({ title: "", company: "", about: "", website: "", linkedin: "", address: "" });
+  const [show, setShow] = useState<CardShow>(CARD_SHOW_DEFAULT);
   const [saving, setSaving] = useState(false);
 
   useFocusEffect(
@@ -36,6 +58,11 @@ export default function ProfileSettingsScreen({ navigation }: any) {
         setPhone(s.phone || "");
         setCity(s.city || "");
         setAvatarId(s.userAvatarId ?? SUN_AVATAR);
+        setCard({
+          title: s.title || "", company: s.company || "", about: s.about || "",
+          website: s.website || "", linkedin: s.linkedin || "", address: s.address || "",
+        });
+        setShow({ ...CARD_SHOW_DEFAULT, ...s.cardShow });
       });
     }, [])
   );
@@ -50,6 +77,13 @@ export default function ProfileSettingsScreen({ navigation }: any) {
       phone: phone.trim(),
       city: city.trim(),
       userAvatarId: avatarId,
+      title: card.title.trim(),
+      company: card.company.trim(),
+      about: card.about.trim(),
+      website: card.website.trim(),
+      linkedin: card.linkedin.trim(),
+      address: card.address.trim(),
+      cardShow: show,
     });
     setSaving(false);
     showToast(t("Profil bilgilerin güncellendi"));
@@ -129,6 +163,43 @@ export default function ProfileSettingsScreen({ navigation }: any) {
           </View>
         </View>
 
+        <Text style={styles.sectionLabel}>{t("Kartvizit bilgileri")}</Text>
+        <View style={styles.card}>
+          {CARD_FIELDS.map((f, i) => (
+            <View key={f.key} style={[styles.fieldWrap, i > 0 && styles.fieldBorderTop]}>
+              <Text style={styles.fieldLabel}>{t(f.label)}</Text>
+              <TextInput
+                accessibilityLabel={t(f.label)}
+                style={[styles.input, f.multiline && styles.inputMulti]}
+                value={card[f.key]}
+                onChangeText={(v) => setCard((c) => ({ ...c, [f.key]: v }))}
+                placeholder={t(f.placeholder)}
+                placeholderTextColor={colors.textMuted}
+                keyboardType={f.keyboard ?? "default"}
+                autoCapitalize={f.keyboard === "url" ? "none" : "sentences"}
+                multiline={f.multiline}
+                maxLength={f.multiline ? 200 : 120}
+              />
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>{t("Kartvizitte göster")}</Text>
+        <View style={styles.card}>
+          {SHOW_ROWS.map((r, i) => (
+            <View key={r.key} style={[styles.switchRow, i > 0 && styles.fieldBorderTop]}>
+              <Text style={styles.switchLabel}>{t(r.label)}</Text>
+              <Switch
+                value={show[r.key]}
+                onValueChange={(v) => setShow((x) => ({ ...x, [r.key]: v }))}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                accessibilityLabel={t("Kartvizitte göster: {field}", { field: t(r.label) })}
+              />
+            </View>
+          ))}
+        </View>
+        <Text style={styles.note}>{t("Ad, e-posta ve telefon yukarıdaki kişisel bilgilerden alınır; kartvizit ve QR kodu bu bilgilerle oluşur.")}</Text>
+
         <TouchableOpacity
           style={[styles.saveBtn, saving && { opacity: 0.6 }]}
           onPress={handleSave}
@@ -178,6 +249,10 @@ const styles = StyleSheet.create({
   fieldBorderTop: { borderTopWidth: 1, borderTopColor: colors.border },
   fieldLabel: { fontSize: 11, color: colors.textMuted, fontWeight: "500", marginBottom: 4 },
   input: { fontSize: 15, color: colors.text, fontWeight: "400" },
+  inputMulti: { minHeight: 44, textAlignVertical: "top" },
+  switchRow: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg },
+  switchLabel: { fontSize: 15, color: colors.text },
+  note: { fontSize: 12, lineHeight: 17, color: colors.textSub, marginTop: -spacing.md, marginBottom: spacing.xl },
   saveBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.button,
