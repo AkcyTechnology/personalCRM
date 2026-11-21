@@ -1197,4 +1197,9 @@ export const en: Record<string, string | [string, string]> = {
   "ornek.com": "example.com",
   "kullanici-adi veya profil linki": "username or profile link",
   "İş adresi": "Work address",
+  "kişiyle bağ kurdun": "people you connected with",
+  "Hikâyen bu ay yeni başlıyor": "Your story starts this month",
+  "Ayın ritmi: {list}": "Rhythm of the month: {list}",
+  "Ayın ritmi": "Rhythm of the month",
+  "{n}. hf": "Wk {n}",
 };
