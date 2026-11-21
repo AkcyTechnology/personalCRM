@@ -203,7 +203,10 @@ fs.mkdirSync(OUT, { recursive: true });
       await click(label_("Profil"));
       await text("İçgörüler").waitFor({ timeout: 3000 });
       await text("Yaklaşan görüşmeler").waitFor({ timeout: 3000 });
-      await text("2 kişi kayıtlı").waitFor({ timeout: 3000 });
+      await label_("2 kişi kayıtlı").waitFor({ timeout: 3000 });
+      await text("Bağlantıların").waitFor({ timeout: 3000 });
+      await text("Rozetler").waitFor({ timeout: 3000 });
+      await text("Görüşme geçmişi").waitFor({ timeout: 3000 });
       // Purposes now live in Hesap ayarları, not on Profile.
       if (await page.getByText("Kullanım amaçların", { exact: true }).locator("visible=true").count()) throw new Error("purposes still on Profile");
     });

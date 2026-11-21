@@ -31,6 +31,8 @@ import Appear from "../components/Appear";
 import AnalyticsConsent from "../components/AnalyticsConsent";
 import CountUp from "../components/CountUp";
 import Avatar from "../components/Avatar";
+import { InfoSheet, MomentTimeline, PillButton, PlanSheet, SectionHeader, LinkButton, WeekStrip } from "../components/Dashboard";
+import { firstNameOf, nextDays, recentMoments, trName, weekPlans, type Plan } from "../utils/homeData";
 import { reasonText } from "./ShuffleScreen";
 import { track } from "../utils/analytics";
 import { t } from "../i18n";
@@ -67,6 +69,10 @@ export default function HomeScreen({ navigation }: any) {
   const [logTarget, setLogTarget] = useState<ContactForm | null>(null);
   const [healthInfoOpen, setHealthInfoOpen] = useState(false);
   const [treeInfoOpen, setTreeInfoOpen] = useState(false);
+  const [detail, setDetail] = useState<null | "goal" | "streak">(null);
+  const [planDay, setPlanDay] = useState<string | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const reload = useCallback(() => loadContacts().then(setContacts), []);
 
@@ -98,6 +104,9 @@ export default function HomeScreen({ navigation }: any) {
       thisWeek: peopleThisWeek(contacts, now),
       tree: treeState(contacts, now),
       health: averageHealthScore(contacts, threshold),
+      week: nextDays(now),
+      plans: weekPlans(contacts, now),
+      recent: recentMoments(contacts, 4, now),
     };
   }, [contacts, threshold]);
 
@@ -211,20 +220,22 @@ export default function HomeScreen({ navigation }: any) {
             </Appear>
           ) : null}
 
-          {/* ── Today's sparks ── */}
+          {/* ── Today's sparks: short chips; the full sentence is the accessible label ── */}
           {data.sparks.length > 0 ? (
             <Appear index={1}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle} accessibilityRole="header">{t("Bugünün kıvılcımları")}</Text>
-                <Text style={styles.meta} accessibilityLabel={t("{done} / {total} tamamlandı", { done: sparksDone, total: data.sparks.length })}>
-                  {`${sparksDone}/${data.sparks.length}`}
-                </Text>
-              </View>
-              <View style={styles.list}>
-                {data.sparks.map((s, i) => (
-                  <SparkRow key={s.id} spark={s} last={i === data.sparks.length - 1} onPress={() => onSpark(s)} />
+              <SectionHeader
+                title={t("Bugünün kıvılcımları")}
+                right={
+                  <Text style={styles.meta} accessibilityLabel={t("{done} / {total} tamamlandı", { done: sparksDone, total: data.sparks.length })}>
+                    {`${sparksDone}/${data.sparks.length}`}
+                  </Text>
+                }
+              />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bleed} contentContainerStyle={styles.chipRow}>
+                {data.sparks.map((s) => (
+                  <SparkChip key={s.id} spark={s} onPress={() => onSpark(s)} />
                 ))}
-              </View>
+              </ScrollView>
             </Appear>
           ) : null}
 
@@ -233,65 +244,91 @@ export default function HomeScreen({ navigation }: any) {
             <TreeCard tree={data.tree} onPress={() => setTreeInfoOpen(true)} />
           </Appear>
 
-          {/* ── Weekly goal · streak ── */}
+          {/* ── Weekly goal · streak: two tiles; details open in a sheet ── */}
           <Appear index={3}>
-            <View style={[styles.card, styles.weekCard]}>
-              <View style={styles.weekCol}>
-                <ProgressRing
-                  size={64}
-                  stroke={6}
-                  progress={data.thisWeek / weeklyGoal}
-                  color={H.primary}
-                  trackColor={H.track}
-                  accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
-                >
-                  <CountUp value={data.thisWeek} style={styles.ringValue} format={(n) => `${n}/${weeklyGoal}`} />
-                </ProgressRing>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.kicker}>{t("Haftalık hedef")}</Text>
-                  <Text style={styles.meta}>{t("Bu hafta görüştüğün farklı kişiler")}</Text>
+            <View style={styles.tiles}>
+              <TouchableOpacity
+                style={styles.tile}
+                onPress={() => setDetail("goal")}
+                accessibilityRole="button"
+                accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
+                accessibilityHint={t("Ayrıntıları gösterir")}
+              >
+                <View style={styles.tileTop}>
+                  <View style={styles.tileIcon}><Ionicons name="locate-outline" size={20} color={H.primary} /></View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </View>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.weekCol} accessible accessibilityLabel={t("Görüşme serisi: {count} hafta", { count: data.streak.current })}>
-                <View style={styles.streakIcon}>
-                  <Ionicons name={data.streak.current > 0 ? "flame-outline" : "leaf-outline"} size={20} color={H.text} />
+                <Text style={styles.tileTitle}>{t("Haftalık hedef")}</Text>
+                <Text style={styles.tileValue}>{t("{done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.tile}
+                onPress={() => setDetail("streak")}
+                accessibilityRole="button"
+                accessibilityLabel={t("Görüşme serisi: {count} hafta", { count: data.streak.current })}
+                accessibilityHint={t("Ayrıntıları gösterir")}
+              >
+                <View style={styles.tileTop}>
+                  <View style={styles.tileIcon}>
+                    <Ionicons name={data.streak.current > 0 ? "flame-outline" : "leaf-outline"} size={20} color={H.primary} />
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.kicker}>{t("Görüşme serisi")}</Text>
-                  <Text style={styles.name}>
-                    {data.streak.current > 0 ? t("{count} hafta", { count: data.streak.current }) : t("Henüz başlamadı")}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {data.streak.thisWeekDone
-                      ? t("Bu hafta görüşme kaydettin")
-                      : t("Seri, en az bir görüşme kaydettiğin her hafta uzar")}
-                  </Text>
-                </View>
-              </View>
-              {data.streak.freezes > 0 || data.health !== null ? (
-                <View style={styles.metaRow}>
-                  {data.streak.freezes > 0 ? (
-                    <View style={styles.pill} accessible accessibilityLabel={t("{count} dondurma hakkı", { count: data.streak.freezes })}>
-                      <Ionicons name="snow-outline" size={14} color={H.sub} />
-                      <Text style={styles.pillText}>{t("{count} dondurma hakkı", { count: data.streak.freezes })}</Text>
-                    </View>
-                  ) : null}
-                  {data.health !== null ? (
-                    <TouchableOpacity
-                      style={styles.pill}
-                      onPress={() => setHealthInfoOpen(true)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("Takip durumu: {label}. Nasıl hesaplanır?", { label: t(healthScoreLabel(data.health)) })}
-                    >
-                      <View style={[styles.dot, { backgroundColor: healthScoreColor(data.health) }]} />
-                      <Text style={styles.pillText}>{t("Takip durumu: {label}", { label: t(healthScoreLabel(data.health)) })}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              ) : null}
+                <Text style={styles.tileTitle}>{t("Görüşme serisi")}</Text>
+                <Text style={styles.tileValue}>{t("{count} hafta", { count: data.streak.current })}</Text>
+              </TouchableOpacity>
             </View>
           </Appear>
+
+          {/* ── Upcoming plans this week ── */}
+          <Appear index={4}>
+            <SectionHeader
+              title={t("Yaklaşan planlar")}
+              right={<PillButton icon="add" label={t("Plan ekle")} onPress={() => { setPlanDay(selectedDay); setPlanOpen(true); }} />}
+            />
+            <WeekStrip days={data.week} marked={new Set(data.plans.map((p) => p.date))} selected={selectedDay} onSelect={setSelectedDay} />
+            <PlansList
+              plans={selectedDay ? data.plans.filter((p) => p.date === selectedDay) : data.plans}
+              weekEmpty={data.plans.length === 0}
+              onOpen={goToContact}
+              onAdd={() => { setPlanDay(selectedDay); setPlanOpen(true); }}
+            />
+          </Appear>
+
+          {/* ── People to see again ── */}
+          {dueCount > 0 ? (
+            <Appear index={5}>
+              <SectionHeader
+                title={t("Yeniden görüş")}
+                right={<LinkButton label={t("Tümü")} onPress={() => navigation.navigate("People", { filter: "reachOut", threshold })} />}
+              />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bleed} contentContainerStyle={styles.chipRow}>
+                {data.due.slice(0, 12).map((c) => {
+                  const days = daysSinceIntervalStart(c);
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={styles.face}
+                      onPress={() => goToContact(c)}
+                      accessibilityRole="button"
+                      accessibilityLabel={days >= 9999 ? c.fullName : t("{name}, {days} gündür görüşülmedi", { name: c.fullName, days })}
+                    >
+                      <Avatar name={c.fullName} avatarId={c.avatarId} size={56} ringColor={H.primary} />
+                      <Text style={styles.faceName} numberOfLines={1}>{firstNameOf(c.fullName)}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </Appear>
+          ) : null}
+
+          {/* ── Recent catch-ups ── */}
+          {data.recent.length > 0 ? (
+            <Appear index={6}>
+              <SectionHeader title={t("Son görüşmeler")} />
+              <MomentTimeline items={data.recent} onOpen={goToContact} />
+            </Appear>
+          ) : null}
 
           {/* ── Import from contacts: last, fully above the tab bar ── */}
           {contacts.length < 3 ? (
@@ -306,6 +343,63 @@ export default function HomeScreen({ navigation }: any) {
 
       <HealthInfoModal visible={healthInfoOpen} onClose={() => setHealthInfoOpen(false)} />
       <TreeInfoModal visible={treeInfoOpen} tree={data.tree} onClose={() => setTreeInfoOpen(false)} />
+      <InfoSheet visible={detail === "goal"} title={t("Haftalık hedef")} onClose={() => setDetail(null)}>
+        <View style={styles.detailRow}>
+          <ProgressRing
+            size={72}
+            stroke={7}
+            progress={data.thisWeek / weeklyGoal}
+            color={H.primary}
+            trackColor={H.track}
+            accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done: data.thisWeek, goal: weeklyGoal })}
+          >
+            <CountUp value={data.thisWeek} style={styles.ringValue} format={(n) => `${n}/${weeklyGoal}`} />
+          </ProgressRing>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.name}>{t("Bu hafta görüştüğün farklı kişiler")}</Text>
+            <Text style={styles.body}>
+              {data.thisWeek >= weeklyGoal
+                ? t("Bu haftanın hedefine ulaştın.")
+                : t("Haftalık hedefe ulaşmak için bu hafta {count} kişiyle daha görüşmen yeterli.", { count: weeklyGoal - data.thisWeek })}
+            </Text>
+          </View>
+        </View>
+        {data.health !== null ? (
+          <TouchableOpacity
+            style={styles.pill}
+            onPress={() => { setDetail(null); setHealthInfoOpen(true); }}
+            accessibilityRole="button"
+            accessibilityLabel={t("Takip durumu: {label}. Nasıl hesaplanır?", { label: t(healthScoreLabel(data.health)) })}
+          >
+            <View style={[styles.dot, { backgroundColor: healthScoreColor(data.health) }]} />
+            <Text style={styles.pillText}>{t("Takip durumu: {label}", { label: t(healthScoreLabel(data.health)) })}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.meta}>{t("Hedefi Hesap ayarları > Haftalık hedef bölümünden değiştirebilirsin.")}</Text>
+      </InfoSheet>
+      <InfoSheet visible={detail === "streak"} title={t("Görüşme serisi")} onClose={() => setDetail(null)}>
+        <View style={styles.detailRow}>
+          <View style={styles.bigIcon}>
+            <Ionicons name={data.streak.current > 0 ? "flame-outline" : "leaf-outline"} size={30} color={H.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.name}>
+              {data.streak.current > 0 ? t("{count} hafta", { count: data.streak.current }) : t("Henüz başlamadı")}
+            </Text>
+            <Text style={styles.body}>
+              {data.streak.thisWeekDone ? t("Bu hafta görüşme kaydettin") : t("Seri, en az bir görüşme kaydettiğin her hafta uzar")}
+            </Text>
+          </View>
+        </View>
+        {data.streak.best > 0 ? <Text style={styles.body}>{t("En uzun serin: {count} hafta", { count: data.streak.best })}</Text> : null}
+        {data.streak.freezes > 0 ? (
+          <View style={styles.pill} accessible accessibilityLabel={t("{count} dondurma hakkı", { count: data.streak.freezes })}>
+            <Ionicons name="snow-outline" size={14} color={H.sub} />
+            <Text style={styles.pillText}>{t("{count} dondurma hakkı", { count: data.streak.freezes })}</Text>
+          </View>
+        ) : null}
+      </InfoSheet>
+      <PlanSheet visible={planOpen} contacts={contacts} day={planDay} onClose={() => setPlanOpen(false)} onSaved={() => reload()} />
       <AnalyticsConsent ready={loaded && contacts.length > 0} />
       <LogInteractionModal
         visible={!!logTarget}
@@ -366,11 +460,20 @@ function sparkContent(s: Spark): { icon: IconName; text: string } {
   }
 }
 
-function SparkRow({ spark, last, onPress }: { spark: Spark; last: boolean; onPress: () => void }) {
+/** Short label for the chip; the full sentence stays the accessible label. */
+function sparkShort(s: Spark): string {
+  if (s.kind === "meetUp") return t("Kahve planla");
+  const name = firstName(s.contact.fullName);
+  if (s.kind === "birthday") return t("Doğum günü: {name}", { name });
+  const nameTo = trName(name, "dative");
+  return s.kind === "followUp" ? t("{nameTo} sor", { nameTo }) : t("{nameTo} yaz", { nameTo });
+}
+
+function SparkChip({ spark, onPress }: { spark: Spark; onPress: () => void }) {
   const c = sparkContent(spark);
   return (
     <TouchableOpacity
-      style={[styles.sparkRow, !last && styles.sparkDivider]}
+      style={[styles.chip, spark.done && styles.chipDone]}
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
@@ -378,11 +481,50 @@ function SparkRow({ spark, last, onPress }: { spark: Spark; last: boolean; onPre
       accessibilityState={{ checked: spark.done }}
     >
       <View style={[styles.sparkIcon, spark.done && styles.sparkIconDone]}>
-        <Ionicons name={spark.done ? "checkmark" : c.icon} size={16} color={spark.done ? colors.onFill : H.text} />
+        <Ionicons name={spark.done ? "checkmark" : c.icon} size={16} color={spark.done ? colors.onFill : H.primary} />
       </View>
-      <Text style={[styles.sparkText, spark.done && styles.sparkTextDone]}>{c.text}</Text>
-      <Ionicons name="chevron-forward" size={18} color={H.sub} />
+      <Text style={[styles.chipText, spark.done && styles.sparkTextDone]} numberOfLines={1}>{sparkShort(spark)}</Text>
+      <Ionicons name="chevron-forward" size={14} color={H.sub} />
     </TouchableOpacity>
+  );
+}
+
+function PlansList({ plans, weekEmpty, onOpen, onAdd }: { plans: Plan[]; weekEmpty: boolean; onOpen: (c: ContactForm) => void; onAdd: () => void }) {
+  if (weekEmpty) {
+    return (
+      <View style={styles.planEmpty}>
+        <Ionicons name="calendar-outline" size={20} color={H.primary} />
+        <Text style={[styles.body, { flex: 1 }]}>{t("Önümüzdeki 7 gün için planlı bir görüşmen yok.")}</Text>
+        <TouchableOpacity style={styles.smallPrimary} onPress={onAdd} accessibilityRole="button">
+          <Text style={styles.smallPrimaryText}>{t("Plan ekle")}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  if (plans.length === 0) return <Text style={styles.meta}>{t("Bu gün için plan yok.")}</Text>;
+  return (
+    <View style={styles.list}>
+      {plans.map((p, i) => (
+        <TouchableOpacity
+          key={`${p.contact.id}-${p.date}-${i}`}
+          style={[styles.planRow, i < plans.length - 1 && styles.sparkDivider]}
+          onPress={() => onOpen(p.contact)}
+          accessibilityRole="button"
+        >
+          <Avatar name={p.contact.fullName} avatarId={p.contact.avatarId} size={36} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.name} numberOfLines={1}>{p.contact.fullName}</Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {p.kind === "birthday" ? t("Doğum günü") : p.note || t("Hatırlatıcı")}
+            </Text>
+          </View>
+          <Text style={styles.meta}>
+            {p.time ?? ""}
+          </Text>
+          <Ionicons name={p.kind === "birthday" ? "gift-outline" : "alarm-outline"} size={18} color={H.primary} />
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 }
 
@@ -407,26 +549,26 @@ function vitalityText(tree: TreeState): string {
 
 function TreeCard({ tree, onPress }: { tree: TreeState; onPress: () => void }) {
   const stageName = t(TREE_STAGES[tree.stage].name);
+  const next = tree.toNext > 0 ? t("{count} an daha ve ağacın büyüyecek", { count: tree.toNext }) : t("Ağacın en büyük halinde");
   return (
     <TouchableOpacity
-      style={[styles.card, styles.treeCard]}
+      style={styles.treeCard}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={t("Bağ ağacın: {stage}. {moments} an. {status}", { stage: stageName, moments: tree.moments, status: vitalityText(tree) })}
+      accessibilityLabel={t("Bağ ağacın: {stage}. {moments} an. {status}", { stage: stageName, moments: tree.moments, status: `${vitalityText(tree)}. ${next}` })}
       accessibilityHint={t("Ağacın nasıl büyüdüğünü gösterir")}
     >
-      <BondTree tree={tree} size={76} minimal />
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text style={styles.kicker}>{t("Bağ ağacın")}</Text>
-        <Text style={styles.name}>{stageName}</Text>
-        <Text style={styles.meta}>{vitalityText(tree)}</Text>
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        <Text style={styles.tileTitle}>{t("Bağ ağacın")}</Text>
+        <Text style={styles.treeStage}>{stageName}</Text>
+        <Text style={styles.meta} numberOfLines={2}>{vitalityText(tree)}</Text>
         <View style={styles.treeTrack}>
           <View style={[styles.treeFill, { width: `${Math.round(tree.progress * 100)}%` }]} />
         </View>
-        <Text style={styles.meta}>
-          {tree.toNext > 0 ? t("{count} an daha ve ağacın büyüyecek", { count: tree.toNext }) : t("Ağacın en büyük halinde")}
-        </Text>
+      </View>
+      <View style={styles.treeArt}>
+        <BondTree tree={tree} size={96} minimal />
       </View>
     </TouchableOpacity>
   );
@@ -438,8 +580,11 @@ function TreeInfoModal({ visible, tree, onClose }: { visible: boolean; tree: Tre
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel={t("Kapat")}>
         <View style={styles.sheet} onStartShouldSetResponder={() => true}>
           <Text style={styles.sectionTitle} accessibilityRole="header">{t("Bağ ağacın nasıl büyür?")}</Text>
-          <Text style={[styles.body, { marginTop: 6, marginBottom: 10 }]}>
+          <Text style={[styles.body, { marginTop: 6, marginBottom: 6 }]}>
             {t("Kaydettiğin her an ağacına bir yaprak ekler. Bu hafta konuştuğun her kişi bir çiçek açtırır. Ağacın asla solmaz; sen uzaktayken sadece dinlenir.")}
+          </Text>
+          <Text style={[styles.name, { marginBottom: 8 }]}>
+            {tree.toNext > 0 ? t("{count} an daha ve ağacın büyüyecek", { count: tree.toNext }) : t("Ağacın en büyük halinde")}
           </Text>
           {TREE_STAGES.map((st, i) => {
             const reached = tree.stage >= i;
@@ -505,25 +650,54 @@ const styles = StyleSheet.create({
   podTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   podActions: { flexDirection: "row", gap: 8 },
 
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 8 },
-  list: { backgroundColor: H.card, borderRadius: R.card, borderWidth: 1, borderColor: H.border, overflow: "hidden" },
-  sparkRow: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  bleed: { marginHorizontal: -20, marginTop: 8 },
+  chipRow: { paddingHorizontal: 20, gap: 8 },
+  chip: {
+    minHeight: 48, maxWidth: 240, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 12,
+    borderRadius: 14, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder,
+  },
+  chipDone: { backgroundColor: H.card, borderColor: H.border },
+  chipText: { flexShrink: 1, fontSize: 14, lineHeight: 20, fontWeight: "600", color: H.text },
+
+  tiles: { flexDirection: "row", gap: 10 },
+  tile: {
+    flex: 1, minHeight: 64, gap: 2, padding: 12,
+    borderRadius: 14, backgroundColor: H.card, borderWidth: 1, borderColor: H.border,
+  },
+  tileTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  tileIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+  tileTitle: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: H.text },
+  tileValue: { fontSize: 16, lineHeight: 22, fontWeight: "700", color: H.primary },
+  detailRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  bigIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+
+  planEmpty: {
+    marginTop: 8, flexDirection: "row", alignItems: "center", gap: 10, padding: 12,
+    borderRadius: 12, backgroundColor: H.card, borderWidth: 1, borderColor: H.border,
+  },
+  smallPrimary: { minHeight: 40, paddingHorizontal: 12, borderRadius: 10, backgroundColor: H.primary, alignItems: "center", justifyContent: "center" },
+  smallPrimaryText: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: H.onPrimary },
+  planRow: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
+
+  face: { width: 68, alignItems: "center", gap: 4 },
+  faceName: { fontSize: 12, lineHeight: 16, color: H.text, fontWeight: "500" },
+
+  list: { marginTop: 8, backgroundColor: H.card, borderRadius: R.card, borderWidth: 1, borderColor: H.border, overflow: "hidden" },
   sparkDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: H.border },
-  sparkIcon: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: H.border, alignItems: "center", justifyContent: "center" },
+  sparkIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: H.card },
   sparkIconDone: { backgroundColor: colors.success, borderColor: colors.success },
-  sparkText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: "400", color: H.text },
   // Done stays readable: the check says it's done; the line-through is a hint.
   sparkTextDone: { textDecorationLine: "line-through", color: H.sub },
 
-  treeCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
-  treeTrack: { height: 6, borderRadius: 3, backgroundColor: H.track, marginTop: 6, overflow: "hidden" },
+  treeCard: {
+    flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 16, paddingRight: 8, paddingVertical: 10,
+    borderRadius: 16, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder,
+  },
+  treeStage: { fontSize: 18, lineHeight: 24, fontWeight: "700", color: H.text },
+  treeArt: { width: 104, height: 104, borderRadius: 52, alignItems: "center", justifyContent: "center", backgroundColor: H.card },
+  treeTrack: { height: 6, borderRadius: 3, backgroundColor: H.card, marginTop: 6, overflow: "hidden" },
   treeFill: { height: 6, borderRadius: 3, backgroundColor: colors.success },
 
-  weekCard: { gap: 12 },
-  weekCol: { flexDirection: "row", alignItems: "center", gap: 12 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: H.border },
-  streakIcon: { width: 64, alignItems: "center" },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pill: {
     minHeight: 32, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10,
     borderRadius: R.button, backgroundColor: H.bg, borderWidth: 1, borderColor: H.border,
@@ -531,10 +705,6 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 13, lineHeight: 18, fontWeight: "500", color: H.text },
   dot: { width: 8, height: 8, borderRadius: 4 },
 
-  bdayChip: {
-    flexDirection: "row", alignItems: "center", gap: 8, minHeight: 56, paddingHorizontal: 12,
-    backgroundColor: H.card, borderRadius: R.row, borderWidth: 1, borderColor: H.border,
-  },
 
   importRow: {
     minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14,

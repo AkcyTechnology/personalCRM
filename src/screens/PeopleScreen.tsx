@@ -95,7 +95,9 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
   const [query, setQuery] = useState("");
   const [quick, setQuick] = useState<QuickFilter>(initialQuick);
   const [dupOnly, setDupOnly] = useState(false);
-  const [filters, setFilters] = useState<AdvancedFilters>(EMPTY_FILTERS);
+  // Opened from a group card on Profile: start filtered to that group.
+  const initialGroup: string | undefined = route?.params?.group;
+  const [filters, setFilters] = useState<AdvancedFilters>(initialGroup ? { ...EMPTY_FILTERS, groups: [initialGroup] } : EMPTY_FILTERS);
   const [sortKey, setSortKey] = useState<SortKey>(initialQuick === "due" ? "nextReminder" : "name");
   const [threshold, setThreshold] = useState(14);
   const [loaded, setLoaded] = useState(false);

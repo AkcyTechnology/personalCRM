@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "../screens/AddContactScreen";
@@ -142,20 +142,29 @@ export default function ContactReminders({ contact, onChange }: Props) {
   );
 }
 
-function AddSheet({
+export function AddSheet({
   kind,
   name,
   onClose,
   onSaveReminder,
   onSaveDay,
+  initialDate,
 }: {
   kind: null | "reminder" | "day";
+  /** Day to start on (e.g. the day picked on a week strip); past days fall back to tomorrow. */
+  initialDate?: string;
   name: string;
   onClose: () => void;
   onSaveReminder: (date: string, time: string, note: string) => void;
   onSaveDay: (label: string, date: string) => void;
 }) {
   const [date, setDate] = useState(toISODate(addDays(new Date(), 1)));
+  useEffect(() => {
+    if (kind === "reminder") {
+      const today = toISODate(new Date());
+      setDate(initialDate && initialDate >= today ? initialDate : toISODate(addDays(new Date(), 1)));
+    }
+  }, [kind, initialDate]);
   const [time, setTime] = useState("09:00");
   const [note, setNote] = useState("");
   const [label, setLabel] = useState("");

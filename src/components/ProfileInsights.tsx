@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { ContactForm } from "../screens/AddContactScreen";
 import Avatar from "./Avatar";
@@ -11,31 +11,25 @@ import { addDays, parseISODate, toISODate } from "../utils/dates";
 import { colors } from "../theme/colors";
 import { locale, t, tv } from "../i18n";
 
-type Props = {
-  contacts: ContactForm[];
-  threshold: number;
-  weeklyGoal: number;
-  onOpenPerson: (c: ContactForm) => void;
-};
-
 const MAX_TIMELINE = 5;
 const WEEKS = 4;
 const CHART_H = 72;
 
+export type Upcoming = { c: ContactForm; date: string; due: boolean };
+
 /**
- * İçgörüler on Profile, in this order: Görüşme aktivitesi (weekly goal plus
- * the last four weeks), Bağlantılar, Yaklaşan görüşmeler. The goal and the
- * chart use one measure: different people met per Monday–Sunday week.
+ * Everything the Profile insights draw, computed once. The weekly goal and the
+ * four-week chart use one measure: different people met per Monday–Sunday week.
  */
-export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpenPerson }: Props) {
-  const data = useMemo(() => {
+export function useProfileInsights(contacts: ContactForm[], threshold: number, weeklyGoal: number) {
+  return useMemo(() => {
     const now = new Date();
     const today = toISODate(now);
     const end = toISODate(addDays(now, 7));
 
     const weeks = recentWeeks(contacts, WEEKS, now);
 
-    const upcoming = contacts
+    const upcoming: Upcoming[] = contacts
       .map((c) => ({ c, date: nextReminderISO(c, threshold) }))
       .filter((x): x is { c: ContactForm; date: string } => !!x.date && x.date <= end)
       .map((x) => ({ ...x, due: x.date <= today }))
@@ -50,69 +44,102 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
 
     return { weeks, upcoming, groups, recency: contactRecency(contacts, now), facts: insightFacts(contacts, weeklyGoal, now) };
   }, [contacts, threshold, weeklyGoal]);
+}
 
-  const { weeks, upcoming, groups, recency, facts } = data;
+/** Görüşme aktivitesi: the weekly goal and the last four weeks. */
+export function ActivityCard({ weeks, weeklyGoal, onDetails }: { weeks: { start: Date; people: number }[]; weeklyGoal: number; onDetails?: () => void }) {
   const goal = Math.max(1, weeklyGoal || 3);
   const done = weeks[WEEKS - 1].people;
   const pct = Math.min(1, done / goal);
   const empty = weeks.every((w) => w.people === 0);
   const maxWeek = Math.max(1, ...weeks.map((w) => w.people));
-  const total = contacts.length;
-
   return (
-    <View style={styles.wrap}>
-      {/* ── Görüşme aktivitesi ── */}
-      <View style={styles.card}>
+    <View style={styles.card}>
+      <View style={styles.cardHead}>
         <Text style={styles.cardTitle} accessibilityRole="header">{t("Görüşme aktivitesi")}</Text>
-        <View style={styles.goalHead}>
-          <Text style={styles.label}>{t("Haftalık hedef")}</Text>
-          <Text style={styles.goalValue}>{t("{done} / {goal} kişi", { done, goal })}</Text>
-        </View>
-        <View
-          style={styles.track}
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done, goal })}
-          accessibilityValue={{ min: 0, max: goal, now: Math.min(done, goal) }}
-        >
-          <View style={[styles.fill, { width: `${Math.round(pct * 100)}%` }]} />
-        </View>
-
-        <View style={styles.divider} />
-        <Text style={styles.label}>{t("Son 4 hafta")}</Text>
-        {empty ? (
-          <Text style={styles.muted}>{t("Son 4 haftada görüşme kaydı yok")}</Text>
-        ) : (
-          <View style={styles.chart}>
-            {weeks.map((w, i) => {
-              const current = i === WEEKS - 1;
-              const label = current ? t("Bu hafta") : w.start.toLocaleDateString(locale(), { day: "numeric", month: "short" });
-              return (
-                <View
-                  key={w.start.toISOString()}
-                  style={styles.col}
-                  accessible
-                  accessibilityLabel={t("{week}: {count} kişi", { week: label, count: w.people })}
-                >
-                  <Text style={[styles.colValue, current && styles.colValueNow]}>{w.people}</Text>
-                  <View style={styles.colArea}>
-                    <View
-                      style={[
-                        styles.bar,
-                        { height: Math.max(w.people > 0 ? 6 : 2, Math.round((w.people / maxWeek) * CHART_H)) },
-                        current ? styles.barNow : styles.barPast,
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.colLabel, current && styles.colLabelNow]} numberOfLines={1}>{label}</Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {onDetails ? (
+          <TouchableOpacity onPress={onDetails} style={styles.cardLink} accessibilityRole="button">
+            <Text style={styles.cardLinkText}>{t("Aktivite ayrıntıları")}</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.goalHead}>
+        <Text style={styles.label}>{t("Haftalık hedef")}</Text>
+        <Text style={styles.goalValue}>{t("{done} / {goal} kişi", { done, goal })}</Text>
+      </View>
+      <View
+        style={styles.track}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={t("Haftalık hedef: {done} / {goal} kişi", { done, goal })}
+        accessibilityValue={{ min: 0, max: goal, now: Math.min(done, goal) }}
+      >
+        <View style={[styles.fill, { width: `${Math.round(pct * 100)}%` }]} />
       </View>
 
-      {/* ── Bağlantılar ── */}
+      <View style={styles.divider} />
+      <Text style={styles.label}>{t("Son 4 hafta")}</Text>
+      {empty ? (
+        <Text style={styles.muted}>{t("Son 4 haftada görüşme kaydı yok")}</Text>
+      ) : (
+        <View style={styles.chart}>
+          {weeks.map((w, i) => {
+            const current = i === WEEKS - 1;
+            const label = current ? t("Bu hafta") : w.start.toLocaleDateString(locale(), { day: "numeric", month: "short" });
+            return (
+              <View key={w.start.toISOString()} style={styles.col} accessible accessibilityLabel={t("{week}: {count} kişi", { week: label, count: w.people })}>
+                <Text style={[styles.colValue, current && styles.colValueNow]}>{w.people}</Text>
+                <View style={styles.colArea}>
+                  <View
+                    style={[
+                      styles.bar,
+                      { height: Math.max(w.people > 0 ? 6 : 2, Math.round((w.people / maxWeek) * CHART_H)) },
+                      current ? styles.barNow : styles.barPast,
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.colLabel, current && styles.colLabelNow]} numberOfLines={1}>{label}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Haftalık aktivite: different people met on each day of this week. */
+export function DailyActivityCard({ days, counts }: { days: { iso: string; date: Date; isToday: boolean }[]; counts: number[] }) {
+  const max = Math.max(1, ...counts);
+  const empty = counts.every((n) => n === 0);
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle} accessibilityRole="header">{t("Haftalık aktivite")}</Text>
+      {empty ? <Text style={styles.muted}>{t("Bu hafta henüz görüşme kaydı yok")}</Text> : null}
+      <View style={styles.chart}>
+        {days.map((d, i) => {
+          const n = counts[i];
+          const wd = d.date.toLocaleDateString(locale(), { weekday: "narrow" });
+          const long = d.date.toLocaleDateString(locale(), { weekday: "long" });
+          return (
+            <View key={d.iso} style={styles.col} accessible accessibilityLabel={t("{week}: {count} kişi", { week: long, count: n })}>
+              <View style={[styles.colArea, { height: 64 }]}>
+                <View style={[styles.dayBar, { height: Math.max(n > 0 ? 8 : 4, Math.round((n / max) * 64)) }, d.isToday ? styles.barNow : n > 0 ? styles.barPast : styles.barEmpty]} />
+              </View>
+              <Text style={[styles.colLabel, d.isToday && styles.colLabelNow]}>{wd}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** Bağlantılar: each group's share of everyone you saved. */
+export function ConnectionsList({ groups, total }: { groups: [string, number][]; total: number }) {
+  return (
+    <>
       <Text style={styles.title} accessibilityRole="header">{t("Bağlantılar")}</Text>
       {groups.length === 0 ? (
         <Text style={styles.line}>{t("Henüz kişi eklenmedi")}</Text>
@@ -123,12 +150,7 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
           {groups.map(([label, count]) => {
             const share = count / total;
             return (
-              <View
-                key={label}
-                style={styles.groupRow}
-                accessible
-                accessibilityLabel={t("{circle}: {count} kişi, yüzde {pct}", { circle: tv(label), count, pct: Math.round(share * 100) })}
-              >
+              <View key={label} style={styles.groupRow} accessible accessibilityLabel={t("{circle}: {count} kişi, yüzde {pct}", { circle: tv(label), count, pct: Math.round(share * 100) })}>
                 <Text style={styles.groupLabel} numberOfLines={1}>{tv(label)}</Text>
                 <View style={styles.groupTrack}>
                   <View style={[styles.groupFill, { width: `${Math.round(share * 100)}%` }]} />
@@ -139,47 +161,41 @@ export default function ProfileInsights({ contacts, threshold, weeklyGoal, onOpe
           })}
         </View>
       )}
+    </>
+  );
+}
 
-      {/* ── Son 30 günde iletişim ── */}
-      <RecencyCard r={recency} />
-
-      {/* ── Yazılı analiz ── */}
-      <Analysis facts={facts} />
-
-      {/* ── Yaklaşan görüşmeler ── */}
-      <Text style={styles.title} accessibilityRole="header">{t("Yaklaşan görüşmeler")}</Text>
-      {upcoming.length === 0 ? (
-        <Text style={styles.line}>{t("Önümüzdeki 7 gün için hatırlatma yok")}</Text>
-      ) : (
-        <View style={styles.timeline}>
-          {upcoming.slice(0, MAX_TIMELINE).map(({ c, date, due }, i, arr) => (
-            <TouchableOpacity
-              key={c.id ?? c.fullName}
-              style={styles.tlRow}
-              onPress={() => onOpenPerson(c)}
-              accessibilityRole="button"
-              accessibilityLabel={`${dateLabel(date, due)}, ${c.fullName}`}
-            >
-              <Text style={[styles.tlDate, due && styles.tlDateDue]}>{dateLabel(date, due)}</Text>
-              <View style={styles.tlRail}>
-                <View style={[styles.tlDot, due && styles.tlDotDue]} />
-                {i < arr.length - 1 ? <View style={styles.tlLine} /> : null}
-              </View>
-              <Avatar name={c.fullName} avatarId={c.avatarId} size={32} />
-              <Text style={styles.tlName} numberOfLines={1}>{c.fullName}</Text>
-            </TouchableOpacity>
-          ))}
-          {upcoming.length > MAX_TIMELINE ? (
-            <Text style={styles.more}>{t("+{count} kişi daha", { count: upcoming.length - MAX_TIMELINE })}</Text>
-          ) : null}
-        </View>
-      )}
+/** Yaklaşan görüşmeler as a timeline (optionally one day only). */
+export function UpcomingList({ upcoming, onOpenPerson, emptyText }: { upcoming: Upcoming[]; onOpenPerson: (c: ContactForm) => void; emptyText?: string }) {
+  if (upcoming.length === 0) return <Text style={styles.line}>{emptyText ?? t("Önümüzdeki 7 gün için hatırlatma yok")}</Text>;
+  return (
+    <View style={styles.timeline}>
+      {upcoming.slice(0, MAX_TIMELINE).map(({ c, date, due }, i, arr) => (
+        <TouchableOpacity
+          key={c.id ?? c.fullName}
+          style={styles.tlRow}
+          onPress={() => onOpenPerson(c)}
+          accessibilityRole="button"
+          accessibilityLabel={`${dateLabel(date, due)}, ${c.fullName}`}
+        >
+          <Text style={[styles.tlDate, due && styles.tlDateDue]}>{dateLabel(date, due)}</Text>
+          <View style={styles.tlRail}>
+            <View style={[styles.tlDot, due && styles.tlDotDue]} />
+            {i < arr.length - 1 ? <View style={styles.tlLine} /> : null}
+          </View>
+          <Avatar name={c.fullName} avatarId={c.avatarId} size={32} />
+          <Text style={styles.tlName} numberOfLines={1}>{c.fullName}</Text>
+        </TouchableOpacity>
+      ))}
+      {upcoming.length > MAX_TIMELINE ? (
+        <Text style={styles.more}>{t("+{count} kişi daha", { count: upcoming.length - MAX_TIMELINE })}</Text>
+      ) : null}
     </View>
   );
 }
 
 /** Everyone in one of three groups by their latest completed catch-up. */
-function RecencyCard({ r }: { r: ReturnType<typeof contactRecency> }) {
+export function RecencyCard({ r }: { r: ReturnType<typeof contactRecency> }) {
   const hasHistory = r.recent + r.older > 0;
   const segs = [
     { n: r.recent, style: styles.segRecent },
@@ -228,7 +244,9 @@ function LegendRow({ style, text }: { style: object; text: string }) {
 }
 
 /** A few plain sentences about the data, shown only when there is something to say. */
-function Analysis({ facts }: { facts: ReturnType<typeof insightFacts> }) {
+export function Analysis({ facts }: { facts: ReturnType<typeof insightFacts> }) {
+  // The first two sentences show; the rest open on demand.
+  const [open, setOpen] = useState(false);
   const fmt = (n: number) => n.toLocaleString(locale(), { maximumFractionDigits: 1 });
   const items: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [];
   if (facts.trend) {
@@ -277,15 +295,22 @@ function Analysis({ facts }: { facts: ReturnType<typeof insightFacts> }) {
     });
   }
   if (items.length === 0) return null;
+  const shown = open ? items : items.slice(0, 2);
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle} accessibilityRole="header">{t("Yazılı analiz")}</Text>
-      {items.map((it, i) => (
+      {shown.map((it, i) => (
         <View key={i} style={styles.analysisRow}>
           <Ionicons name={it.icon} size={16} color={colors.primary} style={{ marginTop: 2 }} />
           <Text style={styles.analysisText}>{it.text}</Text>
         </View>
       ))}
+      {items.length > 2 ? (
+        <TouchableOpacity onPress={() => setOpen(!open)} style={styles.cardLink} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+          <Text style={styles.cardLinkText}>{open ? t("Daha az göster") : t("Tümünü göster ({count})", { count: items.length })}</Text>
+          <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -302,7 +327,6 @@ function dateLabel(iso: string, due: boolean): string {
 const card = { backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border } as const;
 
 const styles = StyleSheet.create({
-  wrap: { gap: 8 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text, marginTop: 16 },
   line: { fontSize: 14, lineHeight: 20, color: colors.textSub },
   label: { fontSize: 14, lineHeight: 20, fontWeight: "500", color: colors.text },
@@ -310,6 +334,11 @@ const styles = StyleSheet.create({
 
   card: { ...card, padding: 14, gap: 8 },
   cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.text },
+  cardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" },
+  cardLink: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 32 },
+  cardLinkText: { fontSize: 13, lineHeight: 18, fontWeight: "600", color: colors.primary },
+  dayBar: { width: "48%", maxWidth: 28, borderRadius: 6 },
+  barEmpty: { backgroundColor: colors.borderLight },
   goalHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
   goalValue: { fontSize: 16, lineHeight: 22, fontWeight: "600", color: colors.primary, fontVariant: ["tabular-nums"] },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.borderLight, overflow: "hidden" },
