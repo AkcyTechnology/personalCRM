@@ -4,7 +4,7 @@ type Asset = number;
 /** Painted planets for the Universe map. The sun is you. */
 export const SUN: Asset = require("../../assets/universe/sun.webp");
 /** Matches the night-sky GIF's darkest tone (tab bar backdrop on the Universe tab). */
-export const SPACE_BASE = "#101A4A";
+export const SPACE_BASE = "#060A1E";
 export const SPACE_BG: Asset = require("../../assets/universe/space.gif");
 
 const PLANETS = {

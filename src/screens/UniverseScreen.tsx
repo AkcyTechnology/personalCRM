@@ -29,6 +29,7 @@ import { radius } from "../theme/radius";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import { SUN, SPACE_BG, SPACE_BASE, PLANET_TINT, assignPlanets, planetImage, type PlanetKey } from "../data/planets";
 import { consumeGlow } from "../app/glow";
+import SpaceViewport from "../components/SpaceViewport";
 import { t, tv } from "../i18n";
 
 const MAX_CLUSTERS = 8;
@@ -98,6 +99,8 @@ export default function UniverseScreen({ navigation }: { navigation: any }) {
     <View style={styles.screen}>
       {/* Night sky: a softly animated GIF, still when Reduce Motion is on. */}
       <Image source={SPACE_BG} style={StyleSheet.absoluteFill} contentFit="cover" autoplay={!reduceMotion} accessible={false} />
+      {/* Deeper space: darken the sky, more at the edges. */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(2,4,16,0.55)" }]} />
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title} accessibilityRole="header">{t("Evrenin")}</Text>
         <TouchableOpacity
@@ -155,8 +158,9 @@ function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMoti
     return () => { loop.stop(); turn.stop(); };
   }, [float, spin, reduceMotion]);
 
-  const canvasW = width;
-  const canvasH = Math.max(440, Math.min(height * 0.64, width * 1.35));
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const canvasW = box?.w ?? width;
+  const canvasH = Math.max(360, box?.h ?? height * 0.6);
   const map = useMemo(
     () => (contacts ? layout(contacts, threshold, canvasW, canvasH) : null),
     [contacts, threshold, canvasW, canvasH]
@@ -182,7 +186,10 @@ function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMoti
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      {box ? (
+      <SpaceViewport width={canvasW} height={canvasH} reduceMotion={reduceMotion}>
       <View style={{ width: canvasW, height: canvasH }}>
         <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFill}>
           {map.orbits.map((r) => (
@@ -274,9 +281,12 @@ function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMoti
           );
         })}
       </View>
+      </SpaceViewport>
+      ) : null}
+      </View>
 
       {/* Legend / planet filter */}
-      <View style={styles.legend}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.legend}>
         {map.hubs.map((hub, i) => {
           const active = focusCluster === i;
           return (
@@ -293,7 +303,7 @@ function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMoti
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.hintRow}>
         <View style={styles.hintItem}><View style={[styles.hintDot, { borderColor: colors.success }]} /><Text style={styles.hintText}>{t("Güçlü bağ")}</Text></View>
@@ -318,7 +328,7 @@ function UniverseMap({ navigation, reduceMotion }: { navigation: any; reduceMoti
           if (target) logMoment(target, type, note, date, () => loadContacts().then(setContacts));
         }}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -436,7 +446,7 @@ const styles = StyleSheet.create({
   planetHit: { alignItems: "center", minWidth: 48, minHeight: 48 },
   planetLabel: { marginTop: 2, fontSize: 12, lineHeight: 16, fontWeight: "600", color: SKY.text, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, maxWidth: PLANET + 40 },
   nodeWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  legend: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 20, marginTop: 8 },
+  legend: { flexDirection: "row", gap: 8, paddingHorizontal: 20, paddingTop: 10 },
   legendChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -449,7 +459,7 @@ const styles = StyleSheet.create({
     backgroundColor: SKY.chip,
   },
   legendText: { fontSize: 13, fontWeight: "500", color: SKY.text },
-  hintRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, paddingHorizontal: 20, marginTop: 14 },
+  hintRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, paddingHorizontal: 20, paddingVertical: 10 },
   hintItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   hintDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3 },
   hintText: { fontSize: 13, color: SKY.sub, fontWeight: "500" },

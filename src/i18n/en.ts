@@ -1202,4 +1202,9 @@ export const en: Record<string, string | [string, string]> = {
   "Ayın ritmi: {list}": "Rhythm of the month: {list}",
   "Ayın ritmi": "Rhythm of the month",
   "{n}. hf": "Wk {n}",
+  "Kara delik": "Black hole",
+  "Yakınlaştır": "Zoom in",
+  "Uzaklaştır": "Zoom out",
+  "Ortala": "Centre",
+  "Kaydır · iki parmakla yakınlaştır": "Drag · pinch to zoom",
 };
