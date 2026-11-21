@@ -26,7 +26,9 @@ export async function canUseAppLockAsync(): Promise<boolean> {
 
 export async function authenticateAsync(reason?: string): Promise<boolean> {
   const LA = getModule();
-  if (!LA) return true;
+  // Fail closed: if the native module is missing on a phone, the lock stays
+  // shut instead of opening. Web has no app lock.
+  if (!LA) return Platform.OS === "web";
   try {
     const result = await LA.authenticateAsync({
       promptMessage: reason ?? t("Connectly'nin kilidini aç"),

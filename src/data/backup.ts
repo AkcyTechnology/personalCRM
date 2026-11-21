@@ -9,7 +9,7 @@ import { isDuplicateContact } from "../utils/duplicateContact";
 import { todayISO } from "../utils/dates";
 import { resetAnalytics } from "../utils/analytics";
 import { t } from "../i18n";
-import { isKnownAvatar } from "./avatars";
+import { sanitizeContacts, sanitizePortableSettings } from "./sanitize";
 import { decryptBackupText, encryptBackupText, isEncryptedBackup, WrongPasswordError } from "./backupCrypto";
 
 const FORMAT = "connectly-backup";
@@ -57,57 +57,18 @@ export function parseBackup(text: string): BackupFile {
   if (typeof obj.version !== "number" || obj.version > VERSION) {
     throw new Error(t("Bu yedek daha yeni bir uygulama sürümüyle oluşturulmuş."));
   }
-  const str = (v: unknown, max = 2000) => (typeof v === "string" ? v.slice(0, max) : "");
-  const contacts: ContactForm[] = obj.contacts
-    .filter((c): c is ContactForm => !!c && typeof c === "object" && typeof (c as ContactForm).fullName === "string" && !!(c as ContactForm).fullName.trim())
-    .slice(0, 10_000)
-    .map((c) => ({
-      ...c,
-      id: typeof c.id === "string" ? c.id : undefined,
-      fullName: str(c.fullName, 200),
-      company: str(c.company, 200),
-      jobTitle: str(c.jobTitle, 200),
-      birthday: str(c.birthday, 20),
-      relationship: str(c.relationship, 100),
-      metWhere: str(c.metWhere, 200),
-      phone: str(c.phone, 40),
-      email: str(c.email, 200),
-      website: str(c.website, 500),
-      instagram: str(c.instagram, 200),
-      city: str(c.city, 200),
-      socials: Array.isArray(c.socials)
-        ? c.socials.filter((s) => s && typeof s.platform === "string" && typeof s.handle === "string").slice(0, 20)
-        : [],
-      tags: str(c.tags, 500),
-      priority: str(c.priority, 50),
-      lastContactDate: str(c.lastContactDate, 30),
-      reminderFreq: str(c.reminderFreq, 50),
-      notes: str(c.notes, 20_000),
-      reminderIntervalDays: typeof c.reminderIntervalDays === "number" && c.reminderIntervalDays > 0 ? Math.round(c.reminderIntervalDays) : undefined,
-      avatarId: isKnownAvatar(c.avatarId) ? c.avatarId : undefined,
-      deviceContactId: typeof c.deviceContactId === "string" ? c.deviceContactId.slice(0, 200) : undefined,
-      extraPhones: Array.isArray(c.extraPhones) ? c.extraPhones.filter((p) => typeof p === "string").map((p) => p.slice(0, 40)).slice(0, 10) : undefined,
-      reminders: Array.isArray(c.reminders)
-        ? c.reminders
-            .filter((r) => r && typeof r.id === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) && /^\d{2}:\d{2}$/.test(String(r.time)))
-            .map((r) => ({ id: r.id, date: r.date, time: r.time, note: str(r.note, 500), done: r.done === true }))
-            .slice(0, 200)
-        : undefined,
-      specialDays: Array.isArray(c.specialDays)
-        ? c.specialDays
-            // Fixed-length groups, no nesting: linear time, not a ReDoS risk.
-            // eslint-disable-next-line security/detect-unsafe-regex
-            .filter((d) => d && typeof d.id === "string" && /^\d{2}\/\d{2}(\/\d{4})?$/.test(String(d.date)))
-            .map((d) => ({ id: d.id, label: str(d.label, 80), date: d.date }))
-            .slice(0, 50)
-        : undefined,
-      interactions: Array.isArray(c.interactions)
-        ? c.interactions
-            .filter((i) => i && typeof i.id === "string" && typeof i.date === "string" && typeof i.type === "string")
-            .map((i) => ({ ...i, note: typeof i.note === "string" ? i.note.slice(0, 5000) : undefined }))
-        : [],
-    }));
-  return { ...(obj as BackupFile), contacts };
+  // Only known, well-typed fields; capped lists; unique ids (see sanitize.ts).
+  const contacts = sanitizeContacts(obj.contacts);
+  return {
+    format: FORMAT,
+    version: obj.version,
+    exportedAt: typeof obj.exportedAt === "string" ? obj.exportedAt.slice(0, 40) : "",
+    contacts,
+    settings: sanitizePortableSettings(obj.settings),
+    customRelationships: Array.isArray(obj.customRelationships)
+      ? obj.customRelationships.filter((l): l is string => typeof l === "string" && !!l.trim()).map((l) => l.slice(0, 60)).slice(0, 100)
+      : [],
+  };
 }
 
 export type BackupText = { text: string; count: number; encrypted: boolean };
@@ -202,7 +163,8 @@ export async function restoreBackupAsync(backup: BackupFile, mode: "merge" | "re
     await loadContacts();
     if (backup.settings) {
       const current = await loadSettings();
-      await saveSettings({ ...current, ...backup.settings, appLockEnabled: current.appLockEnabled });
+      // Privacy and security choices always stay this phone's own.
+      await saveSettings({ ...current, ...sanitizePortableSettings(backup.settings) });
     }
     return backup.contacts.length;
   }

@@ -77,10 +77,20 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const hidden = locked || (!!enabled && covered);
+
   return (
     <View style={{ flex: 1 }}>
-      {children}
-      {(locked || (enabled && covered)) && (
+      {/* While locked, screen readers must not reach the content underneath. */}
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={hidden}
+        importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+        aria-hidden={hidden}
+      >
+        {children}
+      </View>
+      {hidden && (
         <View style={[StyleSheet.absoluteFill, styles.cover]}>
           <View style={styles.iconWrap}>
             <Ionicons name="lock-closed" size={34} color={colors.primary} />

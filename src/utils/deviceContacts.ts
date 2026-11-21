@@ -49,16 +49,24 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
+/**
+ * Address-book text is not ours: a shared contact card can carry huge or
+ * odd values. Trim, drop control characters and cap the length.
+ */
+function clean(v: string | undefined | null, max: number): string {
+  return (v ?? "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
+}
+
 function map(c: LegacyContacts.ExistingContact, i = 0): DeviceContact {
   const b = c.birthday;
   return {
-    id: c.id ?? String(i),
-    name: (c.name ?? [c.firstName, c.lastName].filter(Boolean).join(" ")).trim(),
-    phone: c.phoneNumbers?.[0]?.number?.trim() ?? "",
-    phones: [...new Set((c.phoneNumbers ?? []).map((p) => p.number?.trim() ?? "").filter(Boolean))],
-    email: c.emails?.[0]?.email?.trim() ?? "",
-    company: c.company?.trim() ?? "",
-    jobTitle: c.jobTitle?.trim() ?? "",
+    id: clean(c.id ?? String(i), 200),
+    name: clean(c.name ?? [c.firstName, c.lastName].filter(Boolean).join(" "), 200),
+    phone: clean(c.phoneNumbers?.[0]?.number, 40),
+    phones: [...new Set((c.phoneNumbers ?? []).map((p) => clean(p.number, 40)).filter(Boolean))].slice(0, 10),
+    email: clean(c.emails?.[0]?.email, 200),
+    company: clean(c.company, 200),
+    jobTitle: clean(c.jobTitle, 200),
     birthday:
       b && b.day && b.month !== undefined
         ? `${pad(b.day)}/${pad(b.month + 1)}${b.year ? `/${b.year}` : ""}`

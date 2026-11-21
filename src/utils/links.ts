@@ -24,10 +24,16 @@ export function toSafeWebUrl(input: string): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
   if (!/^https?:\/\//i.test(withScheme)) return null;
   const host = withScheme.replace(/^https?:\/\//i, "").split(/[/?#]/)[0];
-  // Single character class + optional port: linear-time, not a ReDoS risk.
-  // eslint-disable-next-line security/detect-unsafe-regex
-  if (!host || !/^[a-z0-9.-]+(:\d+)?$/i.test(host) || !host.includes(".")) return null;
-  return withScheme;
+  return isValidHost(host) ? withScheme : null;
+}
+
+/** A real host name with at least two labels ("ornek.com"), optional port; no "..", no empty labels, no user info. */
+function isValidHost(host: string): boolean {
+  if (!host || host.length > 260 || host.includes("@")) return false;
+  const [name, port, extra] = host.split(":");
+  if (extra !== undefined || (port !== undefined && !/^\d{1,5}$/.test(port))) return false;
+  const labels = name.split(".");
+  return labels.length >= 2 && labels.every((l) => /^[a-z0-9-]{1,63}$/i.test(l) && !l.startsWith("-") && !l.endsWith("-"));
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
