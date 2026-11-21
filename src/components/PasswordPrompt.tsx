@@ -13,6 +13,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import { MIN_PASSWORD_LENGTH } from "../data/backupCrypto";
+import type { TextInputInstance } from "react-native";
 import { t } from "../i18n";
 
 type Options = {
@@ -48,7 +49,7 @@ export default function PasswordPromptHost() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const againRef = useRef<TextInput>(null);
+  const againRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     open = (r) => {
@@ -95,7 +96,7 @@ export default function PasswordPromptHost() {
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => !busy && close(false)}>
+    <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) close(false); }}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={styles.sheet} accessibilityViewIsModal>
           <View style={styles.icon}>

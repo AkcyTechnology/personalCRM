@@ -11,6 +11,7 @@ import { monthlyStory } from "../utils/engagement";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme/colors";
 import { track } from "../utils/analytics";
+import type { HostInstance } from "react-native";
 import { locale, t, tv } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Story">;
@@ -25,7 +26,7 @@ export default function StoryScreen({ navigation }: Props) {
   const [contacts, setContacts] = useState<ContactForm[]>([]);
   const [offset, setOffset] = useState(0);
   const [showNames, setShowNames] = useState(false);
-  const cardRef = useRef<View>(null);
+  const cardRef = useRef<HostInstance>(null);
 
   useEffect(() => {
     loadContacts().then(setContacts);

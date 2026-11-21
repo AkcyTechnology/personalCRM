@@ -409,7 +409,7 @@ export default function PeopleScreen({ navigation, route }: { navigation: any; r
           ListHeaderComponent={
             filterCount > 0 || quick !== "all" || query ? (
               <Text style={styles.resultMeta}>{t("{count} kişi gösteriliyor", { count: list.length })}</Text>
-            ) : null
+            ) : undefined
           }
           renderItem={({ item, index }) => {
             const row = (

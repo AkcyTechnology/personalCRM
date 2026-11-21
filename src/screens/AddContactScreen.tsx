@@ -370,7 +370,7 @@ export default function AddContactScreen({ navigation }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <StatusBar barStyle={colorScheme() === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
+      <StatusBar barStyle={colorScheme() === "dark" ? "light-content" : "dark-content"} />
 
       {/* App bar */}
       <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>

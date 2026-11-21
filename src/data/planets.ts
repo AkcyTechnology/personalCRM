@@ -1,10 +1,11 @@
-import type { ImageSourcePropType } from "react-native";
+/** A bundled image (the number `require` returns), usable by RN and expo-image. */
+type Asset = number;
 
 /** Painted planets for the Universe map. The sun is you. */
-export const SUN: ImageSourcePropType = require("../../assets/universe/sun.webp");
+export const SUN: Asset = require("../../assets/universe/sun.webp");
 /** Matches the night-sky GIF's darkest tone (tab bar backdrop on the Universe tab). */
 export const SPACE_BASE = "#101A4A";
-export const SPACE_BG: ImageSourcePropType = require("../../assets/universe/space.gif");
+export const SPACE_BG: Asset = require("../../assets/universe/space.gif");
 
 const PLANETS = {
   leafy: require("../../assets/universe/leafy.webp"),
@@ -17,7 +18,7 @@ const PLANETS = {
   "ringed-pink": require("../../assets/universe/ringed-pink.webp"),
   "leafy-teal": require("../../assets/universe/leafy-teal.webp"),
   "moon-mint": require("../../assets/universe/moon-mint.webp"),
-} as const satisfies Record<string, ImageSourcePropType>;
+} as const satisfies Record<string, Asset>;
 
 export type PlanetKey = keyof typeof PLANETS;
 
@@ -70,6 +71,6 @@ export function assignPlanets(labels: string[]): PlanetKey[] {
   });
 }
 
-export function planetImage(key: PlanetKey): ImageSourcePropType {
+export function planetImage(key: PlanetKey): Asset {
   return PLANETS[key];
 }

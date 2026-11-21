@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import type { TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "../screens/AddContactScreen";
@@ -38,7 +39,7 @@ type Props = {
  */
 export default function HelloSheet({ visible, contact, onClose }: Props) {
   const insets = useSafeAreaInsets();
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const [draft, setDraft] = useState<HelloDraft>({ text: "", fromSuggestion: null });
   // Shown on the button itself: a toast would sit behind this modal on phones.
   const [copied, setCopied] = useState(false);
