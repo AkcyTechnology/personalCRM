@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ContactForm } from "../screens/AddContactScreen";
 import Avatar from "./Avatar";
+import BadgeMedal, { type MedalId } from "./BadgeMedal";
 import { AddSheet } from "./ContactReminders";
 import { showToast } from "./Toast";
 import { INTERACTION_TYPES } from "./LogInteractionModal";
@@ -264,14 +265,12 @@ export function BadgeRow({ items, onOpen }: { items: Badge[]; onOpen: (b: Badge)
       {items.map((b) => (
         <TouchableOpacity
           key={b.id}
-          style={[s.badge, b.earned ? s.badgeOn : s.badgeOff]}
+          style={s.badge}
           onPress={() => onOpen(b)}
           accessibilityRole="button"
           accessibilityLabel={`${t(b.title)}, ${t(b.goal)}, ${b.earned ? t("kazanıldı") : t("henüz kazanılmadı")}`}
         >
-          <View style={[s.badgeIcon, !b.earned && s.badgeIconOff]}>
-            <Ionicons name={b.icon as IconName} size={22} color={b.earned ? colors.primary : colors.textMuted} />
-          </View>
+          <BadgeMedal id={b.id as MedalId} earned={b.earned} size={76} />
           <Text style={[s.badgeTitle, !b.earned && s.badgeTextOff]} numberOfLines={1}>{t(b.title)}</Text>
           <Text style={s.badgeGoal} numberOfLines={1}>{t(b.goal)}</Text>
         </TouchableOpacity>
@@ -356,11 +355,7 @@ const s = StyleSheet.create({
 
   bleed: { marginHorizontal: -20 },
   badgeRow: { paddingHorizontal: 20, gap: 10 },
-  badge: { width: 104, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 8, alignItems: "center", gap: 4 },
-  badgeOn: { backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder },
-  badgeOff: { backgroundColor: colors.borderLight, borderWidth: 1, borderColor: colors.border },
-  badgeIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, marginBottom: 4 },
-  badgeIconOff: { opacity: 0.7 },
+  badge: { width: 92, paddingVertical: 4, alignItems: "center", gap: 2 },
   badgeTitle: { fontSize: 14, lineHeight: 18, fontWeight: "700", color: colors.text },
   badgeTextOff: { color: colors.textSub },
   badgeGoal: { fontSize: 12, lineHeight: 16, color: colors.textSub },

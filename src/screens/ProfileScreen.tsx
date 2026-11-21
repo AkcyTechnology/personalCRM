@@ -12,6 +12,7 @@ import { hasAnyHistory, weekStats } from "../utils/stats";
 import { badges, currentWeek, dailyPeople, nextDays, firstNameOf, recentMoments, trName, type Badge } from "../utils/homeData";
 import Avatar from "../components/Avatar";
 import HelloSheet from "../components/HelloSheet";
+import BadgeMedal, { type MedalId } from "../components/BadgeMedal";
 import { SUN_AVATAR } from "../data/avatars";
 import {
   ActivityCard,
@@ -256,7 +257,10 @@ export default function ProfileScreen({ navigation }: any) {
       <InfoSheet visible={!!badge} title={badge ? t(badge.title) : ""} onClose={() => setBadge(null)}>
         {badge ? (
           <>
-            <Text style={styles.body}>{t(badge.goal)}</Text>
+            <View style={{ alignItems: "center" }}>
+              <BadgeMedal id={badge.id as MedalId} earned={badge.earned} size={132} />
+            </View>
+            <Text style={[styles.body, { textAlign: "center" }]}>{t(badge.goal)}</Text>
             <View style={styles.badgeTrack}>
               <View style={[styles.badgeFill, { width: `${Math.round(badge.progress * 100)}%` }]} />
             </View>
